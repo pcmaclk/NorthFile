@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI;
+using System.Threading;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -39,6 +40,8 @@ namespace FileExplorerUI
         private string _currentQuery = string.Empty;
         private readonly string _engineVersion;
         private RustUsnCapability _usnCapability;
+        private FileSystemWatcher? _dirWatcher;
+        private CancellationTokenSource? _watcherDebounceCts;
 
         public MainWindow()
         {
@@ -191,6 +194,7 @@ namespace FileExplorerUI
         {
             _currentPath = string.IsNullOrWhiteSpace(PathTextBox.Text) ? @"C:\" : PathTextBox.Text.Trim();
             UpdateUsnCapability(_currentPath);
+            ConfigureDirectoryWatcher(_currentPath);
             EnsureRefreshFallbackInvalidation(_currentPath, "manual_load");
             _currentPageSize = InitialPageSize;
             _lastFetchMs = 0;
@@ -371,6 +375,96 @@ namespace FileExplorerUI
             {
                 _usnCapability = default;
             }
+        }
+
+        private void ConfigureDirectoryWatcher(string path)
+        {
+            _dirWatcher?.Dispose();
+            _dirWatcher = null;
+
+            // Week4 MVP: when USN is unavailable, consume incremental changes via watcher.
+            if (_usnCapability.available != 0)
+            {
+                return;
+            }
+            if (!Directory.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                var watcher = new FileSystemWatcher(path)
+                {
+                    IncludeSubdirectories = false,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                    EnableRaisingEvents = true,
+                };
+
+                watcher.Changed += Watcher_OnChanged;
+                watcher.Created += Watcher_OnChanged;
+                watcher.Deleted += Watcher_OnChanged;
+                watcher.Renamed += Watcher_OnRenamed;
+                _dirWatcher = watcher;
+            }
+            catch
+            {
+                // Non-fatal: we can still rely on manual refresh + TTL.
+            }
+        }
+
+        private void Watcher_OnChanged(object sender, FileSystemEventArgs e)
+        {
+            ScheduleIncrementalRefreshFromWatcher("changed");
+        }
+
+        private void Watcher_OnRenamed(object sender, RenamedEventArgs e)
+        {
+            ScheduleIncrementalRefreshFromWatcher("renamed");
+        }
+
+        private void ScheduleIncrementalRefreshFromWatcher(string reason)
+        {
+            string snapPath = _currentPath;
+            _watcherDebounceCts?.Cancel();
+            _watcherDebounceCts = new CancellationTokenSource();
+            CancellationToken token = _watcherDebounceCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(250, token);
+                    if (token.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    _ = DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (!string.Equals(snapPath, _currentPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return;
+                        }
+
+                        try
+                        {
+                            RustBatchInterop.MarkPathChanged(_currentPath);
+                        }
+                        catch
+                        {
+                            // Ignore mark failures; background refresh will still attempt to recover.
+                        }
+
+                        EnsureRefreshFallbackInvalidation(_currentPath, $"watcher_{reason}");
+                        _ = RefreshCurrentDirectoryInBackgroundAsync();
+                    });
+                }
+                catch (TaskCanceledException)
+                {
+                    // Ignore debounce cancellation.
+                }
+            });
         }
 
         private static string DescribeUsnCapability(RustUsnCapability c)
@@ -591,6 +685,7 @@ namespace FileExplorerUI
             try
             {
                 UpdateUsnCapability(_currentPath);
+                ConfigureDirectoryWatcher(_currentPath);
                 EnsureRefreshFallbackInvalidation(_currentPath, "background_refresh");
                 await LoadPageAsync(_currentPath, cursor: 0, append: false);
             }
