@@ -38,6 +38,7 @@ namespace FileExplorerUI
         private readonly Stack<string> _backStack = new();
         private string _currentQuery = string.Empty;
         private readonly string _engineVersion;
+        private RustUsnCapability _usnCapability;
 
         public MainWindow()
         {
@@ -189,15 +190,8 @@ namespace FileExplorerUI
         private async Task LoadFirstPageAsync()
         {
             _currentPath = string.IsNullOrWhiteSpace(PathTextBox.Text) ? @"C:\" : PathTextBox.Text.Trim();
-            // Manual load acts as an explicit refresh signal.
-            try
-            {
-                RustBatchInterop.InvalidateMemoryDirectory(_currentPath);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatus($"Path: {_currentPath} | Invalidate warning: {ex.Message}");
-            }
+            UpdateUsnCapability(_currentPath);
+            EnsureRefreshFallbackInvalidation(_currentPath, "manual_load");
             _currentPageSize = InitialPageSize;
             _lastFetchMs = 0;
             UpdateBreadcrumbs(_currentPath);
@@ -286,10 +280,11 @@ namespace FileExplorerUI
                 string hitInfo = page.ScannedEntries > 0
                     ? $" | Match: {page.MatchedEntries}/{page.ScannedEntries} ({(page.MatchedEntries * 100.0 / page.ScannedEntries):F1}%)"
                     : string.Empty;
+                string usnInfo = $" | USN: {DescribeUsnCapability(_usnCapability)}";
 
                 this.AppWindow.Title = $"连接:{_statusCode} 项:{_entries.Count}";
                 UpdateStatus(
-                    $"Path: {path}{searchInfo}{hitInfo} | Loaded: {page.Rows.Count} | Total: {_totalEntries} | Source: {source} | HasMore: {_hasMore} | NextCursor: {_nextCursor} | Fetch: {sw.ElapsedMilliseconds}ms | Batch: {_currentPageSize}"
+                    $"Path: {path}{searchInfo}{hitInfo}{usnInfo} | Loaded: {page.Rows.Count} | Total: {_totalEntries} | Source: {source} | HasMore: {_hasMore} | NextCursor: {_nextCursor} | Fetch: {sw.ElapsedMilliseconds}ms | Batch: {_currentPageSize}"
                 );
                 LogPerfSnapshot(
                     mode: string.IsNullOrWhiteSpace(_currentQuery) ? "browse" : "search",
@@ -303,7 +298,8 @@ namespace FileExplorerUI
                     fetchMs: sw.ElapsedMilliseconds,
                     batch: _currentPageSize,
                     hasMore: _hasMore,
-                    nextCursor: _nextCursor
+                    nextCursor: _nextCursor,
+                    usn: DescribeUsnCapability(_usnCapability)
                 );
             }
             catch (Exception ex)
@@ -336,14 +332,66 @@ namespace FileExplorerUI
             long fetchMs,
             uint batch,
             bool hasMore,
-            ulong nextCursor
+            ulong nextCursor,
+            string usn
         )
         {
             double hitRate = scanned > 0 ? matched * 100.0 / scanned : 0.0;
             string q = string.IsNullOrWhiteSpace(query) ? "-" : query;
             Debug.WriteLine(
-                $"[PERF] mode={mode} path=\"{path}\" query=\"{q}\" source={source} loaded={loaded} total={total} scanned={scanned} matched={matched} hit={hitRate:F1}% fetch_ms={fetchMs} batch={batch} has_more={hasMore} next={nextCursor}"
+                $"[PERF] mode={mode} path=\"{path}\" query=\"{q}\" source={source} loaded={loaded} total={total} scanned={scanned} matched={matched} hit={hitRate:F1}% fetch_ms={fetchMs} batch={batch} has_more={hasMore} next={nextCursor} usn={usn}"
             );
+        }
+
+        private void EnsureRefreshFallbackInvalidation(string path, string reason)
+        {
+            // Week4 strategy: if USN capability is unavailable, force invalidate to keep consistency.
+            if (_usnCapability.available != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                RustBatchInterop.InvalidateMemoryDirectory(path);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Path: {path} | Invalidate warning({reason}): {ex.Message}");
+            }
+        }
+
+        private void UpdateUsnCapability(string path)
+        {
+            try
+            {
+                _usnCapability = RustBatchInterop.ProbeUsnCapability(path);
+            }
+            catch
+            {
+                _usnCapability = default;
+            }
+        }
+
+        private static string DescribeUsnCapability(RustUsnCapability c)
+        {
+            if (c.error_code != 0)
+            {
+                return $"Error({c.error_code})";
+            }
+            if (c.available != 0)
+            {
+                return "Available";
+            }
+            if (c.is_ntfs_local == 0)
+            {
+                return "NotNTFS";
+            }
+            if (c.access_denied != 0)
+            {
+                return "Denied";
+            }
+            return "Unavailable";
         }
 
         private static uint ClampPageSize(uint suggested, uint fallback)
@@ -542,7 +590,8 @@ namespace FileExplorerUI
         {
             try
             {
-                RustBatchInterop.InvalidateMemoryDirectory(_currentPath);
+                UpdateUsnCapability(_currentPath);
+                EnsureRefreshFallbackInvalidation(_currentPath, "background_refresh");
                 await LoadPageAsync(_currentPath, cursor: 0, append: false);
             }
             catch

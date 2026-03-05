@@ -6,6 +6,7 @@ pub mod memory;
 pub mod ntfs;
 pub mod search;
 pub mod traditional;
+pub mod usn;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn test_connection() -> i32 {

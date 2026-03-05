@@ -15,6 +15,7 @@ use crate::ntfs::{
 };
 use crate::search::Matcher;
 use crate::traditional::{list_directory_all, list_directory_page};
+use crate::usn::{clear_usn_capability_cache, probe_usn_capability_cached};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -759,7 +760,29 @@ pub extern "C" fn fe_memory_invalidate_dir(path_utf8: *const c_char) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn fe_memory_clear_cache() -> i32 {
-    match clear_memory_cache() {
+    let mem = clear_memory_cache();
+    let usn = clear_usn_capability_cache();
+    match (mem, usn) {
+        (Ok(_), Ok(_)) => 0,
+        (Err(e), _) => e.code as i32,
+        (_, Err(e)) => e.code as i32,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn fe_usn_mark_path_changed(path_utf8: *const c_char) -> i32 {
+    if path_utf8.is_null() {
+        return 1001;
+    }
+
+    // SAFETY: path_utf8 must be a valid null-terminated C string from caller.
+    let c_path = unsafe { CStr::from_ptr(path_utf8) };
+    let path_str = match c_path.to_str() {
+        Ok(v) => v,
+        Err(_) => return 1001,
+    };
+
+    match invalidate_directory_cache(Path::new(path_str)) {
         Ok(_) => 0,
         Err(e) => e.code as i32,
     }
@@ -961,3 +984,56 @@ pub extern "C" fn fe_ntfs_list_index_root(
         SOURCE_NTFS_INDEX_ROOT,
     )
 }
+
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct FfiUsnCapability {
+    pub is_ntfs_local: u8,
+    pub can_open_volume: u8,
+    pub access_denied: u8,
+    pub available: u8,
+    pub error_code: i32,
+}
+
+impl FfiUsnCapability {
+    fn ok(v: crate::usn::UsnCapability) -> Self {
+        Self {
+            is_ntfs_local: if v.is_ntfs_local { 1 } else { 0 },
+            can_open_volume: if v.can_open_volume { 1 } else { 0 },
+            access_denied: if v.access_denied { 1 } else { 0 },
+            available: if v.available { 1 } else { 0 },
+            error_code: 0,
+        }
+    }
+
+    fn err(code: i32) -> Self {
+        Self {
+            is_ntfs_local: 0,
+            can_open_volume: 0,
+            access_denied: 0,
+            available: 0,
+            error_code: code,
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn fe_usn_probe_volume(path_utf8: *const c_char) -> FfiUsnCapability {
+    if path_utf8.is_null() {
+        return FfiUsnCapability::err(1001);
+    }
+
+    // SAFETY: path_utf8 must be a valid null-terminated C string from caller.
+    let c_path = unsafe { CStr::from_ptr(path_utf8) };
+    let path_str = match c_path.to_str() {
+        Ok(v) => v,
+        Err(_) => return FfiUsnCapability::err(1001),
+    };
+
+    match probe_usn_capability_cached(Path::new(path_str)) {
+        Ok(v) => FfiUsnCapability::ok(v),
+        Err(e) => FfiUsnCapability::err(e.code as i32),
+    }
+}
+
