@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="FileExplorerUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:FileExplorerUI"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="FileExplorerUI">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10" Padding="16">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button
+                x:Name="BackButton"
+                VerticalAlignment="Bottom"
+                Click="BackButton_Click"
+                Content="Back" />
+            <Button
+                x:Name="UpButton"
+                VerticalAlignment="Bottom"
+                Click="UpButton_Click"
+                Content="Up" />
+            <TextBox
+                x:Name="PathTextBox"
+                Width="520"
+                Header="Directory Path"
+                KeyDown="PathTextBox_KeyDown"
+                Text="C:\" />
+            <Button
+                x:Name="LoadButton"
+                VerticalAlignment="Bottom"
+                Click="LoadButton_Click"
+                Content="Load" />
+            <Button
+                x:Name="NextButton"
+                VerticalAlignment="Bottom"
+                Click="NextButton_Click"
+                Content="Next Page" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+            <TextBox
+                x:Name="SearchTextBox"
+                Width="220"
+                Header="Search In Current Dir"
+                PlaceholderText="keyword"
+                KeyDown="SearchTextBox_KeyDown" />
+            <Button
+                x:Name="SearchButton"
+                VerticalAlignment="Bottom"
+                Click="SearchButton_Click"
+                Content="Search" />
+            <Button
+                x:Name="ClearSearchButton"
+                VerticalAlignment="Bottom"
+                Click="ClearSearchButton_Click"
+                Content="Clear Search" />
+            <TextBox
+                x:Name="RenameTextBox"
+                Width="260"
+                Header="Rename Selected To"
+                PlaceholderText="new name" />
+            <Button
+                x:Name="RenameButton"
+                VerticalAlignment="Bottom"
+                Click="RenameButton_Click"
+                Content="Rename Selected" />
+            <Button
+                x:Name="DeleteButton"
+                VerticalAlignment="Bottom"
+                Click="DeleteButton_Click"
+                Content="Delete Selected" />
+            <CheckBox
+                x:Name="RecursiveDeleteCheckBox"
+                VerticalAlignment="Bottom"
+                Content="Recursive" />
+        </StackPanel>
+
+        <ScrollViewer
+            Grid.Row="2"
+            HorizontalScrollBarVisibility="Auto"
+            VerticalScrollBarVisibility="Disabled"
+            VerticalAlignment="Center">
+            <ItemsControl
+                x:Name="BreadcrumbItemsControl"
+                ItemsSource="{x:Bind Breadcrumbs, Mode=OneWay}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                        <Button
+                            Click="BreadcrumbButton_Click"
+                            Content="{x:Bind Label}"
+                            Tag="{x:Bind FullPath}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <TextBlock
+            x:Name="StatusTextBlock"
+            Grid.Row="3"
+            TextWrapping="Wrap"
+            Text="Loading..." />
+
+        <ListView
+            x:Name="EntriesListView"
+            Grid.Row="4"
+            IsItemClickEnabled="False"
+            DoubleTapped="EntriesListView_DoubleTapped"
+            Loaded="EntriesListView_Loaded">
+            <ListView.ContextFlyout>
+                <MenuFlyout>
+                    <MenuFlyoutItem
+                        Click="ContextRename_Click"
+                        Text="Rename" />
+                    <MenuFlyoutItem
+                        Click="ContextDelete_Click"
+                        Text="Delete" />
+                    <MenuFlyoutSeparator />
+                    <MenuFlyoutItem
+                        Click="ContextRefresh_Click"
+                        Text="Refresh" />
+                </MenuFlyout>
+            </ListView.ContextFlyout>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Width="60" Text="{Binding Type}" />
+                        <TextBlock Width="420" Text="{Binding Name}" />
+                        <TextBlock Text="{Binding MftRef}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</Window>

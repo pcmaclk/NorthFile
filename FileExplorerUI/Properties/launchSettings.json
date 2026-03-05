@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "FileExplorerUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "FileExplorerUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

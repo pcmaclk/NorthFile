@@ -1,0 +1,28 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.vs/
+*.user
+*.suo
+*.tmp
+
+# Git migration backup
+.git_rust_engine_backup/
+
+# Rust
+**/target/
+**/*.rs.bk
+
+# .NET / WinUI build artifacts
+**/bin/
+**/obj/
+**/TestResults/
+*.appxupload
+*.msixupload
+*.pdb
+
+# Local native copy for UI runtime
+FileExplorerUI/rust_engine.dll
+FileExplorerUI/build_diag.txt
