@@ -167,19 +167,19 @@
                     Padding="8, 8, 0, 8"
                     >
                     <Grid RowDefinitions="Auto,*">
-                        <Border BorderBrush="#FFE3E5E8" BorderThickness="0,0,0,1" Margin="0,0,8,4" HorizontalAlignment="Left">
+                        <Border BorderBrush="#FFE3E5E8" BorderThickness="0,0,0,1" Margin="4,0,8,4" HorizontalAlignment="Left">
                             <Grid
-                                Margin="24,0,12,0"
+                                Margin="16,0,12,0"
                                 Height="28"
-                                Width="688">
+                                Width="{Binding ElementName=RootWindow, Path=DetailsContentWidth}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" MinWidth="220" />
+                                    <ColumnDefinition Width="*" MinWidth="150" />
                                     <ColumnDefinition Width="6" />
-                                    <ColumnDefinition Width="150" MinWidth="90" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
                                     <ColumnDefinition Width="6" />
-                                    <ColumnDefinition Width="120" MinWidth="80" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
                                     <ColumnDefinition Width="6" />
-                                    <ColumnDefinition Width="180" MinWidth="120" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock
@@ -214,9 +214,42 @@
                                     FontSize="12"
                                     Foreground="#FF6F6F6F" />
 
-                                <Border Grid.Column="1" Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
-                                <Border Grid.Column="3" Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
-                                <Border Grid.Column="5" Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
+                                <Border
+                                    Grid.Column="1"
+                                    Width="6"
+                                    Background="Transparent"
+                                    Tag="1"
+                                    PointerPressed="ColumnSplitter_PointerPressed"
+                                    PointerMoved="ColumnSplitter_PointerMoved"
+                                    PointerReleased="ColumnSplitter_PointerReleased"
+                                    PointerCanceled="ColumnSplitter_PointerReleased"
+                                    PointerCaptureLost="ColumnSplitter_PointerReleased">
+                                    <Border Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
+                                </Border>
+                                <Border
+                                    Grid.Column="3"
+                                    Width="6"
+                                    Background="Transparent"
+                                    Tag="2"
+                                    PointerPressed="ColumnSplitter_PointerPressed"
+                                    PointerMoved="ColumnSplitter_PointerMoved"
+                                    PointerReleased="ColumnSplitter_PointerReleased"
+                                    PointerCanceled="ColumnSplitter_PointerReleased"
+                                    PointerCaptureLost="ColumnSplitter_PointerReleased">
+                                    <Border Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
+                                </Border>
+                                <Border
+                                    Grid.Column="5"
+                                    Width="6"
+                                    Background="Transparent"
+                                    Tag="3"
+                                    PointerPressed="ColumnSplitter_PointerPressed"
+                                    PointerMoved="ColumnSplitter_PointerMoved"
+                                    PointerReleased="ColumnSplitter_PointerReleased"
+                                    PointerCanceled="ColumnSplitter_PointerReleased"
+                                    PointerCaptureLost="ColumnSplitter_PointerReleased">
+                                    <Border Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
+                                </Border>
 
 
                             </Grid>
@@ -229,13 +262,15 @@
                             IsItemClickEnabled="False"
                             SelectionMode="Single"
                             Background="Transparent"
+                            Padding="0"
+                            ScrollViewer.VerticalScrollBarVisibility="Visible"
+                            ScrollViewer.VerticalScrollMode="Enabled"
                             DoubleTapped="EntriesListView_DoubleTapped"
                             ContextRequested="EntriesListView_ContextRequested"
                             Loaded="EntriesListView_Loaded">
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
-                                    <Setter Property="HorizontalAlignment" Value="Left" />
-                                    <Setter Property="Width" Value="708" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                 </Style>
                             </ListView.ItemContainerStyle>
                             <ListView.ContextFlyout>
@@ -260,17 +295,17 @@
                                     <Grid
                                         Height="30"
                                         Margin="8,0,12,0"
-                                        Width="688"
+                                        Width="{Binding ElementName=RootWindow, Path=DetailsContentWidth}"
                                         HorizontalAlignment="Left"
                                         RightTapped="EntryRow_RightTapped">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" MinWidth="220" />
+                                            <ColumnDefinition Width="*" MinWidth="150" />
                                             <ColumnDefinition Width="6" />
-                                            <ColumnDefinition Width="150" MinWidth="90" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
                                             <ColumnDefinition Width="6" />
-                                            <ColumnDefinition Width="120" MinWidth="80" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
                                             <ColumnDefinition Width="6" />
-                                            <ColumnDefinition Width="180" MinWidth="120" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
                                         </Grid.ColumnDefinitions>
 
                                         <StackPanel

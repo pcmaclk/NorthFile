@@ -18,8 +18,77 @@ using WinRT.Interop;
 
 namespace FileExplorerUI
 {
-    public sealed partial class MainWindow : Window
+    public sealed partial class MainWindow : Window, INotifyPropertyChanged
     {
+        private GridLength _typeColumnWidth = new(150);
+        private GridLength _sizeColumnWidth = new(120);
+        private GridLength _modifiedColumnWidth = new(180);
+        private double _detailsContentWidth = 688;
+        private Border? _activeColumnSplitter;
+        private int _activeSplitterTag;
+        private double _dragStartX;
+        private double _dragStartType;
+        private double _dragStartSize;
+        private double _dragStartContent;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public GridLength TypeColumnWidth
+        {
+            get => _typeColumnWidth;
+            set
+            {
+                if (_typeColumnWidth.Equals(value))
+                {
+                    return;
+                }
+                _typeColumnWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TypeColumnWidth)));
+            }
+        }
+
+        public GridLength SizeColumnWidth
+        {
+            get => _sizeColumnWidth;
+            set
+            {
+                if (_sizeColumnWidth.Equals(value))
+                {
+                    return;
+                }
+                _sizeColumnWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SizeColumnWidth)));
+            }
+        }
+
+        public GridLength ModifiedColumnWidth
+        {
+            get => _modifiedColumnWidth;
+            set
+            {
+                if (_modifiedColumnWidth.Equals(value))
+                {
+                    return;
+                }
+                _modifiedColumnWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ModifiedColumnWidth)));
+            }
+        }
+
+        public double DetailsContentWidth
+        {
+            get => _detailsContentWidth;
+            set
+            {
+                if (Math.Abs(_detailsContentWidth - value) < 0.1)
+                {
+                    return;
+                }
+                _detailsContentWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsContentWidth)));
+            }
+        }
+
         private const uint InitialPageSize = 96;
         private const uint MinPageSize = 64;
         private const uint MaxPageSize = 1000;
@@ -134,6 +203,96 @@ namespace FileExplorerUI
         private async void LoadButton_Click(object sender, RoutedEventArgs e)
         {
             await NavigateToPathAsync(PathTextBox.Text.Trim(), pushHistory: true);
+        }
+
+        private void ColumnSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not Border splitter || splitter.Tag is not string tagText || !int.TryParse(tagText, out int tag))
+            {
+                return;
+            }
+
+            _activeColumnSplitter = splitter;
+            _activeSplitterTag = tag;
+            _dragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            _dragStartType = TypeColumnWidth.Value;
+            _dragStartSize = SizeColumnWidth.Value;
+            _dragStartContent = DetailsContentWidth;
+            splitter.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+
+        private void ColumnSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not Border splitter || !ReferenceEquals(splitter, _activeColumnSplitter))
+            {
+                return;
+            }
+
+            if (!e.GetCurrentPoint(splitter).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            double x = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            double delta = x - _dragStartX;
+            if (Math.Abs(delta) < 0.5)
+            {
+                return;
+            }
+
+            const double minType = 90;
+            const double minSize = 80;
+            const double minName = 150;
+
+            double type = _dragStartType;
+            double size = _dragStartSize;
+            double modified = ModifiedColumnWidth.Value;
+            double content = _dragStartContent;
+
+            switch (_activeSplitterTag)
+            {
+                case 1:
+                    {
+                        content = Math.Max(minName + 18 + type + size + modified, _dragStartContent + delta);
+                    }
+                    break;
+                case 2:
+                    {
+                        double newType = Math.Max(minType, _dragStartType + delta);
+                        double applied = newType - _dragStartType;
+                        type = newType;
+                        content = Math.Max(minName + 18 + type + size + modified, _dragStartContent + applied);
+                    }
+                    break;
+                case 3:
+                    {
+                        double newSize = Math.Max(minSize, _dragStartSize + delta);
+                        double applied = newSize - _dragStartSize;
+                        size = newSize;
+                        content = Math.Max(minName + 18 + type + size + modified, _dragStartContent + applied);
+                    }
+                    break;
+            }
+
+            TypeColumnWidth = new GridLength(type);
+            SizeColumnWidth = new GridLength(size);
+            ModifiedColumnWidth = new GridLength(modified);
+            DetailsContentWidth = content;
+            e.Handled = true;
+        }
+
+        private void ColumnSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border splitter)
+            {
+                splitter.ReleasePointerCaptures();
+            }
+
+            _activeColumnSplitter = null;
+            _activeSplitterTag = 0;
+            _dragStartX = 0;
+            e.Handled = true;
         }
 
 
