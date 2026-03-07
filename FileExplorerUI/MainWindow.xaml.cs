@@ -20,19 +20,37 @@ namespace FileExplorerUI
 {
     public sealed partial class MainWindow : Window, INotifyPropertyChanged
     {
+        private GridLength _nameColumnWidth = new(220);
         private GridLength _typeColumnWidth = new(150);
         private GridLength _sizeColumnWidth = new(120);
         private GridLength _modifiedColumnWidth = new(180);
-        private double _detailsContentWidth = 688;
-        private double _detailsRowWidth = 708;
-        private Border? _activeColumnSplitter;
+        private double _detailsContentWidth = 694;
+        private double _detailsRowWidth = 714;
+        private UIElement? _activeColumnSplitter;
         private int _activeSplitterTag;
         private double _dragStartX;
+        private double _dragStartName;
         private double _dragStartType;
         private double _dragStartSize;
+        private double _dragStartModified;
         private double _dragStartContent;
+        private int _splitterHoverCount;
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        public GridLength NameColumnWidth
+        {
+            get => _nameColumnWidth;
+            set
+            {
+                if (_nameColumnWidth.Equals(value))
+                {
+                    return;
+                }
+                _nameColumnWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameColumnWidth)));
+            }
+        }
 
         public GridLength TypeColumnWidth
         {
@@ -156,12 +174,17 @@ namespace FileExplorerUI
         private const int GWL_WNDPROC = -4;
         private const int WM_NCLBUTTONDOWN = 0x00A1;
         private const int WM_NCRBUTTONDOWN = 0x00A4;
+        private const int WM_SETCURSOR = 0x0020;
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
         public MainWindow()
         {
             InitializeComponent();
+            RegisterColumnSplitterHandlers(HeaderSplitter1);
+            RegisterColumnSplitterHandlers(HeaderSplitter2);
+            RegisterColumnSplitterHandlers(HeaderSplitter3);
+            RegisterColumnSplitterHandlers(HeaderSplitter4);
             EntriesListView.ItemsSource = _entries;
             EntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
             EntriesListView.SizeChanged += EntriesListView_SizeChanged;
@@ -176,6 +199,15 @@ namespace FileExplorerUI
             ApplyCommandDockLayout();
             InstallWindowHook();
             _ = LoadFirstPageAsync();
+        }
+
+        private void RegisterColumnSplitterHandlers(UIElement splitter)
+        {
+            splitter.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(ColumnSplitter_PointerPressed), true);
+            splitter.AddHandler(UIElement.PointerMovedEvent, new PointerEventHandler(ColumnSplitter_PointerMoved), true);
+            splitter.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
+            splitter.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
+            splitter.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
         }
 
         private void InstallWindowHook()
@@ -204,6 +236,13 @@ namespace FileExplorerUI
             {
                 _ = DispatcherQueue.TryEnqueue(CloseActiveBreadcrumbFlyout);
             }
+            else if (msg == WM_SETCURSOR && (_splitterHoverCount > 0 || _activeColumnSplitter is not null))
+            {
+                if (ColumnSplitter.TryApplyResizeCursor())
+                {
+                    return new IntPtr(1);
+                }
+            }
 
             return NativeMethods.CallWindowProc(_originalWndProc, hWnd, msg, wParam, lParam);
         }
@@ -223,24 +262,48 @@ namespace FileExplorerUI
 
         private void ColumnSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is not Border splitter || splitter.Tag is not string tagText || !int.TryParse(tagText, out int tag))
+            if (sender is not FrameworkElement splitter || splitter.Tag is not string tagText || !int.TryParse(tagText, out int tag))
             {
                 return;
             }
 
+            ColumnSplitter.TryApplyResizeCursor();
             _activeColumnSplitter = splitter;
             _activeSplitterTag = tag;
             _dragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            _dragStartName = NameColumnWidth.Value;
             _dragStartType = TypeColumnWidth.Value;
             _dragStartSize = SizeColumnWidth.Value;
+            _dragStartModified = ModifiedColumnWidth.Value;
             _dragStartContent = DetailsContentWidth;
-            splitter.CapturePointer(e.Pointer);
+            if (splitter is UIElement uiElement)
+            {
+                uiElement.CapturePointer(e.Pointer);
+            }
             e.Handled = true;
+        }
+
+        private void ColumnSplitterHover_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            _splitterHoverCount++;
+        }
+
+        private void ColumnSplitterHover_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            if (_splitterHoverCount > 0)
+            {
+                _splitterHoverCount--;
+            }
         }
 
         private void ColumnSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is not Border splitter || !ReferenceEquals(splitter, _activeColumnSplitter))
+            if (sender is UIElement)
+            {
+                ColumnSplitter.TryApplyResizeCursor();
+            }
+
+            if (sender is not UIElement splitter || !ReferenceEquals(splitter, _activeColumnSplitter))
             {
                 return;
             }
@@ -259,38 +322,44 @@ namespace FileExplorerUI
 
             const double minType = 90;
             const double minSize = 80;
-            const double minName = 150;
+            const double minName = 120;
+            const double minModified = 120;
 
+            double name = _dragStartName;
             double type = _dragStartType;
             double size = _dragStartSize;
-            double modified = ModifiedColumnWidth.Value;
+            double modified = _dragStartModified;
             double content = _dragStartContent;
 
             switch (_activeSplitterTag)
             {
                 case 1:
                     {
-                        content = Math.Max(minName + 18 + type + size + modified, _dragStartContent + delta);
+                        name = Math.Max(minName, _dragStartName + delta);
+                        content = name + 24 + type + size + modified;
                     }
                     break;
                 case 2:
                     {
-                        double newType = Math.Max(minType, _dragStartType + delta);
-                        double applied = newType - _dragStartType;
-                        type = newType;
-                        content = Math.Max(minName + 18 + type + size + modified, _dragStartContent + applied);
+                        type = Math.Max(minType, _dragStartType + delta);
+                        content = name + 24 + type + size + modified;
                     }
                     break;
                 case 3:
                     {
-                        double newSize = Math.Max(minSize, _dragStartSize + delta);
-                        double applied = newSize - _dragStartSize;
-                        size = newSize;
-                        content = Math.Max(minName + 18 + type + size + modified, _dragStartContent + applied);
+                        size = Math.Max(minSize, _dragStartSize + delta);
+                        content = name + 24 + type + size + modified;
+                    }
+                    break;
+                case 4:
+                    {
+                        modified = Math.Max(minModified, _dragStartModified + delta);
+                        content = name + 24 + type + size + modified;
                     }
                     break;
             }
 
+            NameColumnWidth = new GridLength(name);
             TypeColumnWidth = new GridLength(type);
             SizeColumnWidth = new GridLength(size);
             ModifiedColumnWidth = new GridLength(modified);
@@ -300,7 +369,7 @@ namespace FileExplorerUI
 
         private void ColumnSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is Border splitter)
+            if (sender is UIElement splitter)
             {
                 splitter.ReleasePointerCaptures();
             }

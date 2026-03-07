@@ -147,6 +147,7 @@
             <ScrollViewer
                 x:Name="SidebarScrollViewer"
                 Grid.Column="0"
+                Padding="0,4,0,0"
                 HorizontalContentAlignment="Stretch"
                 HorizontalScrollBarVisibility="Disabled"
                 VerticalScrollBarVisibility="Auto">
@@ -154,11 +155,11 @@
                     x:Name="SidebarGroupsHost"
                     HorizontalAlignment="Stretch"
                     Spacing="4"
-                    Margin="0,4,0,0"
+                    Margin="0"
                     BorderThickness="0"/>
             </ScrollViewer>
 
-            <Grid Grid.Column="1" Margin="8,0,0,0">
+            <Grid Grid.Column="1" Padding="8,0,0,0">
                 <Border
                     CornerRadius="10"
                     Background="#FFFFFFFF"
@@ -167,28 +168,32 @@
                     Padding="8, 8, 0, 8"
                     >
                     <Grid RowDefinitions="Auto,*">
-                        <Border BorderBrush="#FFE3E5E8" BorderThickness="0,0,0,1" Margin="4,0,8,4" HorizontalAlignment="Left">
-                            <Grid
-                                Margin="16,0,12,0"
-                                Height="28"
-                                Width="{Binding ElementName=RootWindow, Path=DetailsContentWidth}">
+                        <Border x:Name="DetailsHeaderBorder" BorderBrush="#FFE3E5E8" BorderThickness="0" Margin="0" Padding="8,0,8,0" HorizontalAlignment="Left" Background="#FFF8F8F8" Width="{x:Bind DetailsRowWidth, Mode=OneWay}">
+                            <Border BorderBrush="#FFE3E5E8" BorderThickness="0,0,0,1">
+                                <Grid
+                                    x:Name="DetailsHeaderGrid"
+                                    Margin="0"
+                                    Height="28"
+                                    HorizontalAlignment="Stretch">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" MinWidth="150" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
                                     <ColumnDefinition Width="6" />
                                     <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
                                     <ColumnDefinition Width="6" />
                                     <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
                                     <ColumnDefinition Width="6" />
                                     <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
+                                    <ColumnDefinition Width="6" />
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock
-                                    Text="名称"
-                                    Margin="26,0,0,0"
-                                    VerticalAlignment="Center"
-                                    HorizontalAlignment="Left"
-                                    FontSize="12"
-                                    Foreground="#FF6F6F6F" />
+                                <Border Grid.Column="0" Padding="32,0,0,0" Background="Transparent">
+                                    <TextBlock
+                                        Text="名称"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Left"
+                                        FontSize="12"
+                                        Foreground="#FF6F6F6F" />
+                                </Border>
                                 <TextBlock
                                     Grid.Column="2"
                                     Text="类型"
@@ -214,45 +219,34 @@
                                     FontSize="12"
                                     Foreground="#FF6F6F6F" />
 
-                                <Border
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter1"
                                     Grid.Column="1"
-                                    Width="6"
-                                    Background="Transparent"
                                     Tag="1"
-                                    PointerPressed="ColumnSplitter_PointerPressed"
-                                    PointerMoved="ColumnSplitter_PointerMoved"
-                                    PointerReleased="ColumnSplitter_PointerReleased"
-                                    PointerCanceled="ColumnSplitter_PointerReleased"
-                                    PointerCaptureLost="ColumnSplitter_PointerReleased">
-                                    <Border Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
-                                </Border>
-                                <Border
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter2"
                                     Grid.Column="3"
-                                    Width="6"
-                                    Background="Transparent"
                                     Tag="2"
-                                    PointerPressed="ColumnSplitter_PointerPressed"
-                                    PointerMoved="ColumnSplitter_PointerMoved"
-                                    PointerReleased="ColumnSplitter_PointerReleased"
-                                    PointerCanceled="ColumnSplitter_PointerReleased"
-                                    PointerCaptureLost="ColumnSplitter_PointerReleased">
-                                    <Border Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
-                                </Border>
-                                <Border
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter3"
                                     Grid.Column="5"
-                                    Width="6"
-                                    Background="Transparent"
                                     Tag="3"
-                                    PointerPressed="ColumnSplitter_PointerPressed"
-                                    PointerMoved="ColumnSplitter_PointerMoved"
-                                    PointerReleased="ColumnSplitter_PointerReleased"
-                                    PointerCanceled="ColumnSplitter_PointerReleased"
-                                    PointerCaptureLost="ColumnSplitter_PointerReleased">
-                                    <Border Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
-                                </Border>
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter4"
+                                    Grid.Column="7"
+                                    Tag="4"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
 
 
-                            </Grid>
+                                </Grid>
+                            </Border>
                         </Border>
 
                         <ListView
@@ -272,7 +266,14 @@
                                 <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
                                     <Setter Property="HorizontalAlignment" Value="Left" />
                                     <Setter Property="Width" Value="{Binding ElementName=RootWindow, Path=DetailsRowWidth}" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="Height" Value="30" />
+                                    <Setter Property="MinHeight" Value="30" />
+                                    <Setter Property="CornerRadius" Value="0" />
+                                    <Setter Property="BorderThickness" Value="0" />
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="VerticalContentAlignment" Value="Stretch" />
                                 </Style>
                             </ListView.ItemContainerStyle>
                             <ListView.ContextFlyout>
@@ -294,54 +295,57 @@
                             </ListView.ContextFlyout>
                             <ListView.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid
+                                    <Border
                                         Height="30"
-                                        Margin="8,0,12,0"
-                                        Width="{Binding ElementName=RootWindow, Path=DetailsContentWidth}"
-                                        HorizontalAlignment="Left"
+                                        Padding="8,0,8,0"
+                                        HorizontalAlignment="Stretch"
                                         RightTapped="EntryRow_RightTapped">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" MinWidth="150" />
-                                            <ColumnDefinition Width="6" />
-                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
-                                            <ColumnDefinition Width="6" />
-                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
-                                            <ColumnDefinition Width="6" />
-                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
-                                        </Grid.ColumnDefinitions>
+                                        <Grid HorizontalAlignment="Stretch">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
+                                                <ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
+                                                <ColumnDefinition Width="6" />
+                                            </Grid.ColumnDefinitions>
 
-                                        <StackPanel
-                                            Orientation="Horizontal"
-                                            Spacing="8"
-                                            VerticalAlignment="Center">
+                                            <StackPanel
+                                                Orientation="Horizontal"
+                                                Spacing="8"
+                                                Margin="6,0,0,0"
+                                                VerticalAlignment="Center">
+                                                <TextBlock
+                                                    Width="18"
+                                                    FontFamily="Segoe Fluent Icons"
+                                                    FontSize="14"
+                                                    VerticalAlignment="Center"
+                                                    Text="{Binding IconGlyph}" />
+                                                <TextBlock
+                                                    VerticalAlignment="Center"
+                                                    Text="{Binding Name}"
+                                                    TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
                                             <TextBlock
-                                                Width="18"
-                                                FontFamily="Segoe Fluent Icons"
-                                                FontSize="14"
+                                                Grid.Column="2"
+                                                Margin="8,0,0,0"
                                                 VerticalAlignment="Center"
-                                                Text="{Binding IconGlyph}" />
-                                            <TextBlock
-                                                VerticalAlignment="Center"
-                                                Text="{Binding Name}"
+                                                Text="{Binding Type}"
                                                 TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                        <TextBlock
-                                            Grid.Column="2"
-                                            Margin="8,0,0,0"
-                                            VerticalAlignment="Center"
-                                            Text="{Binding Type}"
-                                            TextTrimming="CharacterEllipsis" />
-                                        <TextBlock
-                                            Grid.Column="4"
-                                            Margin="8,0,0,0"
-                                            VerticalAlignment="Center"
-                                            Text="{Binding SizeText}" />
-                                        <TextBlock
-                                            Grid.Column="6"
-                                            Margin="8,0,0,0"
-                                            VerticalAlignment="Center"
-                                            Text="{Binding ModifiedText}" />
-                                    </Grid>
+                                            <TextBlock
+                                                Grid.Column="4"
+                                                Margin="8,0,0,0"
+                                                VerticalAlignment="Center"
+                                                Text="{Binding SizeText}" />
+                                            <TextBlock
+                                                Grid.Column="6"
+                                                Margin="8,0,0,0"
+                                                VerticalAlignment="Center"
+                                                Text="{Binding ModifiedText}" />
+                                        </Grid>
+                                    </Border>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
