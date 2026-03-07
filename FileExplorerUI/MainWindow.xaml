@@ -168,7 +168,7 @@
                     Padding="8, 8, 0, 8"
                     >
                     <Grid RowDefinitions="Auto,*">
-                        <Border x:Name="DetailsHeaderBorder" BorderBrush="#FFE3E5E8" BorderThickness="0" Margin="0" Padding="8,0,8,0" HorizontalAlignment="Left" Background="#FFF8F8F8" Width="{x:Bind DetailsRowWidth, Mode=OneWay}">
+                        <Border x:Name="DetailsHeaderBorder" BorderBrush="#FFE3E5E8" BorderThickness="0" Margin="0" Padding="8,0,8,0" HorizontalAlignment="Left" Background="Transparent" Width="{x:Bind DetailsRowWidth, Mode=OneWay}">
                             <Border BorderBrush="#FFE3E5E8" BorderThickness="0,0,0,1">
                                 <Grid
                                     x:Name="DetailsHeaderGrid"
