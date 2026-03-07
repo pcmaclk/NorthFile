@@ -270,6 +270,8 @@
                             Loaded="EntriesListView_Loaded">
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                                    <Setter Property="HorizontalAlignment" Value="Left" />
+                                    <Setter Property="Width" Value="{Binding ElementName=RootWindow, Path=DetailsRowWidth}" />
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                 </Style>
                             </ListView.ItemContainerStyle>

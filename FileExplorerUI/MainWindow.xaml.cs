@@ -24,6 +24,7 @@ namespace FileExplorerUI
         private GridLength _sizeColumnWidth = new(120);
         private GridLength _modifiedColumnWidth = new(180);
         private double _detailsContentWidth = 688;
+        private double _detailsRowWidth = 708;
         private Border? _activeColumnSplitter;
         private int _activeSplitterTag;
         private double _dragStartX;
@@ -86,6 +87,21 @@ namespace FileExplorerUI
                 }
                 _detailsContentWidth = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsContentWidth)));
+                DetailsRowWidth = value + 20;
+            }
+        }
+
+        public double DetailsRowWidth
+        {
+            get => _detailsRowWidth;
+            set
+            {
+                if (Math.Abs(_detailsRowWidth - value) < 0.1)
+                {
+                    return;
+                }
+                _detailsRowWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsRowWidth)));
             }
         }
 
