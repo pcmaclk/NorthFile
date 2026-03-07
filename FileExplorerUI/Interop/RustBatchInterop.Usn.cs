@@ -23,12 +23,19 @@ public static partial class RustBatchInterop
 
     public static RustUsnCapability ProbeUsnCapability(string path)
     {
-        return UsnProbeVolume(path);
+        lock (NativeCallGate)
+        {
+            return UsnProbeVolume(path);
+        }
     }
 
     public static void MarkPathChanged(string path)
     {
-        int code = UsnMarkPathChangedNative(path);
+        int code;
+        lock (NativeCallGate)
+        {
+            code = UsnMarkPathChangedNative(path);
+        }
         if (code != 0)
         {
             throw new InvalidOperationException($"USN mark changed failed: {code}");

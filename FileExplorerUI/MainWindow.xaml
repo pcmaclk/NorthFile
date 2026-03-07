@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Window
     x:Class="FileExplorerUI.MainWindow"
+    x:Name="RootWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:FileExplorerUI"
@@ -13,133 +14,388 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10" Padding="16">
-        <StackPanel Orientation="Horizontal" Spacing="8">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8" Padding="8">
+        <Grid
+            ColumnDefinitions="Auto,Auto,Auto,Auto,4*,1*"
+            Height="36"
+            ColumnSpacing="8">
             <Button
                 x:Name="BackButton"
-                VerticalAlignment="Bottom"
+                Style="{StaticResource SubtleButtonStyle}"
+                Width="32"
+                Height="32"
+                Padding="0"
                 Click="BackButton_Click"
-                Content="Back" />
+                ToolTipService.ToolTip="Back">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE72B;" />
+            </Button>
+            <Button
+                x:Name="ForwardButton"
+                Grid.Column="1"
+                Style="{StaticResource SubtleButtonStyle}"
+                Width="32"
+                Height="32"
+                Padding="0"
+                Click="ForwardButton_Click"
+                ToolTipService.ToolTip="Forward">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE72A;" />
+            </Button>
             <Button
                 x:Name="UpButton"
-                VerticalAlignment="Bottom"
+                Grid.Column="2"
+                Style="{StaticResource SubtleButtonStyle}"
+                Width="32"
+                Height="32"
+                Padding="0"
                 Click="UpButton_Click"
-                Content="Up" />
-            <TextBox
-                x:Name="PathTextBox"
-                Width="520"
-                Header="Directory Path"
-                KeyDown="PathTextBox_KeyDown"
-                Text="C:\" />
+                ToolTipService.ToolTip="Up">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE74A;" />
+            </Button>
             <Button
                 x:Name="LoadButton"
-                VerticalAlignment="Bottom"
+                Grid.Column="3"
+                Style="{StaticResource SubtleButtonStyle}"
+                Width="32"
+                Height="32"
+                Padding="0"
                 Click="LoadButton_Click"
-                Content="Load" />
-            <Button
-                x:Name="NextButton"
-                VerticalAlignment="Bottom"
-                Click="NextButton_Click"
-                Content="Next Page" />
-        </StackPanel>
+                ToolTipService.ToolTip="Go">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE72C;" />
+            </Button>
+            <Grid Grid.Column="4">
+                <Border
+                    x:Name="AddressBreadcrumbBorder"
+                    Height="32"
+                    Padding="6,0"
+                    Background="#FFFBFBFB"
+                    BorderBrush="{ThemeResource TextControlBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Tapped="AddressBreadcrumbBorder_Tapped">
+                    <ScrollViewer
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Disabled"
+                        VerticalAlignment="Center">
+                        <ItemsControl
+                            x:Name="BreadcrumbItemsControl"
+                            ItemsSource="{Binding Breadcrumbs, ElementName=RootWindow}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                                    <Grid ColumnDefinitions="Auto,Auto">
+                                        <Button
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="10, 0, 10, 1"
+                                            Click="BreadcrumbButton_Click"
+                                            Tag="{Binding FullPath}">
+                                            <TextBlock
+                                                Text="{Binding Label}"
+                                                TextTrimming="CharacterEllipsis" />
+                                        </Button>
+                                        <Button
+                                            Grid.Column="1"
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="4, 0, 4, 1"
+                                            Visibility="{Binding ChevronVisibility}"
+                                            Click="BreadcrumbChevronButton_Click"
+                                            Content=">"
+                                            Tag="{Binding FullPath}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                <TextBox
+                    x:Name="PathTextBox"
+                    PlaceholderText="Address"
+                    Visibility="Collapsed"
+                    KeyDown="PathTextBox_KeyDown"
+                    LostFocus="PathTextBox_LostFocus"
+                    Padding="12, 7, 8, 8"
+                    Text="C:\" />
+            </Grid>
             <TextBox
                 x:Name="SearchTextBox"
-                Width="220"
-                Header="Search In Current Dir"
-                PlaceholderText="keyword"
+                Grid.Column="5"
+                Height="32"
+                PlaceholderText="Search in current folder"
                 KeyDown="SearchTextBox_KeyDown" />
-            <Button
-                x:Name="SearchButton"
-                VerticalAlignment="Bottom"
-                Click="SearchButton_Click"
-                Content="Search" />
-            <Button
-                x:Name="ClearSearchButton"
-                VerticalAlignment="Bottom"
-                Click="ClearSearchButton_Click"
-                Content="Clear Search" />
-            <TextBox
-                x:Name="RenameTextBox"
-                Width="260"
-                Header="Rename Selected To"
-                PlaceholderText="new name" />
-            <Button
-                x:Name="RenameButton"
-                VerticalAlignment="Bottom"
-                Click="RenameButton_Click"
-                Content="Rename Selected" />
-            <Button
-                x:Name="DeleteButton"
-                VerticalAlignment="Bottom"
-                Click="DeleteButton_Click"
-                Content="Delete Selected" />
-            <CheckBox
-                x:Name="RecursiveDeleteCheckBox"
-                VerticalAlignment="Bottom"
-                Content="Recursive" />
-        </StackPanel>
+        </Grid>
 
-        <ScrollViewer
-            Grid.Row="2"
-            HorizontalScrollBarVisibility="Auto"
-            VerticalScrollBarVisibility="Disabled"
-            VerticalAlignment="Center">
-            <ItemsControl
-                x:Name="BreadcrumbItemsControl"
-                ItemsSource="{x:Bind Breadcrumbs, Mode=OneWay}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" Spacing="6" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
-                        <Button
-                            Click="BreadcrumbButton_Click"
-                            Content="{x:Bind Label}"
-                            Tag="{x:Bind FullPath}" />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <Grid
+            Grid.Row="1"
+            ColumnDefinitions="220,*"
+            ColumnSpacing="0">
+            <ScrollViewer
+                x:Name="SidebarScrollViewer"
+                Grid.Column="0"
+                HorizontalContentAlignment="Stretch"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+                <StackPanel
+                    x:Name="SidebarGroupsHost"
+                    HorizontalAlignment="Stretch"
+                    Spacing="4"
+                    Margin="0,4,0,0"
+                    BorderThickness="0"/>
+            </ScrollViewer>
+
+            <Grid Grid.Column="1" Margin="8,0,0,0">
+                <Border
+                    CornerRadius="10"
+                    Background="#FFFFFFFF"
+                    BorderBrush="#FFDADDE3"
+                    BorderThickness="1"
+                    Padding="8, 8, 0, 8"
+                    >
+                    <Grid RowDefinitions="Auto,*">
+                        <Border BorderBrush="#FFE3E5E8" BorderThickness="0,0,0,1" Margin="0,0,8,4" HorizontalAlignment="Left">
+                            <Grid
+                                Margin="24,0,12,0"
+                                Height="28"
+                                Width="688">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" MinWidth="220" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="150" MinWidth="90" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="120" MinWidth="80" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="180" MinWidth="120" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock
+                                    Text="名称"
+                                    Margin="26,0,0,0"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"
+                                    FontSize="12"
+                                    Foreground="#FF6F6F6F" />
+                                <TextBlock
+                                    Grid.Column="2"
+                                    Text="类型"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"
+                                    FontSize="12"
+                                    Foreground="#FF6F6F6F" />
+                                <TextBlock
+                                    Grid.Column="4"
+                                    Text="大小"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"
+                                    FontSize="12"
+                                    Foreground="#FF6F6F6F" />
+                                <TextBlock
+                                    Grid.Column="6"
+                                    Text="修改日期"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"
+                                    FontSize="12"
+                                    Foreground="#FF6F6F6F" />
+
+                                <Border Grid.Column="1" Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
+                                <Border Grid.Column="3" Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
+                                <Border Grid.Column="5" Width="1" HorizontalAlignment="Center" Margin="0,4" Background="#FFE5E7EA" />
+
+
+                            </Grid>
+                        </Border>
+
+                        <ListView
+                            x:Name="EntriesListView"
+                            Grid.Row="1"
+                            HorizontalAlignment="Stretch"
+                            IsItemClickEnabled="False"
+                            SelectionMode="Single"
+                            Background="Transparent"
+                            DoubleTapped="EntriesListView_DoubleTapped"
+                            ContextRequested="EntriesListView_ContextRequested"
+                            Loaded="EntriesListView_Loaded">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                                    <Setter Property="HorizontalAlignment" Value="Left" />
+                                    <Setter Property="Width" Value="708" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ContextFlyout>
+                                <MenuFlyout
+                                    x:Name="EntriesContextFlyout"
+                                    Opening="EntriesContextFlyout_Opening"
+                                    Closed="EntriesContextFlyout_Closed">
+                                    <MenuFlyoutItem
+                                        Click="ContextRename_Click"
+                                        Text="Rename" />
+                                    <MenuFlyoutItem
+                                        Click="ContextDelete_Click"
+                                        Text="Delete" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem
+                                        Click="ContextRefresh_Click"
+                                        Text="Refresh" />
+                                </MenuFlyout>
+                            </ListView.ContextFlyout>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid
+                                        Height="30"
+                                        Margin="8,0,12,0"
+                                        Width="688"
+                                        HorizontalAlignment="Left"
+                                        RightTapped="EntryRow_RightTapped">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" MinWidth="220" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="150" MinWidth="90" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="120" MinWidth="80" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="180" MinWidth="120" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel
+                                            Orientation="Horizontal"
+                                            Spacing="8"
+                                            VerticalAlignment="Center">
+                                            <TextBlock
+                                                Width="18"
+                                                FontFamily="Segoe Fluent Icons"
+                                                FontSize="14"
+                                                VerticalAlignment="Center"
+                                                Text="{Binding IconGlyph}" />
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                Text="{Binding Name}"
+                                                TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock
+                                            Grid.Column="2"
+                                            Margin="8,0,0,0"
+                                            VerticalAlignment="Center"
+                                            Text="{Binding Type}"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock
+                                            Grid.Column="4"
+                                            Margin="8,0,0,0"
+                                            VerticalAlignment="Center"
+                                            Text="{Binding SizeText}" />
+                                        <TextBlock
+                                            Grid.Column="6"
+                                            Margin="8,0,0,0"
+                                            VerticalAlignment="Center"
+                                            Text="{Binding ModifiedText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Border>
+
+                <Border
+                    x:Name="CommandDockPanel"
+                    Width="360"
+                    Padding="10"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Visibility="Collapsed"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Margin="10"
+                    PointerExited="CommandDockPanel_PointerExited">
+                    <StackPanel Spacing="8">
+                        <TextBlock
+                            FontWeight="SemiBold"
+                            Text="Command Dock" />
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <Button
+                                x:Name="RenameButton"
+                                Grid.Column="0"
+                                Click="RenameButton_Click"
+                                Content="Rename" />
+                            <Button
+                                x:Name="DeleteButton"
+                                Grid.Column="1"
+                                Click="DeleteButton_Click"
+                                Content="Delete" />
+                            <Button
+                                x:Name="NextButton"
+                                Grid.Column="2"
+                                Click="NextButton_Click"
+                                Content="Load More" />
+                        </Grid>
+                        <TextBox
+                            x:Name="RenameTextBox"
+                            PlaceholderText="new name" />
+                        <CheckBox
+                            x:Name="RecursiveDeleteCheckBox"
+                            Content="Recursive delete" />
+
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+                            <RadioButton
+                                GroupName="DockSide"
+                                Tag="Top"
+                                Checked="DockRadio_Checked"
+                                IsChecked="True"
+                                Content="Top" />
+                            <RadioButton
+                                Grid.Column="1"
+                                GroupName="DockSide"
+                                Tag="Right"
+                                Checked="DockRadio_Checked"
+                                Content="Right" />
+                            <RadioButton
+                                Grid.Column="2"
+                                GroupName="DockSide"
+                                Tag="Bottom"
+                                Checked="DockRadio_Checked"
+                                Content="Bottom" />
+                            <ToggleSwitch
+                                x:Name="CommandAutoHideSwitch"
+                                Grid.Column="3"
+                                HorizontalAlignment="Right"
+                                Toggled="CommandAutoHideSwitch_Toggled"
+                                Header="Auto hide" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Button
+                    x:Name="CommandPeekButton"
+                    Visibility="Collapsed"
+                    Content="Commands"
+                    Click="CommandPeekButton_Click"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Margin="10" />
+            </Grid>
+        </Grid>
 
         <TextBlock
             x:Name="StatusTextBlock"
-            Grid.Row="3"
+            Grid.Row="2"
             TextWrapping="Wrap"
             Text="Loading..." />
-
-        <ListView
-            x:Name="EntriesListView"
-            Grid.Row="4"
-            IsItemClickEnabled="False"
-            DoubleTapped="EntriesListView_DoubleTapped"
-            Loaded="EntriesListView_Loaded">
-            <ListView.ContextFlyout>
-                <MenuFlyout>
-                    <MenuFlyoutItem
-                        Click="ContextRename_Click"
-                        Text="Rename" />
-                    <MenuFlyoutItem
-                        Click="ContextDelete_Click"
-                        Text="Delete" />
-                    <MenuFlyoutSeparator />
-                    <MenuFlyoutItem
-                        Click="ContextRefresh_Click"
-                        Text="Refresh" />
-                </MenuFlyout>
-            </ListView.ContextFlyout>
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Width="60" Text="{Binding Type}" />
-                        <TextBlock Width="420" Text="{Binding Name}" />
-                        <TextBlock Text="{Binding MftRef}" />
-                    </StackPanel>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
     </Grid>
 </Window>

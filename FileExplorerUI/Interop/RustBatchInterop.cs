@@ -56,6 +56,8 @@ public sealed record FileBatchPage(
 
 public static partial class RustBatchInterop
 {
+    private static readonly object NativeCallGate = new();
+
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_get_demo_batch")]
     private static partial RustBatchResult GetDemoBatch(uint limit);
 
@@ -94,8 +96,11 @@ public static partial class RustBatchInterop
 
     public static unsafe IReadOnlyList<FileRow> ReadDemoRows(uint limit = 128)
     {
-        RustBatchResult batch = GetDemoBatch(limit);
-        return DecodeAndFree(batch).Rows;
+        lock (NativeCallGate)
+        {
+            RustBatchResult batch = GetDemoBatch(limit);
+            return DecodeAndFree(batch).Rows;
+        }
     }
 
     public static string GetEngineVersion()
@@ -106,7 +111,11 @@ public static partial class RustBatchInterop
 
     public static RustNtfsVolumeMeta ProbeNtfsVolume(string path)
     {
-        RustNtfsVolumeMeta meta = NtfsProbeVolume(path);
+        RustNtfsVolumeMeta meta;
+        lock (NativeCallGate)
+        {
+            meta = NtfsProbeVolume(path);
+        }
         if (meta.error_code != 0)
         {
             throw new InvalidOperationException($"NTFS probe failed ({meta.error_code})");
@@ -122,8 +131,11 @@ public static partial class RustBatchInterop
         uint lastFetchMs = 0
     )
     {
-        RustBatchResult batch = ListDirBatch(path, cursor, limit, lastFetchMs);
-        return DecodeAndFree(batch);
+        lock (NativeCallGate)
+        {
+            RustBatchResult batch = ListDirBatch(path, cursor, limit, lastFetchMs);
+            return DecodeAndFree(batch);
+        }
     }
 
     public static unsafe FileBatchPage ReadDirectoryRowsWithMemoryFallback(
@@ -133,17 +145,20 @@ public static partial class RustBatchInterop
         uint lastFetchMs = 0
     )
     {
-        RustBatchResult memoryBatch = ListDirBatchMemory(path, cursor, limit, lastFetchMs);
-        if (memoryBatch.error_code == 0)
+        lock (NativeCallGate)
         {
-            return DecodeAndFree(memoryBatch);
+            RustBatchResult memoryBatch = ListDirBatchMemory(path, cursor, limit, lastFetchMs);
+            if (memoryBatch.error_code == 0)
+            {
+                return DecodeAndFree(memoryBatch);
+            }
+
+            // Release potential error message from memory path call before falling back.
+            FreeBatchResult(memoryBatch);
+
+            RustBatchResult fallbackBatch = ListDirBatch(path, cursor, limit, lastFetchMs);
+            return DecodeAndFree(fallbackBatch);
         }
-
-        // Release potential error message from memory path call before falling back.
-        FreeBatchResult(memoryBatch);
-
-        RustBatchResult fallbackBatch = ListDirBatch(path, cursor, limit, lastFetchMs);
-        return DecodeAndFree(fallbackBatch);
     }
 
     public static unsafe FileBatchPage ReadDirectoryRowsAuto(
@@ -153,8 +168,11 @@ public static partial class RustBatchInterop
         uint lastFetchMs = 0
     )
     {
-        RustBatchResult batch = ListDirBatchAuto(path, cursor, limit, lastFetchMs);
-        return DecodeAndFree(batch);
+        lock (NativeCallGate)
+        {
+            RustBatchResult batch = ListDirBatchAuto(path, cursor, limit, lastFetchMs);
+            return DecodeAndFree(batch);
+        }
     }
 
     public static unsafe FileBatchPage SearchDirectoryRowsAuto(
@@ -165,13 +183,55 @@ public static partial class RustBatchInterop
         uint lastFetchMs = 0
     )
     {
-        RustBatchResult batch = SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs);
-        return DecodeAndFree(batch);
+        lock (NativeCallGate)
+        {
+            RustBatchResult batch = SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs);
+            return DecodeAndFree(batch);
+        }
+    }
+
+    public static unsafe bool TryReadDirectoryRowsAuto(
+        string path,
+        ulong cursor,
+        uint limit,
+        uint lastFetchMs,
+        out FileBatchPage page,
+        out int errorCode,
+        out string errorMessage
+    )
+    {
+        lock (NativeCallGate)
+        {
+            RustBatchResult batch = ListDirBatchAuto(path, cursor, limit, lastFetchMs);
+            return TryDecodeAndFree(batch, out page, out errorCode, out errorMessage);
+        }
+    }
+
+    public static unsafe bool TrySearchDirectoryRowsAuto(
+        string path,
+        string query,
+        ulong cursor,
+        uint limit,
+        uint lastFetchMs,
+        out FileBatchPage page,
+        out int errorCode,
+        out string errorMessage
+    )
+    {
+        lock (NativeCallGate)
+        {
+            RustBatchResult batch = SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs);
+            return TryDecodeAndFree(batch, out page, out errorCode, out errorMessage);
+        }
     }
 
     public static void InvalidateMemoryDirectory(string path)
     {
-        int code = MemoryInvalidateDir(path);
+        int code;
+        lock (NativeCallGate)
+        {
+            code = MemoryInvalidateDir(path);
+        }
         if (code != 0)
         {
             throw new InvalidOperationException($"Memory invalidate dir failed: {code}");
@@ -180,7 +240,11 @@ public static partial class RustBatchInterop
 
     public static void ClearMemoryCache()
     {
-        int code = MemoryClearCache();
+        int code;
+        lock (NativeCallGate)
+        {
+            code = MemoryClearCache();
+        }
         if (code != 0)
         {
             throw new InvalidOperationException($"Memory clear cache failed: {code}");
@@ -189,7 +253,11 @@ public static partial class RustBatchInterop
 
     public static void DeletePath(string path, bool recursive = true)
     {
-        int code = DeletePathNative(path, recursive ? (byte)1 : (byte)0);
+        int code;
+        lock (NativeCallGate)
+        {
+            code = DeletePathNative(path, recursive ? (byte)1 : (byte)0);
+        }
         if (code != 0)
         {
             throw new InvalidOperationException($"Delete path failed ({code}): {DescribeOperationError(code)}");
@@ -198,7 +266,11 @@ public static partial class RustBatchInterop
 
     public static void RenamePath(string sourcePath, string targetPath)
     {
-        int code = RenamePathNative(sourcePath, targetPath);
+        int code;
+        lock (NativeCallGate)
+        {
+            code = RenamePathNative(sourcePath, targetPath);
+        }
         if (code != 0)
         {
             throw new InvalidOperationException($"Rename path failed ({code}): {DescribeOperationError(code)}");
@@ -244,6 +316,67 @@ public static partial class RustBatchInterop
             FreeBatchResult(batch);
         }
     }
+
+    private static unsafe bool TryDecodeAndFree(
+        RustBatchResult batch,
+        out FileBatchPage page,
+        out int errorCode,
+        out string errorMessage
+    )
+    {
+        try
+        {
+            if (batch.error_code != 0)
+            {
+                errorCode = batch.error_code;
+                errorMessage = Marshal.PtrToStringUTF8(batch.error_message) ?? "unknown rust ffi error";
+                page = EmptyPage;
+                return false;
+            }
+
+            ReadOnlySpan<RustFileEntry> entries = new(batch.entries.ToPointer(), checked((int)batch.entries_len));
+            ReadOnlySpan<char> names = new(batch.names_utf16.ToPointer(), checked((int)batch.names_len));
+
+            List<FileRow> rows = new(entries.Length);
+            foreach (ref readonly RustFileEntry entry in entries)
+            {
+                int off = checked((int)entry.name_off);
+                int len = checked((int)entry.name_len);
+                string name = new(names.Slice(off, len));
+                bool isDirectory = (entry.flags & 0x0001) != 0;
+                rows.Add(new FileRow(entry.mft_ref, name, isDirectory));
+            }
+
+            page = new FileBatchPage(
+                rows,
+                batch.total_entries,
+                batch.scanned_entries,
+                batch.matched_entries,
+                batch.next_cursor,
+                batch.has_more != 0,
+                batch.suggested_next_limit,
+                batch.source_kind
+            );
+            errorCode = 0;
+            errorMessage = string.Empty;
+            return true;
+        }
+        finally
+        {
+            FreeBatchResult(batch);
+        }
+    }
+
+    private static readonly FileBatchPage EmptyPage = new(
+        Array.Empty<FileRow>(),
+        0,
+        0,
+        0,
+        0,
+        false,
+        0,
+        0
+    );
 
     public static string DescribeBatchSource(byte sourceKind) =>
         sourceKind switch
