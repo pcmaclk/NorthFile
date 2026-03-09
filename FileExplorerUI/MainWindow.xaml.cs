@@ -1,6 +1,7 @@
 using FileExplorerUI.Interop;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI;
@@ -24,6 +25,7 @@ namespace FileExplorerUI
         private GridLength _typeColumnWidth = new(150);
         private GridLength _sizeColumnWidth = new(120);
         private GridLength _modifiedColumnWidth = new(180);
+        private GridLength _sidebarColumnWidth = new(220);
         private double _detailsContentWidth = 694;
         private double _detailsRowWidth = 714;
         private UIElement? _activeColumnSplitter;
@@ -34,7 +36,21 @@ namespace FileExplorerUI
         private double _dragStartSize;
         private double _dragStartModified;
         private double _dragStartContent;
+        private double _sidebarDragStartWidth;
         private int _splitterHoverCount;
+        private double _sidebarPreferredExpandedWidth = 220;
+        private bool _isSidebarCompact;
+        private bool _sidebarPinnedCompact;
+        private readonly List<SidebarGroupControl> _sidebarGroups = new();
+        private readonly List<SidebarItemButton> _sidebarItems = new();
+
+        private const double SidebarExpandedDefaultWidth = 220;
+        private const double SidebarExpandedMinWidth = 32;
+        private const double SidebarExpandedMaxWidth = 360;
+        private const double SidebarCompactWidth = 32;
+        private const double SidebarCompactThreshold = SidebarCompactWidth;
+        private const double SidebarSplitterWidth = 0;
+        private const double SidebarMinContentWidth = 520;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -49,6 +65,21 @@ namespace FileExplorerUI
                 }
                 _nameColumnWidth = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameColumnWidth)));
+            }
+        }
+
+        public GridLength SidebarColumnWidth
+        {
+            get => _sidebarColumnWidth;
+            set
+            {
+                if (_sidebarColumnWidth.Equals(value))
+                {
+                    return;
+                }
+
+                _sidebarColumnWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SidebarColumnWidth)));
             }
         }
 
@@ -128,6 +159,7 @@ namespace FileExplorerUI
         private const uint MaxPageSize = 1000;
         private readonly ObservableCollection<EntryViewModel> _entries = new();
         public ObservableCollection<BreadcrumbItemViewModel> Breadcrumbs { get; } = new();
+        public ObservableCollection<BreadcrumbItemViewModel> VisibleBreadcrumbs { get; } = new();
         private ulong _nextCursor;
         private bool _hasMore;
         private bool _isLoading;
@@ -137,6 +169,7 @@ namespace FileExplorerUI
         private uint _currentPageSize = InitialPageSize;
         private uint _lastFetchMs;
         private uint _totalEntries;
+        private DirectorySortMode _currentSortMode = DirectorySortMode.FolderFirstNameAsc;
         private ScrollViewer? _listScrollViewer;
         private double _estimatedItemHeight = 32.0;
         private Brush? _pathDefaultBorderBrush;
@@ -147,6 +180,9 @@ namespace FileExplorerUI
         private RustUsnCapability _usnCapability;
         private FileSystemWatcher? _dirWatcher;
         private CancellationTokenSource? _watcherDebounceCts;
+        private CancellationTokenSource? _directoryLoadCts;
+        private CancellationTokenSource? _metadataPrefetchCts;
+        private long _directorySnapshotVersion;
         private CommandDockSide _commandDockSide = CommandDockSide.Top;
         private bool _showCommandDock = false;
         private bool _sidebarInitialized;
@@ -155,14 +191,21 @@ namespace FileExplorerUI
         private readonly Brush _sidebarSelectedBorderBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0x1E, 0xA7, 0xFF));
         private readonly Brush _sidebarTransparentBrush = new SolidColorBrush(Colors.Transparent);
         private readonly Brush _sidebarSelectedBackgroundBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xFF, 0xFF, 0xFF));
-        private readonly Brush _sidebarHoverBackgroundBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xCC, 0xCC, 0xCC));
+        private readonly Brush _sidebarHoverBackgroundBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xEA, 0xEA, 0xEA));
         private readonly Brush _sidebarTextBrush = new SolidColorBrush(Colors.DimGray);
+        private readonly Brush _sidebarItemTextBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0x28, 0x28, 0x28));
         private readonly Brush _sidebarNormalBackgroundBrush = new SolidColorBrush(Colors.Transparent);
         private readonly Dictionary<string, SidebarItemButton> _sidebarPathButtons = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _sidebarQuickAccessPaths = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _sidebarDrivePaths = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<SidebarGroupState> _sidebarGroupStates = new();
         private IntPtr _windowHandle;
         private IntPtr _originalWndProc;
         private WndProcDelegate? _wndProcDelegate;
         private MenuFlyout? _activeBreadcrumbFlyout;
+        private readonly List<BreadcrumbItemViewModel> _hiddenBreadcrumbItems = new();
+        private bool _breadcrumbWidthsReady;
+        private int _breadcrumbVisibleStartIndex = -1;
 
         private enum CommandDockSide
         {
@@ -178,6 +221,59 @@ namespace FileExplorerUI
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+        private sealed record MetadataWorkItem(int Index, string Name, ulong MftRef, bool IsDirectory, bool IsLink);
+
+        private sealed record MetadataPayload(string SizeText, string ModifiedText, string IconGlyph, Brush IconForeground);
+
+        private sealed class SidebarGroupState
+        {
+            public required string Key { get; init; }
+            public required SidebarGroupControl Control { get; init; }
+            public List<string> Paths { get; } = new();
+        }
+
+        private enum EntryIconKind
+        {
+            Folder,
+            FolderLink,
+            File,
+            FileLink,
+            Text,
+            Archive,
+            Image,
+            Video,
+            Audio,
+            Pdf,
+            Word,
+            Excel,
+            PowerPoint,
+            Code,
+            Executable,
+            Shortcut,
+            DiskImage
+        }
+
+        private static readonly Brush FolderIconBrush = CreateBrush(0xC4, 0x93, 0x2A);
+        private static readonly Brush FolderLinkIconBrush = CreateBrush(0xA7, 0x79, 0x1F);
+        private static readonly Brush FileIconBrush = CreateBrush(0x6C, 0x72, 0x7D);
+        private static readonly Brush FileLinkIconBrush = CreateBrush(0x5E, 0x79, 0xB9);
+        private static readonly Brush TextIconBrush = CreateBrush(0x5B, 0x7F, 0xA3);
+        private static readonly Brush ArchiveIconBrush = CreateBrush(0x8B, 0x6A, 0x3F);
+        private static readonly Brush ImageIconBrush = CreateBrush(0xA4, 0x62, 0xB8);
+        private static readonly Brush VideoIconBrush = CreateBrush(0xC6, 0x5C, 0x5C);
+        private static readonly Brush AudioIconBrush = CreateBrush(0x3F, 0x93, 0x8D);
+        private static readonly Brush PdfIconBrush = CreateBrush(0xC2, 0x4F, 0x4A);
+        private static readonly Brush WordIconBrush = CreateBrush(0x4C, 0x74, 0xC9);
+        private static readonly Brush ExcelIconBrush = CreateBrush(0x3E, 0x8A, 0x63);
+        private static readonly Brush PowerPointIconBrush = CreateBrush(0xD0, 0x72, 0x44);
+        private static readonly Brush CodeIconBrush = CreateBrush(0x6A, 0x66, 0xC7);
+        private static readonly Brush ExecutableIconBrush = CreateBrush(0xB0, 0x5A, 0x7A);
+        private static readonly Brush ShortcutIconBrush = CreateBrush(0x5E, 0x79, 0xB9);
+        private static readonly Brush DiskImageIconBrush = CreateBrush(0x6B, 0x73, 0x88);
+        private const double BreadcrumbOverflowButtonWidth = 34;
+        private const double BreadcrumbItemSpacing = 2;
+        private const double BreadcrumbWidthReserve = 4;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -185,6 +281,7 @@ namespace FileExplorerUI
             RegisterColumnSplitterHandlers(HeaderSplitter2);
             RegisterColumnSplitterHandlers(HeaderSplitter3);
             RegisterColumnSplitterHandlers(HeaderSplitter4);
+            RegisterSidebarSplitterHandlers(SidebarSplitter);
             EntriesListView.ItemsSource = _entries;
             EntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
             EntriesListView.SizeChanged += EntriesListView_SizeChanged;
@@ -208,6 +305,15 @@ namespace FileExplorerUI
             splitter.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
             splitter.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
             splitter.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
+        }
+
+        private void RegisterSidebarSplitterHandlers(UIElement splitter)
+        {
+            splitter.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(SidebarSplitter_PointerPressed), true);
+            splitter.AddHandler(UIElement.PointerMovedEvent, new PointerEventHandler(SidebarSplitter_PointerMoved), true);
+            splitter.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(SidebarSplitter_PointerReleased), true);
+            splitter.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(SidebarSplitter_PointerReleased), true);
+            splitter.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(SidebarSplitter_PointerReleased), true);
         }
 
         private void InstallWindowHook()
@@ -589,31 +695,42 @@ namespace FileExplorerUI
                 _entriesPointerHooked = true;
             }
             UpdateEstimatedItemHeight();
-            RequestPrefetchForCurrentViewport();
+            RequestViewportWork();
         }
 
         private async void ListScrollViewer_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
         {
-            if (sender is not ScrollViewer viewer || !_hasMore)
+            if (sender is not ScrollViewer viewer)
             {
                 return;
             }
 
+            if (DetailsHeaderTranslateTransform is not null)
+            {
+                DetailsHeaderTranslateTransform.X = -viewer.HorizontalOffset;
+            }
+
             UpdateEstimatedItemHeight();
             int estimatedIndex = EstimateViewportBottomIndex(viewer);
-            await EnsureDataForIndexAsync(estimatedIndex);
+            if (_hasMore)
+            {
+                await EnsureDataForIndexAsync(estimatedIndex);
+            }
+            RequestMetadataForCurrentViewport();
         }
 
         private void EntriesListView_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             UpdateEstimatedItemHeight();
-            RequestPrefetchForCurrentViewport();
+            RequestViewportWork();
         }
 
         private void MainWindow_SizeChanged(object sender, WindowSizeChangedEventArgs args)
         {
+            ApplySidebarWidthLayout();
             UpdateEstimatedItemHeight();
-            RequestPrefetchForCurrentViewport();
+            RequestViewportWork();
+            UpdateVisibleBreadcrumbs();
         }
 
         private async Task LoadFirstPageAsync()
@@ -681,6 +798,11 @@ namespace FileExplorerUI
                 return;
             }
 
+            if (!append)
+            {
+                BeginDirectorySnapshot();
+            }
+
             _isLoading = true;
             LoadButton.IsEnabled = false;
             NextButton.IsEnabled = false;
@@ -704,6 +826,7 @@ namespace FileExplorerUI
                                 cursor,
                                 requestedPageSize,
                                 _lastFetchMs,
+                                _currentSortMode,
                                 out FileBatchPage p,
                                 out int code,
                                 out string msg
@@ -724,6 +847,7 @@ namespace FileExplorerUI
                                 cursor,
                                 requestedPageSize,
                                 _lastFetchMs,
+                                _currentSortMode,
                                 out FileBatchPage p,
                                 out int code,
                                 out string msg
@@ -762,6 +886,7 @@ namespace FileExplorerUI
                 _totalEntries = page.TotalEntries;
                 EnsurePlaceholderCount((int)_totalEntries);
                 FillPageRows((int)cursor, page.Rows);
+                RequestMetadataForCurrentViewport();
 
                 _nextCursor = page.NextCursor;
                 _hasMore = page.HasMore;
@@ -772,10 +897,11 @@ namespace FileExplorerUI
                     ? $" | Match: {page.MatchedEntries}/{page.ScannedEntries} ({(page.MatchedEntries * 100.0 / page.ScannedEntries):F1}%)"
                     : string.Empty;
                 string usnInfo = $" | USN: {DescribeUsnCapability(_usnCapability)}";
+                string sourceDetail = DescribeSourceDetail(page.SourceKind, _usnCapability);
 
                 this.AppWindow.Title = $"FileExplorerUI | Engine {_engineVersion} | Items: {_entries.Count}";
                 UpdateStatus(
-                    $"Path: {path}{searchInfo}{hitInfo}{usnInfo} | Loaded: {page.Rows.Count} | Total: {_totalEntries} | Source: {source} | HasMore: {_hasMore} | NextCursor: {_nextCursor} | Fetch: {sw.ElapsedMilliseconds}ms | Batch: {_currentPageSize}"
+                    $"Path: {path}{searchInfo}{hitInfo}{usnInfo} | Loaded: {page.Rows.Count} | Total: {_totalEntries} | Source: {source}{sourceDetail} | HasMore: {_hasMore} | NextCursor: {_nextCursor} | Fetch: {sw.ElapsedMilliseconds}ms | Batch: {_currentPageSize}"
                 );
                 LogPerfSnapshot(
                     mode: string.IsNullOrWhiteSpace(_currentQuery) ? "browse" : "search",
@@ -874,13 +1000,20 @@ namespace FileExplorerUI
 
             SidebarGroupsHost.Children.Clear();
             _sidebarPathButtons.Clear();
+            _sidebarQuickAccessPaths.Clear();
+            _sidebarDrivePaths.Clear();
+            _sidebarGroups.Clear();
+            _sidebarItems.Clear();
+            _sidebarGroupStates.Clear();
 
-            StackPanel AddGroup(string text, bool expanded = true)
+            SidebarGroupState AddGroup(string key, string text, bool expanded = true)
             {
                 var group = new SidebarGroupControl(
                     text,
                     _sidebarNormalBackgroundBrush,
                     _sidebarHoverBackgroundBrush,
+                    _sidebarSelectedBackgroundBrush,
+                    _sidebarSelectedBorderBrush,
                     _sidebarTextBrush,
                     expanded,
                     headerHeight: 28)
@@ -888,11 +1021,19 @@ namespace FileExplorerUI
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     Margin = new Thickness(0, 6, 0, 0),
                 };
+                group.ExpandedChanged += SidebarGroup_ExpandedChanged;
+                _sidebarGroups.Add(group);
                 SidebarGroupsHost.Children.Add(group);
-                return group.Body;
+                var state = new SidebarGroupState
+                {
+                    Key = key,
+                    Control = group
+                };
+                _sidebarGroupStates.Add(state);
+                return state;
             }
 
-            void AddItem(StackPanel parent, string label, string path)
+            void AddItem(SidebarGroupState groupState, string label, string path)
             {
                 if (string.IsNullOrWhiteSpace(path))
                 {
@@ -912,20 +1053,30 @@ namespace FileExplorerUI
                     _sidebarNormalBackgroundBrush,
                     _sidebarHoverBackgroundBrush,
                     _sidebarSelectedBackgroundBrush,
-                    _sidebarTextBrush,
+                    _sidebarItemTextBrush,
                     _sidebarTransparentBrush,
                     _sidebarSelectedBorderBrush);
                 item.Click += SidebarItemButton_Click;
-                parent.Children.Add(item);
+                groupState.Control.Body.Children.Add(item);
                 _sidebarPathButtons[path] = item;
+                _sidebarItems.Add(item);
+                groupState.Paths.Add(path);
+                if (string.Equals(groupState.Key, "quick_access", StringComparison.Ordinal))
+                {
+                    _sidebarQuickAccessPaths.Add(path);
+                }
+                else if (string.Equals(groupState.Key, "drives", StringComparison.Ordinal))
+                {
+                    _sidebarDrivePaths.Add(path);
+                }
             }
 
-            StackPanel quickAccess = AddGroup("固定", expanded: true);
+            SidebarGroupState quickAccess = AddGroup("quick_access", "固定", expanded: true);
             AddItem(quickAccess, "桌面", Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
             AddItem(quickAccess, "文档", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
             AddItem(quickAccess, "下载", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));
 
-            StackPanel drives = AddGroup("驱动器", expanded: true);
+            SidebarGroupState drives = AddGroup("drives", "驱动器", expanded: true);
 
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
@@ -937,18 +1088,177 @@ namespace FileExplorerUI
                 AddItem(drives, $"本地磁盘 ({letter})", drive.RootDirectory.FullName);
             }
 
-            AddGroup("云盘", expanded: false);
-            AddGroup("网络", expanded: false);
-            AddGroup("标签", expanded: false);
+            _ = AddGroup("cloud", "云盘", expanded: false);
+            _ = AddGroup("network", "网络", expanded: false);
+            _ = AddGroup("tags", "标签", expanded: false);
+            ApplySidebarCompactState(_isSidebarCompact);
             UpdateSidebarSelectionOnly();
+        }
+
+        private void SidebarGroup_ExpandedChanged(object? sender, EventArgs e)
+        {
+            UpdateSidebarSelectionOnly();
+        }
+
+        private void SidebarSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not UIElement splitter)
+            {
+                return;
+            }
+
+            ColumnSplitter.TryApplyResizeCursor();
+            _activeColumnSplitter = splitter;
+            _activeSplitterTag = 100;
+            _dragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            _sidebarDragStartWidth = SidebarColumnWidth.Value;
+            splitter.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+
+        private void SidebarSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is UIElement)
+            {
+                ColumnSplitter.TryApplyResizeCursor();
+            }
+
+            if (sender is not UIElement splitter || !ReferenceEquals(splitter, _activeColumnSplitter) || _activeSplitterTag != 100)
+            {
+                return;
+            }
+
+            if (!e.GetCurrentPoint(splitter).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            double x = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            double delta = x - _dragStartX;
+            double requestedWidth = _sidebarDragStartWidth + delta;
+            ApplySidebarWidthLayout(requestedWidth, fromUserDrag: true);
+            e.Handled = true;
+        }
+
+        private void SidebarSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (_activeSplitterTag != 100)
+            {
+                return;
+            }
+
+            if (sender is UIElement splitter)
+            {
+                splitter.ReleasePointerCaptures();
+            }
+
+            _activeColumnSplitter = null;
+            _activeSplitterTag = 0;
+            _dragStartX = 0;
+            e.Handled = true;
+        }
+
+        private void ApplySidebarWidthLayout(double? requestedWidth = null, bool fromUserDrag = false)
+        {
+            if (ExplorerBodyGrid is null)
+            {
+                return;
+            }
+
+            double bodyWidth = ExplorerBodyGrid.ActualWidth;
+            if (bodyWidth <= 0)
+            {
+                SidebarColumnWidth = new GridLength((_sidebarPinnedCompact || _isSidebarCompact) ? SidebarCompactWidth : _sidebarPreferredExpandedWidth);
+                return;
+            }
+
+            double maxSidebarWidth = Math.Max(SidebarCompactWidth, bodyWidth - SidebarSplitterWidth - SidebarMinContentWidth);
+            if (fromUserDrag)
+            {
+                double dragWidth = requestedWidth ?? _sidebarPreferredExpandedWidth;
+                if (dragWidth <= SidebarCompactThreshold)
+                {
+                    _sidebarPinnedCompact = true;
+                }
+                else
+                {
+                    _sidebarPinnedCompact = false;
+                    _sidebarPreferredExpandedWidth = Math.Clamp(dragWidth, SidebarExpandedMinWidth, SidebarExpandedMaxWidth);
+                }
+            }
+
+            bool forcedCompact = maxSidebarWidth <= SidebarCompactThreshold;
+            bool compact = forcedCompact || _sidebarPinnedCompact;
+            double clampedWidth = Math.Min(_sidebarPreferredExpandedWidth, maxSidebarWidth);
+            double finalWidth = compact
+                ? SidebarCompactWidth
+                : Math.Clamp(clampedWidth, SidebarExpandedMinWidth, SidebarExpandedMaxWidth);
+
+            SidebarColumnWidth = new GridLength(finalWidth);
+            ApplySidebarCompactState(compact);
+        }
+
+        private void ApplySidebarCompactState(bool compact)
+        {
+            if (_isSidebarCompact == compact && _sidebarGroups.Count > 0 && _sidebarItems.Count > 0)
+            {
+                return;
+            }
+
+            _isSidebarCompact = compact;
+
+            foreach (SidebarGroupControl group in _sidebarGroups)
+            {
+                group.SetCompact(compact);
+            }
+
+            foreach (SidebarItemButton item in _sidebarItems)
+            {
+                item.SetCompact(compact);
+            }
         }
 
         private void UpdateSidebarSelectionOnly()
         {
+            bool quickAccessSelected = false;
+            foreach (string quickPath in _sidebarQuickAccessPaths)
+            {
+                if (IsCurrentPath(quickPath))
+                {
+                    quickAccessSelected = true;
+                    break;
+                }
+            }
+
             foreach ((string path, SidebarItemButton btn) in _sidebarPathButtons)
             {
                 bool selected = IsCurrentPath(path);
+                if (quickAccessSelected && _sidebarDrivePaths.Contains(path))
+                {
+                    selected = false;
+                }
                 btn.ApplySelection(selected);
+            }
+
+            foreach (SidebarGroupState groupState in _sidebarGroupStates)
+            {
+                if (quickAccessSelected && string.Equals(groupState.Key, "drives", StringComparison.Ordinal))
+                {
+                    groupState.Control.ApplySelection(false);
+                    continue;
+                }
+
+                bool groupSelected = false;
+                foreach (string path in groupState.Paths)
+                {
+                    if (IsCurrentPath(path))
+                    {
+                        groupSelected = true;
+                        break;
+                    }
+                }
+
+                groupState.Control.ApplySelection(groupSelected);
             }
         }
 
@@ -1156,6 +1466,31 @@ namespace FileExplorerUI
             return "Unavailable";
         }
 
+        private static string DescribeSourceDetail(byte sourceKind, RustUsnCapability c)
+        {
+            if (sourceKind != 1)
+            {
+                return string.Empty;
+            }
+            if (c.error_code != 0)
+            {
+                return $" (NTFS fallback: probe error {c.error_code})";
+            }
+            if (c.is_ntfs_local == 0)
+            {
+                return " (NTFS fallback: not local NTFS)";
+            }
+            if (c.access_denied != 0)
+            {
+                return " (NTFS fallback: access denied)";
+            }
+            if (c.available != 0)
+            {
+                return " (NTFS fallback: probe succeeded, batch path unavailable)";
+            }
+            return " (NTFS fallback: unavailable)";
+        }
+
         private static uint ClampPageSize(uint suggested, uint fallback)
         {
             uint value = suggested == 0 ? fallback : suggested;
@@ -1218,6 +1553,12 @@ namespace FileExplorerUI
             }
         }
 
+        private void RequestViewportWork()
+        {
+            RequestPrefetchForCurrentViewport();
+            RequestMetadataForCurrentViewport();
+        }
+
         private void RequestPrefetchForCurrentViewport()
         {
             if (_listScrollViewer is null || !_hasMore)
@@ -1227,6 +1568,185 @@ namespace FileExplorerUI
 
             int idx = EstimateViewportBottomIndex(_listScrollViewer);
             _ = EnsureDataForIndexAsync(idx);
+        }
+
+        private void RequestMetadataForCurrentViewport()
+        {
+            if (_entries.Count == 0)
+            {
+                CancelAndDispose(ref _metadataPrefetchCts);
+                return;
+            }
+
+            int visibleStart;
+            int visibleEnd;
+            if (_listScrollViewer is null)
+            {
+                visibleStart = 0;
+                visibleEnd = Math.Min(_entries.Count - 1, (int)_currentPageSize - 1);
+            }
+            else
+            {
+                visibleStart = EstimateViewportIndex(_listScrollViewer);
+                visibleEnd = EstimateViewportBottomIndex(_listScrollViewer);
+            }
+
+            if (visibleEnd < visibleStart)
+            {
+                return;
+            }
+
+            int visibleCount = Math.Max(1, visibleEnd - visibleStart + 1);
+            int lookahead = Math.Max(visibleCount, (int)_currentPageSize);
+            int prefetchEnd = Math.Min(_entries.Count - 1, visibleEnd + lookahead);
+
+            List<MetadataWorkItem> visibleItems = CollectMetadataWorkItems(visibleStart, visibleEnd);
+            List<MetadataWorkItem> prefetchItems = CollectMetadataWorkItems(visibleEnd + 1, prefetchEnd);
+            if (visibleItems.Count == 0 && prefetchItems.Count == 0)
+            {
+                return;
+            }
+
+            CancellationTokenSource? baseCts = _directoryLoadCts;
+            if (baseCts is null)
+            {
+                return;
+            }
+
+            CancelAndDispose(ref _metadataPrefetchCts);
+            _metadataPrefetchCts = CancellationTokenSource.CreateLinkedTokenSource(baseCts.Token);
+            CancellationToken token = _metadataPrefetchCts.Token;
+            long snapshotVersion = _directorySnapshotVersion;
+            string path = _currentPath;
+
+            _ = Task.Run(async () =>
+            {
+                await HydrateMetadataBatchAsync(path, snapshotVersion, visibleItems, token);
+                await HydrateMetadataBatchAsync(path, snapshotVersion, prefetchItems, token);
+            }, token);
+        }
+
+        private List<MetadataWorkItem> CollectMetadataWorkItems(int startIndex, int endIndex)
+        {
+            var items = new List<MetadataWorkItem>();
+            if (startIndex < 0 || startIndex >= _entries.Count || endIndex < startIndex)
+            {
+                return items;
+            }
+
+            int cappedEnd = Math.Min(endIndex, _entries.Count - 1);
+            for (int i = startIndex; i <= cappedEnd; i++)
+            {
+                EntryViewModel entry = _entries[i];
+                if (!entry.IsLoaded || entry.IsMetadataLoaded)
+                {
+                    continue;
+                }
+
+                items.Add(new MetadataWorkItem(i, entry.Name, entry.MftRef, entry.IsDirectory, entry.IsLink));
+            }
+
+            return items;
+        }
+
+        private async Task HydrateMetadataBatchAsync(
+            string path,
+            long snapshotVersion,
+            IReadOnlyList<MetadataWorkItem> items,
+            CancellationToken token
+        )
+        {
+            foreach (MetadataWorkItem item in items)
+            {
+                token.ThrowIfCancellationRequested();
+
+                MetadataPayload payload = BuildMetadataPayload(path, item.Name, item.IsDirectory, item.IsLink, token);
+
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                _ = DispatcherQueue.TryEnqueue(() =>
+                {
+                    ApplyMetadataPayload(snapshotVersion, item, payload);
+                });
+            }
+        }
+
+        private MetadataPayload BuildMetadataPayload(
+            string path,
+            string name,
+            bool isDirectory,
+            bool isLink,
+            CancellationToken token
+        )
+        {
+            token.ThrowIfCancellationRequested();
+            string fullPath = Path.Combine(path, name);
+            string sizeText = isDirectory ? string.Empty : GetFileSizeText(fullPath);
+            token.ThrowIfCancellationRequested();
+            string modifiedText = GetModifiedTimeText(fullPath, isDirectory);
+            string iconGlyph = GetEntryIconGlyph(isDirectory, isLink, name);
+            Brush iconForeground = GetEntryIconBrush(isDirectory, isLink, name);
+            return new MetadataPayload(sizeText, modifiedText, iconGlyph, iconForeground);
+        }
+
+        private void ApplyMetadataPayload(long snapshotVersion, MetadataWorkItem item, MetadataPayload payload)
+        {
+            if (snapshotVersion != _directorySnapshotVersion)
+            {
+                return;
+            }
+
+            if (item.Index < 0 || item.Index >= _entries.Count)
+            {
+                return;
+            }
+
+            EntryViewModel current = _entries[item.Index];
+            if (!current.IsLoaded)
+            {
+                return;
+            }
+
+            if (current.MftRef != item.MftRef || !string.Equals(current.Name, item.Name, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            current.SizeText = payload.SizeText;
+            current.ModifiedText = payload.ModifiedText;
+            current.IconGlyph = payload.IconGlyph;
+            current.IconForeground = payload.IconForeground;
+            current.IsMetadataLoaded = true;
+        }
+
+        private void BeginDirectorySnapshot()
+        {
+            CancelAndDispose(ref _metadataPrefetchCts);
+            CancelAndDispose(ref _directoryLoadCts);
+            _directoryLoadCts = new CancellationTokenSource();
+            _directorySnapshotVersion++;
+        }
+
+        private static void CancelAndDispose(ref CancellationTokenSource? cts)
+        {
+            if (cts is null)
+            {
+                return;
+            }
+
+            try
+            {
+                cts.Cancel();
+            }
+            catch
+            {
+            }
+
+            cts.Dispose();
+            cts = null;
         }
 
         private void UpdateEstimatedItemHeight()
@@ -1260,11 +1780,14 @@ namespace FileExplorerUI
                     Name = "...",
                     Type = "",
                     IconGlyph = "\uE9CE",
+                    IconForeground = FileIconBrush,
                     MftRef = 0,
                     SizeText = "",
                     ModifiedText = "",
                     IsDirectory = false,
-                    IsLoaded = false
+                    IsLink = false,
+                    IsLoaded = false,
+                    IsMetadataLoaded = false
                 });
             }
 
@@ -1288,15 +1811,176 @@ namespace FileExplorerUI
                 _entries[startIndex + i] = new EntryViewModel
                 {
                     Name = row.Name,
-                    Type = row.IsDirectory ? "文件夹" : GetFileTypeText(row.Name),
-                    IconGlyph = row.IsDirectory ? "\uE8B7" : "\uE8A5",
+                    Type = GetEntryTypeText(row.Name, row.IsDirectory, row.IsLink),
+                    IconGlyph = GetEntryIconGlyph(row.IsDirectory, row.IsLink, row.Name),
+                    IconForeground = GetEntryIconBrush(row.IsDirectory, row.IsLink, row.Name),
                     MftRef = row.MftRef,
-                    SizeText = row.IsDirectory ? "" : GetFileSizeText(Path.Combine(_currentPath, row.Name)),
-                    ModifiedText = GetModifiedTimeText(Path.Combine(_currentPath, row.Name), row.IsDirectory),
+                    SizeText = "",
+                    ModifiedText = "",
                     IsDirectory = row.IsDirectory,
-                    IsLoaded = true
+                    IsLink = row.IsLink,
+                    IsLoaded = true,
+                    IsMetadataLoaded = false
                 };
             }
+        }
+
+        private static string GetEntryTypeText(string name, bool isDirectory, bool isLink)
+        {
+            if (isDirectory)
+            {
+                return isLink ? "文件夹链接" : "文件夹";
+            }
+
+            if (isLink)
+            {
+                return "文件链接";
+            }
+
+            return GetFileTypeText(name);
+        }
+
+        private static string GetEntryIconGlyph(bool isDirectory, bool isLink, string? name = null)
+        {
+            EntryIconKind kind = GetEntryIconKind(name, isDirectory, isLink);
+            return kind switch
+            {
+                EntryIconKind.Folder => "\uE8B7",
+                EntryIconKind.FolderLink => "\uE8F0",
+                EntryIconKind.File => "\uE8A5",
+                EntryIconKind.FileLink => "\uE71B",
+                EntryIconKind.Text => "\uF000",
+                EntryIconKind.Archive => "\uF012",
+                EntryIconKind.Image => "\uEB9F",
+                EntryIconKind.Video => "\uEC0D",
+                EntryIconKind.Audio => "\uEC4F",
+                EntryIconKind.Pdf => "\uEA90",
+                EntryIconKind.Word => "\uF1C2",
+                EntryIconKind.Excel => "\uF1C3",
+                EntryIconKind.PowerPoint => "\uF1C4",
+                EntryIconKind.Code => "\uE943",
+                EntryIconKind.Executable => "\uE756",
+                EntryIconKind.Shortcut => "\uE71B",
+                EntryIconKind.DiskImage => "\uE7F8",
+                _ => "\uE8A5"
+            };
+        }
+
+        private static Brush GetEntryIconBrush(bool isDirectory, bool isLink, string? name = null)
+        {
+            EntryIconKind kind = GetEntryIconKind(name, isDirectory, isLink);
+            return kind switch
+            {
+                EntryIconKind.Folder => FolderIconBrush,
+                EntryIconKind.FolderLink => FolderLinkIconBrush,
+                EntryIconKind.File => FileIconBrush,
+                EntryIconKind.FileLink => FileLinkIconBrush,
+                EntryIconKind.Text => TextIconBrush,
+                EntryIconKind.Archive => ArchiveIconBrush,
+                EntryIconKind.Image => ImageIconBrush,
+                EntryIconKind.Video => VideoIconBrush,
+                EntryIconKind.Audio => AudioIconBrush,
+                EntryIconKind.Pdf => PdfIconBrush,
+                EntryIconKind.Word => WordIconBrush,
+                EntryIconKind.Excel => ExcelIconBrush,
+                EntryIconKind.PowerPoint => PowerPointIconBrush,
+                EntryIconKind.Code => CodeIconBrush,
+                EntryIconKind.Executable => ExecutableIconBrush,
+                EntryIconKind.Shortcut => ShortcutIconBrush,
+                EntryIconKind.DiskImage => DiskImageIconBrush,
+                _ => FileIconBrush
+            };
+        }
+
+        private static Brush CreateBrush(byte r, byte g, byte b) =>
+            new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, r, g, b));
+
+        private static EntryIconKind GetEntryIconKind(string? name, bool isDirectory, bool isLink)
+        {
+            if (isDirectory)
+            {
+                return isLink ? EntryIconKind.FolderLink : EntryIconKind.Folder;
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return isLink ? EntryIconKind.FileLink : EntryIconKind.File;
+            }
+
+            string ext = Path.GetExtension(name).ToLowerInvariant();
+            if (string.IsNullOrEmpty(ext))
+            {
+                return isLink ? EntryIconKind.FileLink : EntryIconKind.File;
+            }
+
+            if (ext is ".lnk" or ".url")
+            {
+                return EntryIconKind.Shortcut;
+            }
+
+            if (ext is ".txt" or ".log" or ".md" or ".ini" or ".cfg" or ".conf" or ".nfo")
+            {
+                return EntryIconKind.Text;
+            }
+
+            if (ext is ".zip" or ".rar" or ".7z" or ".tar" or ".gz" or ".bz2" or ".xz" or ".cab")
+            {
+                return EntryIconKind.Archive;
+            }
+
+            if (ext is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp" or ".svg" or ".ico" or ".heic")
+            {
+                return EntryIconKind.Image;
+            }
+
+            if (ext is ".mp4" or ".mkv" or ".avi" or ".mov" or ".wmv" or ".flv" or ".webm" or ".m4v")
+            {
+                return EntryIconKind.Video;
+            }
+
+            if (ext is ".mp3" or ".wav" or ".flac" or ".aac" or ".ogg" or ".m4a" or ".wma")
+            {
+                return EntryIconKind.Audio;
+            }
+
+            if (ext == ".pdf")
+            {
+                return EntryIconKind.Pdf;
+            }
+
+            if (ext is ".doc" or ".docx" or ".rtf" or ".odt")
+            {
+                return EntryIconKind.Word;
+            }
+
+            if (ext is ".xls" or ".xlsx" or ".csv" or ".ods")
+            {
+                return EntryIconKind.Excel;
+            }
+
+            if (ext is ".ppt" or ".pptx" or ".odp")
+            {
+                return EntryIconKind.PowerPoint;
+            }
+
+            if (ext is ".exe" or ".msi" or ".bat" or ".cmd" or ".ps1" or ".com")
+            {
+                return EntryIconKind.Executable;
+            }
+
+            if (ext is ".iso" or ".img" or ".vhd" or ".vhdx")
+            {
+                return EntryIconKind.DiskImage;
+            }
+
+            if (ext is ".rs" or ".cs" or ".cpp" or ".c" or ".h" or ".hpp" or ".py" or ".js" or ".ts" or ".tsx"
+                or ".jsx" or ".java" or ".kt" or ".go" or ".php" or ".swift" or ".json" or ".xml" or ".yaml"
+                or ".yml" or ".toml" or ".md" or ".sql" or ".html" or ".css" or ".scss" or ".sh")
+            {
+                return EntryIconKind.Code;
+            }
+
+            return isLink ? EntryIconKind.FileLink : EntryIconKind.File;
         }
 
         private static string GetFileTypeText(string name)
@@ -1427,12 +2111,16 @@ namespace FileExplorerUI
                 Name = newName,
                 Type = current.Type,
                 IconGlyph = current.IconGlyph,
+                IconForeground = current.IconForeground,
                 MftRef = current.MftRef,
-                SizeText = current.SizeText,
-                ModifiedText = current.ModifiedText,
+                SizeText = string.Empty,
+                ModifiedText = string.Empty,
                 IsDirectory = current.IsDirectory,
-                IsLoaded = true
+                IsLink = current.IsLink,
+                IsLoaded = true,
+                IsMetadataLoaded = false
             };
+            RequestMetadataForCurrentViewport();
         }
 
         private void ApplyLocalDelete(int index)
@@ -1703,7 +2391,58 @@ namespace FileExplorerUI
                 });
             }
 
-            flyout.ShowAt(btn);
+            ShowBreadcrumbFlyout(flyout, btn);
+        }
+
+        private void OverflowBreadcrumbButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn)
+            {
+                return;
+            }
+
+            var flyout = new MenuFlyout();
+            if (Application.Current.Resources.TryGetValue("BreadcrumbMenuFlyoutPresenterStyle", out object styleObj)
+                && styleObj is Style presenterStyle)
+            {
+                flyout.MenuFlyoutPresenterStyle = presenterStyle;
+            }
+
+            _activeBreadcrumbFlyout = flyout;
+            flyout.Closed -= BreadcrumbSplitFlyout_Closed;
+            flyout.Closed += BreadcrumbSplitFlyout_Closed;
+
+            foreach (BreadcrumbItemViewModel item in _hiddenBreadcrumbItems)
+            {
+                var menuItem = new MenuFlyoutItem
+                {
+                    Text = item.Label,
+                    Tag = item.FullPath
+                };
+                menuItem.Click += OverflowBreadcrumbMenuItem_Click;
+                flyout.Items.Add(menuItem);
+            }
+
+            if (flyout.Items.Count == 0)
+            {
+                flyout.Items.Add(new MenuFlyoutItem
+                {
+                    Text = "(empty)",
+                    IsEnabled = false
+                });
+            }
+
+            ShowBreadcrumbFlyout(flyout, btn);
+        }
+
+        private void ShowBreadcrumbFlyout(MenuFlyout flyout, FrameworkElement target)
+        {
+            var options = new FlyoutShowOptions
+            {
+                Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft
+            };
+
+            flyout.ShowAt(target, options);
         }
 
         private void BreadcrumbSplitFlyout_Closed(object? sender, object e)
@@ -1733,6 +2472,17 @@ namespace FileExplorerUI
         }
 
         private async void BreadcrumbSubdirMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuFlyoutItem item || item.Tag is not string target)
+            {
+                return;
+            }
+
+            await NavigateToPathAsync(target, pushHistory: true);
+            ExitAddressEditMode(commit: true);
+        }
+
+        private async void OverflowBreadcrumbMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not MenuFlyoutItem item || item.Tag is not string target)
             {
@@ -1834,6 +2584,19 @@ namespace FileExplorerUI
         private void UpdateBreadcrumbs(string path)
         {
             Breadcrumbs.Clear();
+            _breadcrumbWidthsReady = false;
+            _breadcrumbVisibleStartIndex = -1;
+            _hiddenBreadcrumbItems.Clear();
+            VisibleBreadcrumbs.Clear();
+            if (BreadcrumbItemsControl is not null)
+            {
+                BreadcrumbItemsControl.Opacity = 0;
+            }
+            if (OverflowBreadcrumbButton is not null)
+            {
+                OverflowBreadcrumbButton.Visibility = Visibility.Collapsed;
+            }
+
             string fullPath = Path.GetFullPath(path);
             string root = Path.GetPathRoot(fullPath) ?? string.Empty;
             if (!string.IsNullOrEmpty(root))
@@ -1874,7 +2637,154 @@ namespace FileExplorerUI
                 item.ChevronVisibility = item.HasChildren && !item.IsLast
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+                item.MeasuredWidth = 0;
             }
+        }
+
+        private void AddressBreadcrumbBorder_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateVisibleBreadcrumbs();
+        }
+
+        private void UpdateVisibleBreadcrumbs()
+        {
+            if (Breadcrumbs.Count == 0)
+            {
+                _hiddenBreadcrumbItems.Clear();
+                VisibleBreadcrumbs.Clear();
+                if (OverflowBreadcrumbButton is not null)
+                {
+                    OverflowBreadcrumbButton.Visibility = Visibility.Collapsed;
+                }
+                return;
+            }
+
+            if (!_breadcrumbWidthsReady)
+            {
+                return;
+            }
+
+            int visibleStartIndex = CalculateVisibleBreadcrumbStartIndex();
+            if (visibleStartIndex == _breadcrumbVisibleStartIndex)
+            {
+                return;
+            }
+
+            _breadcrumbVisibleStartIndex = visibleStartIndex;
+            _hiddenBreadcrumbItems.Clear();
+            for (int i = 0; i < visibleStartIndex; i++)
+            {
+                _hiddenBreadcrumbItems.Add(Breadcrumbs[i]);
+            }
+
+            var visibleItems = new List<BreadcrumbItemViewModel>();
+            for (int i = visibleStartIndex; i < Breadcrumbs.Count; i++)
+            {
+                visibleItems.Add(Breadcrumbs[i]);
+            }
+
+            ResetVisibleBreadcrumbs(visibleItems);
+
+            if (BreadcrumbItemsControl is not null)
+            {
+                BreadcrumbItemsControl.Opacity = 1;
+            }
+            if (OverflowBreadcrumbButton is not null)
+            {
+                OverflowBreadcrumbButton.Visibility = visibleStartIndex > 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private int CalculateVisibleBreadcrumbStartIndex()
+        {
+            Border? border = AddressBreadcrumbBorder;
+            double availableWidth = border?.ActualWidth ?? 0;
+            if (border is null || availableWidth <= 0)
+            {
+                return 0;
+            }
+
+            Thickness padding = border.Padding;
+            Thickness borderThickness = border.BorderThickness;
+            availableWidth -= padding.Left + padding.Right + borderThickness.Left + borderThickness.Right + BreadcrumbWidthReserve;
+
+            double usedWidth = 0;
+
+            for (int i = Breadcrumbs.Count - 1; i >= 0; i--)
+            {
+                double itemWidth = Breadcrumbs[i].MeasuredWidth;
+                double requiredWidth = usedWidth + itemWidth;
+                if (i < Breadcrumbs.Count - 1)
+                {
+                    requiredWidth += BreadcrumbItemSpacing;
+                }
+
+                if (i > 0)
+                {
+                    requiredWidth += BreadcrumbOverflowButtonWidth;
+                }
+
+                if (i == Breadcrumbs.Count - 1 || requiredWidth <= availableWidth)
+                {
+                    usedWidth += itemWidth;
+                    if (i < Breadcrumbs.Count - 1)
+                    {
+                        usedWidth += BreadcrumbItemSpacing;
+                    }
+                    continue;
+                }
+
+                return i + 1;
+            }
+
+            return 0;
+        }
+
+        private void ResetVisibleBreadcrumbs(IEnumerable<BreadcrumbItemViewModel> items)
+        {
+            VisibleBreadcrumbs.Clear();
+            foreach (BreadcrumbItemViewModel item in items)
+            {
+                VisibleBreadcrumbs.Add(item);
+            }
+        }
+
+        private void MeasureBreadcrumbItem_Loaded(object sender, RoutedEventArgs e)
+        {
+            UpdateMeasuredBreadcrumbWidth(sender as FrameworkElement);
+        }
+
+        private void MeasureBreadcrumbItem_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateMeasuredBreadcrumbWidth(sender as FrameworkElement);
+        }
+
+        private void UpdateMeasuredBreadcrumbWidth(FrameworkElement? element)
+        {
+            if (element?.DataContext is not BreadcrumbItemViewModel item || element.ActualWidth <= 0)
+            {
+                return;
+            }
+
+            item.MeasuredWidth = element.ActualWidth;
+            if (!_breadcrumbWidthsReady && AreAllBreadcrumbWidthsMeasured())
+            {
+                _breadcrumbWidthsReady = true;
+                UpdateVisibleBreadcrumbs();
+            }
+        }
+
+        private bool AreAllBreadcrumbWidthsMeasured()
+        {
+            for (int i = 0; i < Breadcrumbs.Count; i++)
+            {
+                if (Breadcrumbs[i].MeasuredWidth <= 0)
+                {
+                    return false;
+                }
+            }
+
+            return Breadcrumbs.Count > 0;
         }
 
         private async Task<string?> PromptRenameAsync(string oldName)
@@ -1962,16 +2872,175 @@ namespace FileExplorerUI
         }
     }
 
-    public sealed class EntryViewModel
+    public sealed class EntryViewModel : INotifyPropertyChanged
     {
-        public string Name { get; init; } = string.Empty;
-        public string Type { get; init; } = string.Empty;
-        public string IconGlyph { get; init; } = "\uE8A5";
-        public ulong MftRef { get; init; }
-        public string SizeText { get; init; } = string.Empty;
-        public string ModifiedText { get; init; } = string.Empty;
-        public bool IsDirectory { get; init; }
-        public bool IsLoaded { get; init; }
+        private string _name = string.Empty;
+        private string _type = string.Empty;
+        private string _iconGlyph = "\uE8A5";
+        private Brush _iconForeground = new SolidColorBrush(Colors.DimGray);
+        private ulong _mftRef;
+        private string _sizeText = string.Empty;
+        private string _modifiedText = string.Empty;
+        private bool _isDirectory;
+        private bool _isLink;
+        private bool _isLoaded;
+        private bool _isMetadataLoaded;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public string Name
+        {
+            get => _name;
+            set
+            {
+                if (_name == value)
+                {
+                    return;
+                }
+                _name = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Name)));
+            }
+        }
+
+        public string Type
+        {
+            get => _type;
+            set
+            {
+                if (_type == value)
+                {
+                    return;
+                }
+                _type = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Type)));
+            }
+        }
+
+        public string IconGlyph
+        {
+            get => _iconGlyph;
+            set
+            {
+                if (_iconGlyph == value)
+                {
+                    return;
+                }
+                _iconGlyph = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IconGlyph)));
+            }
+        }
+
+        public Brush IconForeground
+        {
+            get => _iconForeground;
+            set
+            {
+                if (ReferenceEquals(_iconForeground, value))
+                {
+                    return;
+                }
+                _iconForeground = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IconForeground)));
+            }
+        }
+
+        public ulong MftRef
+        {
+            get => _mftRef;
+            set
+            {
+                if (_mftRef == value)
+                {
+                    return;
+                }
+                _mftRef = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MftRef)));
+            }
+        }
+
+        public string SizeText
+        {
+            get => _sizeText;
+            set
+            {
+                if (_sizeText == value)
+                {
+                    return;
+                }
+                _sizeText = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SizeText)));
+            }
+        }
+
+        public string ModifiedText
+        {
+            get => _modifiedText;
+            set
+            {
+                if (_modifiedText == value)
+                {
+                    return;
+                }
+                _modifiedText = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ModifiedText)));
+            }
+        }
+
+        public bool IsDirectory
+        {
+            get => _isDirectory;
+            set
+            {
+                if (_isDirectory == value)
+                {
+                    return;
+                }
+                _isDirectory = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsDirectory)));
+            }
+        }
+
+        public bool IsLink
+        {
+            get => _isLink;
+            set
+            {
+                if (_isLink == value)
+                {
+                    return;
+                }
+                _isLink = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLink)));
+            }
+        }
+
+        public bool IsLoaded
+        {
+            get => _isLoaded;
+            set
+            {
+                if (_isLoaded == value)
+                {
+                    return;
+                }
+                _isLoaded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLoaded)));
+            }
+        }
+
+        public bool IsMetadataLoaded
+        {
+            get => _isMetadataLoaded;
+            set
+            {
+                if (_isMetadataLoaded == value)
+                {
+                    return;
+                }
+                _isMetadataLoaded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMetadataLoaded)));
+            }
+        }
     }
 
     public sealed class BreadcrumbItemViewModel : INotifyPropertyChanged
@@ -1980,6 +3049,7 @@ namespace FileExplorerUI
         private string _fullPath = string.Empty;
         private bool _hasChildren;
         private bool _isLast;
+        private double _measuredWidth;
         private Visibility _chevronVisibility = Visibility.Visible;
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -2051,6 +3121,21 @@ namespace FileExplorerUI
                 }
                 _chevronVisibility = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ChevronVisibility)));
+            }
+        }
+
+        public double MeasuredWidth
+        {
+            get => _measuredWidth;
+            set
+            {
+                if (Math.Abs(_measuredWidth - value) < 0.1)
+                {
+                    return;
+                }
+
+                _measuredWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MeasuredWidth)));
             }
         }
     }

@@ -12,6 +12,10 @@ use crate::ntfs::{
     NtfsIndexRootEntry, NtfsMeta, list_directory_index_root_entries_for_path_with_meta,
     probe_ntfs_for_path,
 };
+use crate::traditional::{
+    SORT_DIRS_FIRST_NAME_ASC, compare_directory_like, normalize_sort_mode, resolve_entry_is_dir,
+    resolve_entry_is_link,
+};
 
 pub struct StringPool {
     data: Vec<u16>,
@@ -107,6 +111,7 @@ impl PathEngine for MemoryPathEngine {
 pub struct MemoryDirItem {
     pub name: String,
     pub is_dir: bool,
+    pub is_link: bool,
 }
 
 const MEMORY_DIR_CACHE_TTL: Duration = Duration::from_secs(3);
@@ -153,15 +158,44 @@ fn ntfs_dir_table() -> &'static Mutex<NtfsDirTable> {
     TABLE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn directory_cache_key(dir_path: &Path, sort_mode: u8) -> String {
+    format!("{}|{}", dir_path.to_string_lossy(), normalize_sort_mode(sort_mode))
+}
+
+fn sort_memory_items(items: &mut [MemoryDirItem], sort_mode: u8) {
+    match normalize_sort_mode(sort_mode) {
+        SORT_DIRS_FIRST_NAME_ASC => items.sort_unstable_by(|a, b| {
+            compare_directory_like(a.is_dir, &a.name, b.is_dir, &b.name)
+        }),
+        _ => unreachable!(),
+    }
+}
+
+fn sort_ntfs_items(items: &mut [NtfsIndexRootEntry], sort_mode: u8) {
+    match normalize_sort_mode(sort_mode) {
+        SORT_DIRS_FIRST_NAME_ASC => items.sort_unstable_by(|a, b| {
+            compare_directory_like(
+                (a.flags & 0x0001) != 0,
+                &a.name,
+                (b.flags & 0x0001) != 0,
+                &b.name,
+            )
+        }),
+        _ => unreachable!(),
+    }
+}
+
 pub fn invalidate_directory_cache(dir_path: &Path) -> Result<bool, FsError> {
-    let key = dir_path.to_string_lossy().to_string();
+    let key_prefix = format!("{}|", dir_path.to_string_lossy());
     let mut table = memory_table().lock().map_err(|_| {
         FsError::new(
             FsErrorCode::Internal,
             "failed to lock memory path table (poisoned mutex)",
         )
     })?;
-    let removed_mem = table.remove(&key).is_some();
+    let mem_before = table.len();
+    table.retain(|key, _| !key.starts_with(&key_prefix));
+    let removed_mem = table.len() != mem_before;
 
     let mut ntfs_table = ntfs_dir_table().lock().map_err(|_| {
         FsError::new(
@@ -169,7 +203,9 @@ pub fn invalidate_directory_cache(dir_path: &Path) -> Result<bool, FsError> {
             "failed to lock ntfs dir table (poisoned mutex)",
         )
     })?;
-    let removed_ntfs = ntfs_table.remove(&key).is_some();
+    let ntfs_before = ntfs_table.len();
+    ntfs_table.retain(|key, _| !key.starts_with(&key_prefix));
+    let removed_ntfs = ntfs_table.len() != ntfs_before;
     Ok(removed_mem || removed_ntfs)
 }
 
@@ -263,6 +299,7 @@ pub fn list_directory_page_memory(
     dir_path: &Path,
     cursor: u64,
     limit: usize,
+    sort_mode: u8,
 ) -> Result<(Vec<MemoryDirItem>, u64, bool, usize), FsError> {
     if limit == 0 || limit > 2000 {
         return Err(FsError::new(
@@ -271,7 +308,7 @@ pub fn list_directory_page_memory(
         ));
     }
 
-    let key = dir_path.to_string_lossy().to_string();
+    let key = directory_cache_key(dir_path, sort_mode);
     let mut table = memory_table().lock().map_err(|_| {
         FsError::new(
             FsErrorCode::Internal,
@@ -305,10 +342,11 @@ pub fn list_directory_page_memory(
             };
             loaded.push(MemoryDirItem {
                 name: dir_entry.file_name().to_string_lossy().into_owned(),
-                is_dir: file_type.is_dir(),
+                is_dir: resolve_entry_is_dir(&dir_entry, &file_type),
+                is_link: resolve_entry_is_link(&dir_entry),
             });
         }
-        loaded.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+        sort_memory_items(&mut loaded, sort_mode);
         table.insert(
             key.clone(),
             CachedDirectory {
@@ -341,8 +379,9 @@ pub fn list_directory_page_memory(
 pub fn list_directory_entries_ntfs_cached(
     dir_path: &Path,
     meta: NtfsMeta,
+    sort_mode: u8,
 ) -> Result<Vec<NtfsIndexRootEntry>, FsError> {
-    let key = dir_path.to_string_lossy().to_string();
+    let key = directory_cache_key(dir_path, sort_mode);
 
     {
         let table = ntfs_dir_table().lock().map_err(|_| {
@@ -358,7 +397,8 @@ pub fn list_directory_entries_ntfs_cached(
         }
     }
 
-    let loaded = list_directory_index_root_entries_for_path_with_meta(dir_path, meta)?;
+    let mut loaded = list_directory_index_root_entries_for_path_with_meta(dir_path, meta)?;
+    sort_ntfs_items(&mut loaded, sort_mode);
     let mut table = ntfs_dir_table().lock().map_err(|_| {
         FsError::new(
             FsErrorCode::Internal,
@@ -380,6 +420,7 @@ pub fn list_directory_page_ntfs_cached(
     meta: NtfsMeta,
     cursor: u64,
     limit: usize,
+    sort_mode: u8,
 ) -> Result<(Vec<NtfsIndexRootEntry>, u64, bool, usize), FsError> {
     if limit == 0 || limit > 2000 {
         return Err(FsError::new(
@@ -388,7 +429,7 @@ pub fn list_directory_page_ntfs_cached(
         ));
     }
 
-    let key = dir_path.to_string_lossy().to_string();
+    let key = directory_cache_key(dir_path, sort_mode);
 
     {
         let table = ntfs_dir_table().lock().map_err(|_| {
@@ -413,7 +454,8 @@ pub fn list_directory_page_ntfs_cached(
         }
     }
 
-    let loaded = list_directory_index_root_entries_for_path_with_meta(dir_path, meta)?;
+    let mut loaded = list_directory_index_root_entries_for_path_with_meta(dir_path, meta)?;
+    sort_ntfs_items(&mut loaded, sort_mode);
     let total = loaded.len();
 
     let start = cursor as usize;

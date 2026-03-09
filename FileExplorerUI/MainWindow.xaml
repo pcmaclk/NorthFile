@@ -78,19 +78,78 @@
                 <Border
                     x:Name="AddressBreadcrumbBorder"
                     Height="32"
-                    Padding="6,0"
+                    Padding="6,0,72,0"
                     Background="#FFFBFBFB"
                     BorderBrush="{ThemeResource TextControlBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="4"
+                    SizeChanged="AddressBreadcrumbBorder_SizeChanged"
                     Tapped="AddressBreadcrumbBorder_Tapped">
-                    <ScrollViewer
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollBarVisibility="Disabled"
+                    <Grid
+                        ColumnDefinitions="Auto,*"
                         VerticalAlignment="Center">
+                        <Button
+                            x:Name="OverflowBreadcrumbButton"
+                            Grid.Column="0"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            Padding="6, 0, 6, 1"
+                            Margin="0,0,4,0"
+                            Visibility="Collapsed"
+                            Click="OverflowBreadcrumbButton_Click"
+                            ToolTipService.ToolTip="Show hidden path parts">
+                            <FontIcon
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE712;" />
+                        </Button>
                         <ItemsControl
-                            x:Name="BreadcrumbItemsControl"
+                            Grid.Column="1"
+                            x:Name="BreadcrumbMeasureItemsControl"
+                            Opacity="0"
+                            IsHitTestVisible="False"
+                            HorizontalAlignment="Left"
                             ItemsSource="{Binding Breadcrumbs, ElementName=RootWindow}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                                    <Grid
+                                        ColumnDefinitions="Auto,Auto"
+                                        Loaded="MeasureBreadcrumbItem_Loaded"
+                                        SizeChanged="MeasureBreadcrumbItem_SizeChanged">
+                                        <Button
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="10, 0, 10, 1"
+                                            IsHitTestVisible="False">
+                                            <TextBlock
+                                                Text="{Binding Label}"
+                                                TextTrimming="CharacterEllipsis" />
+                                        </Button>
+                                        <Button
+                                            Grid.Column="1"
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="4, 4, 4, 4"
+                                            Visibility="{Binding ChevronVisibility}"
+                                            IsHitTestVisible="False">
+                                            <Button.Content>
+                                                <FontIcon
+                                                    FontFamily="Segoe Fluent Icons"
+                                                    FontSize="12"
+                                                    Glyph="&#xE76C;" />
+                                            </Button.Content>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ItemsControl
+                            Grid.Column="1"
+                            x:Name="BreadcrumbItemsControl"
+                            Opacity="0"
+                            ItemsSource="{Binding VisibleBreadcrumbs, ElementName=RootWindow}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel Orientation="Horizontal" Spacing="2" />
@@ -111,16 +170,22 @@
                                         <Button
                                             Grid.Column="1"
                                             Style="{StaticResource SubtleButtonStyle}"
-                                            Padding="4, 0, 4, 1"
+                                            Padding="4, 4, 4, 4"
                                             Visibility="{Binding ChevronVisibility}"
                                             Click="BreadcrumbChevronButton_Click"
-                                            Content=">"
-                                            Tag="{Binding FullPath}" />
+                                            Tag="{Binding FullPath}">
+                                            <Button.Content>
+                                                <FontIcon
+                                                    FontFamily="Segoe Fluent Icons"
+                                                    FontSize="12"
+                                                    Glyph="&#xE76C;" />
+                                            </Button.Content>
+                                        </Button>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </ScrollViewer>
+                    </Grid>
                 </Border>
 
                 <TextBox
@@ -129,7 +194,7 @@
                     Visibility="Collapsed"
                     KeyDown="PathTextBox_KeyDown"
                     LostFocus="PathTextBox_LostFocus"
-                    Padding="12, 7, 8, 8"
+                    Padding="12, 7, 36, 8"
                     Text="C:\" />
             </Grid>
             <TextBox
@@ -141,9 +206,14 @@
         </Grid>
 
         <Grid
+            x:Name="ExplorerBodyGrid"
             Grid.Row="1"
-            ColumnDefinitions="220,*"
             ColumnSpacing="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="{x:Bind SidebarColumnWidth, Mode=OneWay}" />
+                <ColumnDefinition Width="0" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
             <ScrollViewer
                 x:Name="SidebarScrollViewer"
                 Grid.Column="0"
@@ -159,7 +229,7 @@
                     BorderThickness="0"/>
             </ScrollViewer>
 
-            <Grid Grid.Column="1" Padding="8,0,0,0">
+            <Grid Grid.Column="2" Padding="8,0,0,0">
                 <Border
                     CornerRadius="10"
                     Background="#FFFFFFFF"
@@ -169,6 +239,9 @@
                     >
                     <Grid RowDefinitions="Auto,*">
                         <Border x:Name="DetailsHeaderBorder" BorderBrush="#FFE3E5E8" BorderThickness="0" Margin="0" Padding="8,0,8,0" HorizontalAlignment="Left" Background="Transparent" Width="{x:Bind DetailsRowWidth, Mode=OneWay}">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="DetailsHeaderTranslateTransform" />
+                            </Border.RenderTransform>
                             <Border BorderBrush="#FFE3E5E8" BorderThickness="0,0,0,1">
                                 <Grid
                                     x:Name="DetailsHeaderGrid"
@@ -253,10 +326,13 @@
                             x:Name="EntriesListView"
                             Grid.Row="1"
                             HorizontalAlignment="Stretch"
+                            Margin="0,8,0,0"
                             IsItemClickEnabled="False"
                             SelectionMode="Single"
                             Background="Transparent"
                             Padding="0"
+                            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                            ScrollViewer.HorizontalScrollMode="Enabled"
                             ScrollViewer.VerticalScrollBarVisibility="Visible"
                             ScrollViewer.VerticalScrollMode="Enabled"
                             DoubleTapped="EntriesListView_DoubleTapped"
@@ -312,22 +388,26 @@
                                                 <ColumnDefinition Width="6" />
                                             </Grid.ColumnDefinitions>
 
-                                            <StackPanel
-                                                Orientation="Horizontal"
-                                                Spacing="8"
+                                            <Grid
+                                                Grid.Column="0"
+                                                ColumnDefinitions="18,8,*"
                                                 Margin="6,0,0,0"
                                                 VerticalAlignment="Center">
                                                 <TextBlock
+                                                    Grid.Column="0"
                                                     Width="18"
                                                     FontFamily="Segoe Fluent Icons"
                                                     FontSize="14"
+                                                    Foreground="{Binding IconForeground}"
                                                     VerticalAlignment="Center"
                                                     Text="{Binding IconGlyph}" />
                                                 <TextBlock
+                                                    Grid.Column="2"
+                                                    Margin="0,0,4,0"
                                                     VerticalAlignment="Center"
                                                     Text="{Binding Name}"
                                                     TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
+                                            </Grid>
                                             <TextBlock
                                                 Grid.Column="2"
                                                 Margin="8,0,0,0"
@@ -431,6 +511,16 @@
                     VerticalAlignment="Top"
                     Margin="10" />
             </Grid>
+
+            <local:ColumnSplitter
+                x:Name="SidebarSplitter"
+                Grid.Column="2"
+                Width="8"
+                Margin="4,0,0,0"
+                HorizontalAlignment="Left"
+                ShowGuide="False"
+                PointerEntered="ColumnSplitterHover_PointerEntered"
+                PointerExited="ColumnSplitterHover_PointerExited" />
         </Grid>
 
         <TextBlock

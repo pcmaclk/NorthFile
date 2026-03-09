@@ -42,7 +42,12 @@ public struct RustNtfsVolumeMeta
     public int error_code;
 }
 
-public sealed record FileRow(ulong MftRef, string Name, bool IsDirectory);
+public sealed record FileRow(ulong MftRef, string Name, bool IsDirectory, bool IsLink);
+public enum DirectorySortMode : byte
+{
+    FolderFirstNameAsc = 1
+}
+
 public sealed record FileBatchPage(
     IReadOnlyList<FileRow> Rows,
     uint TotalEntries,
@@ -68,16 +73,16 @@ public static partial class RustBatchInterop
     private static partial RustNtfsVolumeMeta NtfsProbeVolume(string path);
 
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_list_dir_batch", StringMarshalling = StringMarshalling.Utf8)]
-    private static partial RustBatchResult ListDirBatch(string path, ulong cursor, uint limit, uint lastFetchMs);
+    private static partial RustBatchResult ListDirBatch(string path, ulong cursor, uint limit, uint lastFetchMs, byte sortMode);
 
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_list_dir_batch_memory", StringMarshalling = StringMarshalling.Utf8)]
-    private static partial RustBatchResult ListDirBatchMemory(string path, ulong cursor, uint limit, uint lastFetchMs);
+    private static partial RustBatchResult ListDirBatchMemory(string path, ulong cursor, uint limit, uint lastFetchMs, byte sortMode);
 
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_list_dir_batch_auto", StringMarshalling = StringMarshalling.Utf8)]
-    private static partial RustBatchResult ListDirBatchAuto(string path, ulong cursor, uint limit, uint lastFetchMs);
+    private static partial RustBatchResult ListDirBatchAuto(string path, ulong cursor, uint limit, uint lastFetchMs, byte sortMode);
 
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_search_dir_batch_auto", StringMarshalling = StringMarshalling.Utf8)]
-    private static partial RustBatchResult SearchDirBatchAuto(string path, string query, ulong cursor, uint limit, uint lastFetchMs);
+    private static partial RustBatchResult SearchDirBatchAuto(string path, string query, ulong cursor, uint limit, uint lastFetchMs, byte sortMode);
 
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_free_batch_result")]
     private static partial void FreeBatchResult(RustBatchResult result);
@@ -128,12 +133,13 @@ public static partial class RustBatchInterop
         string path,
         ulong cursor = 0,
         uint limit = 500,
-        uint lastFetchMs = 0
+        uint lastFetchMs = 0,
+        DirectorySortMode sortMode = DirectorySortMode.FolderFirstNameAsc
     )
     {
         lock (NativeCallGate)
         {
-            RustBatchResult batch = ListDirBatch(path, cursor, limit, lastFetchMs);
+            RustBatchResult batch = ListDirBatch(path, cursor, limit, lastFetchMs, (byte)sortMode);
             return DecodeAndFree(batch);
         }
     }
@@ -142,12 +148,13 @@ public static partial class RustBatchInterop
         string path,
         ulong cursor = 0,
         uint limit = 500,
-        uint lastFetchMs = 0
+        uint lastFetchMs = 0,
+        DirectorySortMode sortMode = DirectorySortMode.FolderFirstNameAsc
     )
     {
         lock (NativeCallGate)
         {
-            RustBatchResult memoryBatch = ListDirBatchMemory(path, cursor, limit, lastFetchMs);
+            RustBatchResult memoryBatch = ListDirBatchMemory(path, cursor, limit, lastFetchMs, (byte)sortMode);
             if (memoryBatch.error_code == 0)
             {
                 return DecodeAndFree(memoryBatch);
@@ -156,7 +163,7 @@ public static partial class RustBatchInterop
             // Release potential error message from memory path call before falling back.
             FreeBatchResult(memoryBatch);
 
-            RustBatchResult fallbackBatch = ListDirBatch(path, cursor, limit, lastFetchMs);
+            RustBatchResult fallbackBatch = ListDirBatch(path, cursor, limit, lastFetchMs, (byte)sortMode);
             return DecodeAndFree(fallbackBatch);
         }
     }
@@ -165,12 +172,13 @@ public static partial class RustBatchInterop
         string path,
         ulong cursor = 0,
         uint limit = 500,
-        uint lastFetchMs = 0
+        uint lastFetchMs = 0,
+        DirectorySortMode sortMode = DirectorySortMode.FolderFirstNameAsc
     )
     {
         lock (NativeCallGate)
         {
-            RustBatchResult batch = ListDirBatchAuto(path, cursor, limit, lastFetchMs);
+            RustBatchResult batch = ListDirBatchAuto(path, cursor, limit, lastFetchMs, (byte)sortMode);
             return DecodeAndFree(batch);
         }
     }
@@ -180,12 +188,13 @@ public static partial class RustBatchInterop
         string query,
         ulong cursor = 0,
         uint limit = 500,
-        uint lastFetchMs = 0
+        uint lastFetchMs = 0,
+        DirectorySortMode sortMode = DirectorySortMode.FolderFirstNameAsc
     )
     {
         lock (NativeCallGate)
         {
-            RustBatchResult batch = SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs);
+            RustBatchResult batch = SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs, (byte)sortMode);
             return DecodeAndFree(batch);
         }
     }
@@ -195,6 +204,7 @@ public static partial class RustBatchInterop
         ulong cursor,
         uint limit,
         uint lastFetchMs,
+        DirectorySortMode sortMode,
         out FileBatchPage page,
         out int errorCode,
         out string errorMessage
@@ -202,7 +212,7 @@ public static partial class RustBatchInterop
     {
         lock (NativeCallGate)
         {
-            RustBatchResult batch = ListDirBatchAuto(path, cursor, limit, lastFetchMs);
+            RustBatchResult batch = ListDirBatchAuto(path, cursor, limit, lastFetchMs, (byte)sortMode);
             return TryDecodeAndFree(batch, out page, out errorCode, out errorMessage);
         }
     }
@@ -213,6 +223,7 @@ public static partial class RustBatchInterop
         ulong cursor,
         uint limit,
         uint lastFetchMs,
+        DirectorySortMode sortMode,
         out FileBatchPage page,
         out int errorCode,
         out string errorMessage
@@ -220,7 +231,7 @@ public static partial class RustBatchInterop
     {
         lock (NativeCallGate)
         {
-            RustBatchResult batch = SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs);
+            RustBatchResult batch = SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs, (byte)sortMode);
             return TryDecodeAndFree(batch, out page, out errorCode, out errorMessage);
         }
     }
@@ -297,7 +308,8 @@ public static partial class RustBatchInterop
                 int len = checked((int)entry.name_len);
                 string name = new(names.Slice(off, len));
                 bool isDirectory = (entry.flags & 0x0001) != 0;
-                rows.Add(new FileRow(entry.mft_ref, name, isDirectory));
+                bool isLink = (entry.flags & 0x0002) != 0;
+                rows.Add(new FileRow(entry.mft_ref, name, isDirectory, isLink));
             }
 
             return new FileBatchPage(
@@ -344,7 +356,8 @@ public static partial class RustBatchInterop
                 int len = checked((int)entry.name_len);
                 string name = new(names.Slice(off, len));
                 bool isDirectory = (entry.flags & 0x0001) != 0;
-                rows.Add(new FileRow(entry.mft_ref, name, isDirectory));
+                bool isLink = (entry.flags & 0x0002) != 0;
+                rows.Add(new FileRow(entry.mft_ref, name, isDirectory, isLink));
             }
 
             page = new FileBatchPage(

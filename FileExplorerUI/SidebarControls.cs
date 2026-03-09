@@ -1,3 +1,4 @@
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -9,16 +10,27 @@ namespace FileExplorerUI
     {
         private readonly Brush _normalBackground;
         private readonly Brush _hoverBackground;
+        private readonly Brush _selectedBackground;
+        private readonly Brush _indicatorBrush;
         private readonly Border _headerBorder;
+        private readonly Border _selectionIndicator;
         private readonly FontIcon _chevronIcon;
+        private readonly TextBlock _headerText;
         private bool _expanded;
+        private bool _compact;
+        private bool _selected;
+        private bool _pointerOver;
 
         public StackPanel Body { get; }
+        public bool IsExpanded => _expanded;
+        public event EventHandler? ExpandedChanged;
 
-        public SidebarGroupControl(string text, Brush normalBackground, Brush hoverBackground, Brush textBrush, bool expanded = true, double headerHeight = 24)
+        public SidebarGroupControl(string text, Brush normalBackground, Brush hoverBackground, Brush selectedBackground, Brush indicatorBrush, Brush textBrush, bool expanded = true, double headerHeight = 24)
         {
             _normalBackground = normalBackground;
             _hoverBackground = hoverBackground;
+            _selectedBackground = selectedBackground;
+            _indicatorBrush = indicatorBrush;
             _expanded = expanded;
 
             Orientation = Orientation.Vertical;
@@ -30,13 +42,15 @@ namespace FileExplorerUI
                 ColumnDefinitions = { new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }, new ColumnDefinition { Width = GridLength.Auto } }
             };
 
-            headerGrid.Children.Add(new TextBlock
+            _headerText = new TextBlock
             {
                 Text = text,
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 12,
                 Foreground = textBrush
-            });
+            };
+            headerGrid.Children.Add(_headerText);
+            _headerText.TextTrimming = TextTrimming.CharacterEllipsis;
 
             _chevronIcon = new FontIcon
             {
@@ -48,6 +62,17 @@ namespace FileExplorerUI
             Grid.SetColumn(_chevronIcon, 1);
             headerGrid.Children.Add(_chevronIcon);
 
+            _selectionIndicator = new Border
+            {
+                Width = 3,
+                Background = _indicatorBrush,
+                CornerRadius = new CornerRadius(1),
+                Margin = new Thickness(1, 7, 0, 7),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Opacity = 0
+            };
+
             _headerBorder = new Border
             {
                 Height = headerHeight,
@@ -56,10 +81,26 @@ namespace FileExplorerUI
                 Padding = new Thickness(9, 0, 8, 0),
                 Child = headerGrid
             };
-            _headerBorder.PointerEntered += (_, __) => _headerBorder.Background = _hoverBackground;
-            _headerBorder.PointerExited += (_, __) => _headerBorder.Background = _normalBackground;
-            _headerBorder.PointerPressed += (_, __) => _headerBorder.Background = _hoverBackground;
-            _headerBorder.PointerReleased += (_, __) => _headerBorder.Background = _hoverBackground;
+            _headerBorder.PointerEntered += (_, __) =>
+            {
+                _pointerOver = true;
+                UpdateHeaderBackground();
+            };
+            _headerBorder.PointerExited += (_, __) =>
+            {
+                _pointerOver = false;
+                UpdateHeaderBackground();
+            };
+            _headerBorder.PointerPressed += (_, __) =>
+            {
+                _pointerOver = true;
+                UpdateHeaderBackground();
+            };
+            _headerBorder.PointerReleased += (_, __) =>
+            {
+                _pointerOver = true;
+                UpdateHeaderBackground();
+            };
             _headerBorder.Tapped += (_, __) => Toggle();
 
             Body = new StackPanel
@@ -70,15 +111,62 @@ namespace FileExplorerUI
                 Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed
             };
 
-            Children.Add(_headerBorder);
+            var headerContainer = new Grid
+            {
+            };
+            headerContainer.Children.Add(_headerBorder);
+            headerContainer.Children.Add(_selectionIndicator);
+
+            Children.Add(headerContainer);
             Children.Add(Body);
         }
 
         public void Toggle()
         {
+            if (_compact)
+            {
+                return;
+            }
+
             _expanded = !_expanded;
             Body.Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed;
             _chevronIcon.Glyph = _expanded ? "\uE70D" : "\uE76C";
+            UpdateHeaderBackground();
+            ExpandedChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void SetCompact(bool compact)
+        {
+            if (_compact == compact)
+            {
+                return;
+            }
+
+            _compact = compact;
+            _headerBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            Body.Margin = compact ? new Thickness(0) : new Thickness(0, 4, 0, 0);
+            Body.Visibility = compact || _expanded ? Visibility.Visible : Visibility.Collapsed;
+            _selectionIndicator.Margin = new Thickness(1, 7, 0, 7);
+            UpdateHeaderBackground();
+        }
+
+        public void ApplySelection(bool selected)
+        {
+            _selected = selected;
+            UpdateHeaderBackground();
+        }
+
+        private void UpdateHeaderBackground()
+        {
+            if (_selected && !_expanded && !_compact)
+            {
+                _headerBorder.Background = _selectedBackground;
+                _selectionIndicator.Opacity = 1;
+                return;
+            }
+
+            _selectionIndicator.Opacity = 0;
+            _headerBorder.Background = _pointerOver ? _hoverBackground : _normalBackground;
         }
     }
 
@@ -89,8 +177,12 @@ namespace FileExplorerUI
         private readonly Brush _selectedBackground;
         private readonly Border _backgroundLayer;
         private readonly Border _selectionIndicator;
+        private readonly Grid _rootGrid;
+        private readonly StackPanel _rowPanel;
+        private readonly TextBlock _labelBlock;
         private bool _selected;
         private bool _pointerOver;
+        private bool _compact;
 
         public SidebarItemButton(
             string label,
@@ -122,22 +214,45 @@ namespace FileExplorerUI
             Background = _normalBackground;
             CornerRadius = new CornerRadius(6);
             Foreground = textBrush;
+            ToolTipService.SetToolTip(this, label);
+            Resources["ButtonBackground"] = transparentBrush;
+            Resources["ButtonBackgroundPointerOver"] = transparentBrush;
+            Resources["ButtonBackgroundPressed"] = transparentBrush;
+            Resources["ButtonBackgroundDisabled"] = transparentBrush;
+            Resources["ButtonBorderBrush"] = transparentBrush;
+            Resources["ButtonBorderBrushPointerOver"] = transparentBrush;
+            Resources["ButtonBorderBrushPressed"] = transparentBrush;
+            Resources["ButtonBorderBrushDisabled"] = transparentBrush;
+            Resources["ButtonForeground"] = textBrush;
+            Resources["ButtonForegroundPointerOver"] = textBrush;
+            Resources["ButtonForegroundPressed"] = textBrush;
+            Resources["ButtonForegroundDisabled"] = textBrush;
 
             _selectionIndicator = new Border
             {
                 Width = 3,
                 Background = indicatorBrush,
-                CornerRadius = new CornerRadius(2),
-                Margin = new Thickness(0, 7, 0, 7),
+                CornerRadius = new CornerRadius(1),
+                Margin = new Thickness(0, 6, 0, 6),
                 HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Stretch,
                 Opacity = 0,
             };
 
-            var rowPanel = new StackPanel
+            _labelBlock = new TextBlock
+            {
+                Text = label,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = textBrush,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+
+            _rowPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 8,
                 Margin = new Thickness(8, 0, 8, 0),
+                Padding = new Thickness(0, 0, 0, 1),
                 VerticalAlignment = VerticalAlignment.Center,
                 Children =
                 {
@@ -150,12 +265,7 @@ namespace FileExplorerUI
                         Height = 16,
                         VerticalAlignment = VerticalAlignment.Center
                     },
-                    new TextBlock
-                    {
-                        Text = label,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Foreground = textBrush
-                    }
+                    _labelBlock
                 }
             };
 
@@ -165,16 +275,23 @@ namespace FileExplorerUI
                 CornerRadius = new CornerRadius(6)
             };
 
-            var rootGrid = new Grid
+            var contentGrid = new Grid
             {
                 MinHeight = 28,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            rootGrid.Children.Add(_backgroundLayer);
-            rootGrid.Children.Add(_selectionIndicator);
-            rootGrid.Children.Add(rowPanel);
+            contentGrid.Children.Add(_backgroundLayer);
+            contentGrid.Children.Add(_rowPanel);
 
-            Content = rootGrid;
+            _rootGrid = new Grid
+            {
+                MinHeight = 28,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _rootGrid.Children.Add(contentGrid);
+            _rootGrid.Children.Add(_selectionIndicator);
+
+            Content = _rootGrid;
 
             PointerEntered += (_, __) =>
             {
@@ -204,6 +321,32 @@ namespace FileExplorerUI
             }
 
             _backgroundLayer.Background = _pointerOver ? _hoverBackground : _normalBackground;
+        }
+
+        public void SetCompact(bool compact)
+        {
+            if (_compact == compact)
+            {
+                return;
+            }
+
+            _compact = compact;
+            _labelBlock.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            _rowPanel.Margin = compact ? new Thickness(0) : new Thickness(8, 0, 8, 0);
+            _rowPanel.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+            HorizontalContentAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+            Width = compact ? 32 : double.NaN;
+            Height = compact ? 32 : double.NaN;
+            MinHeight = compact ? 32 : 28;
+            MinWidth = compact ? 32 : 0;
+            _rootGrid.Width = compact ? 32 : double.NaN;
+            _rootGrid.Height = compact ? 32 : double.NaN;
+            _selectionIndicator.Visibility = Visibility.Visible;
+            _selectionIndicator.Height = compact ? 16 : double.NaN;
+            _selectionIndicator.VerticalAlignment = compact ? VerticalAlignment.Center : VerticalAlignment.Stretch;
+            _selectionIndicator.Margin = compact ? new Thickness(1, 0, 0, 0) : new Thickness(1, 7, 0, 7);
+            _selectionIndicator.Opacity = _selected ? 1 : 0;
+            UpdateBackground();
         }
     }
 }

@@ -644,16 +644,18 @@ fn parse_index_entry(
     } else {
         0
     };
-    let dir_flag = if (file_attrs & 0x1000_0000) != 0 {
-        0x0001
-    } else {
-        0x0000
-    };
+    let mut flags = 0u16;
+    if (file_attrs & 0x0000_0010) != 0 {
+        flags |= 0x0001;
+    }
+    if (file_attrs & 0x0000_0400) != 0 {
+        flags |= 0x0002;
+    }
 
     Some(NtfsIndexRootEntry {
         file_ref,
         name: String::from_utf16_lossy(&utf16),
-        flags: dir_flag,
+        flags,
     })
 }
 

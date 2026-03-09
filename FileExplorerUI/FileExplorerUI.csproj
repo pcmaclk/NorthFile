@@ -46,8 +46,8 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="rust_engine.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    <None Include="..\rust_engine\target\debug\rust_engine.dll" Link="rust_engine.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

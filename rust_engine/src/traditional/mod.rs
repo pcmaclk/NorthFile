@@ -1,5 +1,8 @@
+use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
 
 use crate::core::error::{FsError, FsErrorCode};
 use crate::core::traits::PathEngine;
@@ -10,6 +13,72 @@ use crate::engine::validate_limit;
 pub struct TraditionalDirItem {
     pub name: String,
     pub is_dir: bool,
+    pub is_link: bool,
+}
+
+pub const SORT_DIRS_FIRST_NAME_ASC: u8 = 1;
+
+pub fn normalize_sort_mode(sort_mode: u8) -> u8 {
+    match sort_mode {
+        SORT_DIRS_FIRST_NAME_ASC => SORT_DIRS_FIRST_NAME_ASC,
+        _ => SORT_DIRS_FIRST_NAME_ASC,
+    }
+}
+
+pub fn compare_directory_like(
+    a_is_dir: bool,
+    a_name: &str,
+    b_is_dir: bool,
+    b_name: &str,
+) -> Ordering {
+    b_is_dir
+        .cmp(&a_is_dir)
+        .then_with(|| a_name.to_lowercase().cmp(&b_name.to_lowercase()))
+        .then_with(|| a_name.cmp(b_name))
+}
+
+fn sort_dir_items(items: &mut [TraditionalDirItem], sort_mode: u8) {
+    match normalize_sort_mode(sort_mode) {
+        SORT_DIRS_FIRST_NAME_ASC => items.sort_unstable_by(|a, b| {
+            compare_directory_like(a.is_dir, &a.name, b.is_dir, &b.name)
+        }),
+        _ => unreachable!(),
+    }
+}
+
+pub fn resolve_entry_is_dir(dir_entry: &fs::DirEntry, file_type: &fs::FileType) -> bool {
+    if file_type.is_dir() {
+        return true;
+    }
+
+    #[cfg(windows)]
+    {
+        const FILE_ATTRIBUTE_DIRECTORY: u32 = 0x0010;
+        return fs::symlink_metadata(dir_entry.path())
+            .map(|meta| (meta.file_attributes() & FILE_ATTRIBUTE_DIRECTORY) != 0)
+            .unwrap_or(false);
+    }
+
+    #[cfg(not(windows))]
+    {
+        dir_entry.metadata().map(|meta| meta.is_dir()).unwrap_or(false)
+    }
+}
+
+pub fn resolve_entry_is_link(dir_entry: &fs::DirEntry) -> bool {
+    #[cfg(windows)]
+    {
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+        return fs::symlink_metadata(dir_entry.path())
+            .map(|meta| (meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            .unwrap_or(false);
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = dir_entry;
+        false
+    }
 }
 
 pub struct TraditionalPathEngine;
@@ -55,10 +124,14 @@ impl PathEngine for TraditionalPathEngine {
     }
 }
 
+pub const ENTRY_FLAG_DIRECTORY: u16 = 0x0001;
+pub const ENTRY_FLAG_LINK: u16 = 0x0002;
+
 pub fn list_directory_page(
     dir_path: &Path,
     cursor: u64,
     limit: usize,
+    sort_mode: u8,
 ) -> Result<(Vec<TraditionalDirItem>, u64, bool, usize), FsError> {
     if limit == 0 || limit > 2000 {
         return Err(FsError::new(
@@ -67,7 +140,7 @@ pub fn list_directory_page(
         ));
     }
 
-    let items = list_directory_all(dir_path)?;
+    let items = list_directory_all(dir_path, sort_mode)?;
 
     let start = cursor as usize;
     if start >= items.len() {
@@ -82,7 +155,7 @@ pub fn list_directory_page(
     Ok((page, next_cursor, has_more, items.len()))
 }
 
-pub fn list_directory_all(dir_path: &Path) -> Result<Vec<TraditionalDirItem>, FsError> {
+pub fn list_directory_all(dir_path: &Path, sort_mode: u8) -> Result<Vec<TraditionalDirItem>, FsError> {
     let mut items: Vec<TraditionalDirItem> = Vec::new();
     let entries = fs::read_dir(dir_path).map_err(|e| {
         FsError::new(
@@ -99,10 +172,11 @@ pub fn list_directory_all(dir_path: &Path) -> Result<Vec<TraditionalDirItem>, Fs
 
         items.push(TraditionalDirItem {
             name: dir_entry.file_name().to_string_lossy().into_owned(),
-            is_dir: file_type.is_dir(),
+            is_dir: resolve_entry_is_dir(&dir_entry, &file_type),
+            is_link: resolve_entry_is_link(&dir_entry),
         });
     }
 
-    items.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    sort_dir_items(&mut items, sort_mode);
     Ok(items)
 }

@@ -14,7 +14,10 @@ use crate::ntfs::{
     inspect_mft_record_with_meta, list_index_root_entries_with_meta, read_mft_record_header_with_meta,
 };
 use crate::search::Matcher;
-use crate::traditional::{list_directory_all, list_directory_page};
+use crate::traditional::{
+    ENTRY_FLAG_DIRECTORY, ENTRY_FLAG_LINK, SORT_DIRS_FIRST_NAME_ASC, compare_directory_like,
+    list_directory_all, list_directory_page, normalize_sort_mode,
+};
 use crate::usn::{clear_usn_capability_cache, probe_usn_capability_cached};
 
 #[repr(C)]
@@ -350,6 +353,7 @@ pub extern "C" fn fe_list_dir_batch(
     cursor: u64,
     limit: u32,
     last_fetch_ms: u32,
+    sort_mode: u8,
 ) -> FfiBatchResult {
     if path_utf8.is_null() {
         return FfiBatchResult::err(1001, "path is null");
@@ -365,8 +369,9 @@ pub extern "C" fn fe_list_dir_batch(
         Err(_) => return FfiBatchResult::err(1001, "path is not valid utf-8"),
     };
 
+    let sort_mode = normalize_sort_mode(sort_mode);
     let (items, next_cursor, has_more, total_entries) =
-        match list_directory_page(Path::new(path_str), cursor, limit as usize) {
+        match list_directory_page(Path::new(path_str), cursor, limit as usize, sort_mode) {
             Ok(v) => v,
             Err(e) => return FfiBatchResult::err(e.code as i32, &e.message),
         };
@@ -386,7 +391,8 @@ pub extern "C" fn fe_list_dir_batch(
             parent_id: 0,
             name_off: off,
             name_len: len,
-            flags: if item.is_dir { 0x0001 } else { 0x0000 },
+            flags: (if item.is_dir { ENTRY_FLAG_DIRECTORY } else { 0 })
+                | (if item.is_link { ENTRY_FLAG_LINK } else { 0 }),
             mft_ref: cursor + (idx as u64) + 1,
         });
     }
@@ -411,6 +417,7 @@ pub extern "C" fn fe_list_dir_batch_memory(
     cursor: u64,
     limit: u32,
     last_fetch_ms: u32,
+    sort_mode: u8,
 ) -> FfiBatchResult {
     if path_utf8.is_null() {
         return FfiBatchResult::err(1001, "path is null");
@@ -425,6 +432,7 @@ pub extern "C" fn fe_list_dir_batch_memory(
         Ok(v) => v,
         Err(_) => return FfiBatchResult::err(1001, "path is not valid utf-8"),
     };
+    let sort_mode = normalize_sort_mode(sort_mode);
     let path = Path::new(path_str);
     let meta = match get_or_probe_ntfs_meta(path) {
         Ok(v) => v,
@@ -434,12 +442,14 @@ pub extern "C" fn fe_list_dir_batch_memory(
     // Switchable source:
     // 1) Prefer NTFS INDEX_ROOT traversal for current path.
     // 2) Fall back to simulated memory directory listing for now.
-    if let Some(index_root_batch) = try_index_root_batch(meta, path, cursor, limit, last_fetch_ms) {
+    if let Some(index_root_batch) =
+        try_index_root_batch(meta, path, cursor, limit, last_fetch_ms, sort_mode)
+    {
         return index_root_batch;
     }
 
     let (items, next_cursor, has_more, total_entries) =
-        match list_directory_page_memory(path, cursor, limit as usize) {
+        match list_directory_page_memory(path, cursor, limit as usize, sort_mode) {
             Ok(v) => v,
             Err(e) => return FfiBatchResult::err(e.code as i32, &e.message),
         };
@@ -459,7 +469,8 @@ pub extern "C" fn fe_list_dir_batch_memory(
             parent_id: 0,
             name_off: off,
             name_len: len,
-            flags: if item.is_dir { 0x0001 } else { 0x0000 },
+            flags: (if item.is_dir { ENTRY_FLAG_DIRECTORY } else { 0 })
+                | (if item.is_link { ENTRY_FLAG_LINK } else { 0 }),
             mft_ref: cursor + (idx as u64) + 1,
         });
     }
@@ -484,16 +495,25 @@ fn try_index_root_batch(
     cursor: u64,
     limit: u32,
     last_fetch_ms: u32,
+    sort_mode: u8,
 ) -> Option<FfiBatchResult> {
     let (page, next_cursor, has_more, total_entries) = match list_directory_page_ntfs_cached(
         path,
         meta,
         cursor,
         limit as usize,
+        sort_mode,
     ) {
         Ok(v) => v,
         Err(_) => return None,
     };
+
+    // Some volume roots still hit parser gaps in the raw NTFS path and can
+    // incorrectly look empty. If the NTFS path returns no rows for the first
+    // page but the directory is actually non-empty, fall back to the safer path.
+    if cursor == 0 && total_entries == 0 && directory_appears_non_empty(path) {
+        return None;
+    }
 
     let mut names_utf16: Vec<u16> = Vec::new();
     let mut entries: Vec<FileEntry> = Vec::with_capacity(page.len());
@@ -526,12 +546,20 @@ fn try_index_root_batch(
     ))
 }
 
+fn directory_appears_non_empty(path: &Path) -> bool {
+    match fs::read_dir(path) {
+        Ok(mut entries) => entries.next().is_some(),
+        Err(_) => false,
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn fe_list_dir_batch_auto(
     path_utf8: *const c_char,
     cursor: u64,
     limit: u32,
     last_fetch_ms: u32,
+    sort_mode: u8,
 ) -> FfiBatchResult {
     if path_utf8.is_null() {
         return FfiBatchResult::err(1001, "path is null");
@@ -540,6 +568,7 @@ pub extern "C" fn fe_list_dir_batch_auto(
         return FfiBatchResult::err(1001, "limit must be in range 1..=2000");
     }
 
+    let sort_mode = normalize_sort_mode(sort_mode);
     // SAFETY: path_utf8 must be a valid null-terminated C string from caller.
     let c_path = unsafe { CStr::from_ptr(path_utf8) };
     let path_str = match c_path.to_str() {
@@ -550,15 +579,16 @@ pub extern "C" fn fe_list_dir_batch_auto(
 
     match classify_path(path) {
         VolumeKind::NtfsLocal => {
-            let first_try = fe_list_dir_batch_memory(path_utf8, cursor, limit, last_fetch_ms);
+            let first_try =
+                fe_list_dir_batch_memory(path_utf8, cursor, limit, last_fetch_ms, sort_mode);
             if first_try.error_code == 0 {
                 first_try
             } else {
-                fe_list_dir_batch(path_utf8, cursor, limit, last_fetch_ms)
+                fe_list_dir_batch(path_utf8, cursor, limit, last_fetch_ms, sort_mode)
             }
         }
         VolumeKind::OtherLocal | VolumeKind::Network => {
-            fe_list_dir_batch(path_utf8, cursor, limit, last_fetch_ms)
+            fe_list_dir_batch(path_utf8, cursor, limit, last_fetch_ms, sort_mode)
         }
     }
 }
@@ -567,6 +597,7 @@ pub extern "C" fn fe_list_dir_batch_auto(
 struct SearchItem {
     name: String,
     is_dir: bool,
+    is_link: bool,
     mft_ref: u64,
 }
 
@@ -577,6 +608,7 @@ pub extern "C" fn fe_search_dir_batch_auto(
     cursor: u64,
     limit: u32,
     last_fetch_ms: u32,
+    sort_mode: u8,
 ) -> FfiBatchResult {
     if path_utf8.is_null() || query_utf8.is_null() {
         return FfiBatchResult::err(1001, "path/query is null");
@@ -598,9 +630,10 @@ pub extern "C" fn fe_search_dir_batch_auto(
         Err(_) => return FfiBatchResult::err(1001, "query is not valid utf-8"),
     };
     let path = Path::new(path_str);
+    let sort_mode = normalize_sort_mode(sort_mode);
     let matcher = Matcher::new(query);
 
-    let all_items = match collect_search_items(path) {
+    let all_items = match collect_search_items(path, sort_mode) {
         Ok(v) => v,
         Err(e) => return FfiBatchResult::err(e.code as i32, &e.message),
     };
@@ -613,6 +646,8 @@ pub extern "C" fn fe_search_dir_batch_auto(
             .filter(|item| matcher.is_match(&item.name))
             .collect()
     };
+    let mut filtered = filtered;
+    sort_search_items(&mut filtered, sort_mode);
     let matched_entries = filtered.len() as u32;
 
     let start = cursor as usize;
@@ -646,7 +681,8 @@ pub extern "C" fn fe_search_dir_batch_auto(
             parent_id: 0,
             name_off: off,
             name_len: len,
-            flags: if item.is_dir { 0x0001 } else { 0x0000 },
+            flags: (if item.is_dir { ENTRY_FLAG_DIRECTORY } else { 0 })
+                | (if item.is_link { ENTRY_FLAG_LINK } else { 0 }),
             mft_ref: if item.mft_ref == 0 {
                 cursor + (idx as u64) + 1
             } else {
@@ -669,41 +705,56 @@ pub extern "C" fn fe_search_dir_batch_auto(
     )
 }
 
-fn collect_search_items(path: &Path) -> Result<Vec<SearchItem>, crate::core::error::FsError> {
+fn sort_search_items(items: &mut [SearchItem], sort_mode: u8) {
+    match normalize_sort_mode(sort_mode) {
+        SORT_DIRS_FIRST_NAME_ASC => items.sort_unstable_by(|a, b| {
+            compare_directory_like(a.is_dir, &a.name, b.is_dir, &b.name)
+        }),
+        _ => unreachable!(),
+    }
+}
+
+fn collect_search_items(
+    path: &Path,
+    sort_mode: u8,
+) -> Result<Vec<SearchItem>, crate::core::error::FsError> {
     match classify_path(path) {
         VolumeKind::NtfsLocal => {
             // If raw NTFS volume access is denied (common without elevated privileges),
             // gracefully fall back to traditional directory enumeration.
             if let Ok(meta) = get_or_probe_ntfs_meta(path) {
-                if let Ok(items) = list_directory_entries_ntfs_cached(path, meta) {
+                if let Ok(items) = list_directory_entries_ntfs_cached(path, meta, sort_mode) {
                     return Ok(items
                         .into_iter()
                         .map(|v| SearchItem {
                             name: v.name,
                             is_dir: (v.flags & 0x0001) != 0,
+                            is_link: (v.flags & 0x0002) != 0,
                             mft_ref: v.file_ref,
                         })
                         .collect());
                 }
             }
 
-            let items = list_directory_all(path)?;
+            let items = list_directory_all(path, sort_mode)?;
             Ok(items
                 .into_iter()
                 .map(|v| SearchItem {
                     name: v.name,
                     is_dir: v.is_dir,
+                    is_link: v.is_link,
                     mft_ref: 0,
                 })
                 .collect())
         }
         VolumeKind::OtherLocal | VolumeKind::Network => {
-            let items = list_directory_all(path)?;
+            let items = list_directory_all(path, sort_mode)?;
             Ok(items
                 .into_iter()
                 .map(|v| SearchItem {
                     name: v.name,
                     is_dir: v.is_dir,
+                    is_link: v.is_link,
                     mft_ref: 0,
                 })
                 .collect())
@@ -910,6 +961,7 @@ pub extern "C" fn fe_ntfs_list_index_root(
     record_index: u64,
     cursor: u64,
     limit: u32,
+    sort_mode: u8,
 ) -> FfiBatchResult {
     if path_utf8.is_null() {
         return FfiBatchResult::err(1001, "path is null");
@@ -935,6 +987,18 @@ pub extern "C" fn fe_ntfs_list_index_root(
         Ok(v) => v,
         Err(e) => return FfiBatchResult::err(e.code as i32, &e.message),
     };
+    let mut all = all;
+    match normalize_sort_mode(sort_mode) {
+        SORT_DIRS_FIRST_NAME_ASC => all.sort_unstable_by(|a, b| {
+            compare_directory_like(
+                (a.flags & 0x0001) != 0,
+                &a.name,
+                (b.flags & 0x0001) != 0,
+                &b.name,
+            )
+        }),
+        _ => unreachable!(),
+    }
 
     let start = cursor as usize;
     if start >= all.len() {
