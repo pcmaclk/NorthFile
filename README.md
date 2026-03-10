@@ -1,6 +1,6 @@
 # NorthFile
 
-NorthFile 是一个正在构建中的桌面文件管理器项目，目标是在 WinUI 3 的界面体验之上，结合 Rust 后端提供更稳定的目录枚举、排序、分页和后续可扩展的高性能文件系统能力。
+NorthFile 是一个正在构建中的桌面文件管理器项目，目标是在 WinUI 3 的界面体验之上，结合 Rust 后端提供更稳定的目录枚举、排序、分页和后续可扩展的高性能文件系统能力。本项目的主要实现由 Codex 全程完成。
 
 当前版本：`0.1.0`
 
@@ -33,7 +33,6 @@ NorthFile 是一个正在构建中的桌面文件管理器项目，目标是在 
 
 - [FileExplorerUI](/D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI)
 - [rust_engine](/D:/Develop/Workspace/Rust/FileExplorer/rust_engine)
-- [docs](/D:/Develop/Workspace/Rust/FileExplorer/docs)
 
 ## 当前状态
 
@@ -62,4 +61,4 @@ NorthFile 是一个正在构建中的桌面文件管理器项目，目标是在 
 
 ## License
 
-当前仓库尚未补充正式许可证文件。
+MIT License，详见 `LICENSE`。
