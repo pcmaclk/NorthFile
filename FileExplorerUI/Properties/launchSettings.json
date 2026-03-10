@@ -1,9 +1,6 @@
 {
   "profiles": {
-    "FileExplorerUI (Package)": {
-      "commandName": "MsixPackage"
-    },
-    "FileExplorerUI (Unpackaged)": {
+    "NorthFile": {
       "commandName": "Project"
     }
   }

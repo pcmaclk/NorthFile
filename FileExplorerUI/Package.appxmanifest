@@ -11,12 +11,12 @@
   <Identity
     Name="5ab8cc49-d426-49e7-b14c-f9f480448d6b"
     Publisher="CN=HTML"
-    Version="1.0.0.0" />
+    Version="0.1.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="5ab8cc49-d426-49e7-b14c-f9f480448d6b" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>FileExplorerUI</DisplayName>
+    <DisplayName>NorthFile</DisplayName>
     <PublisherDisplayName>HTML</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -35,8 +35,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="FileExplorerUI"
-        Description="FileExplorerUI"
+        DisplayName="NorthFile"
+        Description="NorthFile"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

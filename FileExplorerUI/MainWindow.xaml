@@ -527,6 +527,6 @@
             x:Name="StatusTextBlock"
             Grid.Row="2"
             TextWrapping="Wrap"
-            Text="Loading..." />
+            Text="加载中..." />
     </Grid>
 </Window>

@@ -111,9 +111,7 @@ namespace FileExplorerUI
                 Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed
             };
 
-            var headerContainer = new Grid
-            {
-            };
+            var headerContainer = new Grid();
             headerContainer.Children.Add(_headerBorder);
             headerContainer.Children.Add(_selectionIndicator);
 
@@ -146,7 +144,6 @@ namespace FileExplorerUI
             _headerBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             Body.Margin = compact ? new Thickness(0) : new Thickness(0, 4, 0, 0);
             Body.Visibility = compact || _expanded ? Visibility.Visible : Visibility.Collapsed;
-            _selectionIndicator.Margin = new Thickness(1, 7, 0, 7);
             UpdateHeaderBackground();
         }
 
@@ -178,7 +175,8 @@ namespace FileExplorerUI
         private readonly Border _backgroundLayer;
         private readonly Border _selectionIndicator;
         private readonly Grid _rootGrid;
-        private readonly StackPanel _rowPanel;
+        private readonly Grid _contentGrid;
+        private readonly FontIcon _iconBlock;
         private readonly TextBlock _labelBlock;
         private bool _selected;
         private bool _pointerOver;
@@ -247,27 +245,31 @@ namespace FileExplorerUI
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
 
-            _rowPanel = new StackPanel
+            _iconBlock = new FontIcon
             {
-                Orientation = Orientation.Horizontal,
-                Spacing = 8,
-                Margin = new Thickness(8, 0, 8, 0),
-                Padding = new Thickness(0, 0, 0, 1),
+                Glyph = iconGlyph,
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                FontSize = 14,
+                Width = 16,
+                Height = 16,
                 VerticalAlignment = VerticalAlignment.Center,
-                Children =
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            _contentGrid = new Grid
+            {
+                Margin = new Thickness(8, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ColumnSpacing = 8,
+                ColumnDefinitions =
                 {
-                    new FontIcon
-                    {
-                        Glyph = iconGlyph,
-                        FontFamily = new FontFamily("Segoe Fluent Icons"),
-                        FontSize = 14,
-                        Width = 16,
-                        Height = 16,
-                        VerticalAlignment = VerticalAlignment.Center
-                    },
-                    _labelBlock
+                    new ColumnDefinition { Width = GridLength.Auto },
+                    new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
                 }
             };
+            _contentGrid.Children.Add(_iconBlock);
+            Grid.SetColumn(_labelBlock, 1);
+            _contentGrid.Children.Add(_labelBlock);
 
             _backgroundLayer = new Border
             {
@@ -275,20 +277,13 @@ namespace FileExplorerUI
                 CornerRadius = new CornerRadius(6)
             };
 
-            var contentGrid = new Grid
-            {
-                MinHeight = 28,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            contentGrid.Children.Add(_backgroundLayer);
-            contentGrid.Children.Add(_rowPanel);
-
             _rootGrid = new Grid
             {
                 MinHeight = 28,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            _rootGrid.Children.Add(contentGrid);
+            _rootGrid.Children.Add(_backgroundLayer);
+            _rootGrid.Children.Add(_contentGrid);
             _rootGrid.Children.Add(_selectionIndicator);
 
             Content = _rootGrid;
@@ -332,8 +327,10 @@ namespace FileExplorerUI
 
             _compact = compact;
             _labelBlock.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            _rowPanel.Margin = compact ? new Thickness(0) : new Thickness(8, 0, 8, 0);
-            _rowPanel.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+            _contentGrid.Margin = compact ? new Thickness(0) : new Thickness(8, 0, 8, 0);
+            _contentGrid.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+            _contentGrid.ColumnSpacing = compact ? 0 : 8;
+            _iconBlock.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
             HorizontalContentAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             Width = compact ? 32 : double.NaN;
             Height = compact ? 32 : double.NaN;

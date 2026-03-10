@@ -290,7 +290,7 @@ namespace FileExplorerUI
             _engineVersion = RustBatchInterop.GetEngineVersion();
 
             UpdateNavButtonsState();
-            this.AppWindow.Title = $"FileExplorerUI | Engine {_engineVersion}";
+            this.AppWindow.Title = $"NorthFile | Engine {_engineVersion}";
             BuildSidebarItems();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
@@ -892,17 +892,9 @@ namespace FileExplorerUI
                 _hasMore = page.HasMore;
                 _currentPageSize = ClampPageSize(page.SuggestedNextLimit, requestedPageSize);
                 string source = RustBatchInterop.DescribeBatchSource(page.SourceKind);
-                string searchInfo = string.IsNullOrWhiteSpace(_currentQuery) ? string.Empty : $" | Query: {_currentQuery}";
-                string hitInfo = page.ScannedEntries > 0
-                    ? $" | Match: {page.MatchedEntries}/{page.ScannedEntries} ({(page.MatchedEntries * 100.0 / page.ScannedEntries):F1}%)"
-                    : string.Empty;
-                string usnInfo = $" | USN: {DescribeUsnCapability(_usnCapability)}";
-                string sourceDetail = DescribeSourceDetail(page.SourceKind, _usnCapability);
 
-                this.AppWindow.Title = $"FileExplorerUI | Engine {_engineVersion} | Items: {_entries.Count}";
-                UpdateStatus(
-                    $"Path: {path}{searchInfo}{hitInfo}{usnInfo} | Loaded: {page.Rows.Count} | Total: {_totalEntries} | Source: {source}{sourceDetail} | HasMore: {_hasMore} | NextCursor: {_nextCursor} | Fetch: {sw.ElapsedMilliseconds}ms | Batch: {_currentPageSize}"
-                );
+                this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Items: {_entries.Count}";
+                UpdateStatus($"当前文件夹下 {_totalEntries} 个项目");
                 LogPerfSnapshot(
                     mode: string.IsNullOrWhiteSpace(_currentQuery) ? "browse" : "search",
                     path: path,
@@ -921,7 +913,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                this.AppWindow.Title = $"FileExplorerUI | Engine {_engineVersion} | Read Failed";
+                this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Read Failed";
                 UpdateStatus($"Path: {path} | Error: {ex.Message}");
             }
             finally
