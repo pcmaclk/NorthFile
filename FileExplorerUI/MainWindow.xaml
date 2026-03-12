@@ -90,21 +90,19 @@
                 PlaceholderText="先保留样式，不做搜索" />
         </Grid>
 
-        <NavigationView
-            x:Name="SidebarNavView"
-            Grid.Row="1"
-            IsBackButtonVisible="Collapsed"
-            IsPaneToggleButtonVisible="False"
-            IsSettingsVisible="False"
-            AlwaysShowHeader="False"
-            PaneDisplayMode="Left"
-            CompactPaneLength="48"
-            OpenPaneLength="280">
-            <NavigationView.PaneCustomContent>
+        <Grid Grid.Row="1" ColumnDefinitions="280,*">
+            <!-- 侧边栏 -->
+            <Border
+                CornerRadius="8"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                 <local:SidebarView />
-            </NavigationView.PaneCustomContent>
+            </Border>
 
-            <Frame x:Name="ContentFrame">
+            <!-- 内容区域 -->
+            <Frame
+                x:Name="ContentFrame"
+                Grid.Column="1"
+                Margin="8,0,0,0">
                 <Grid Padding="24">
                     <Border
                         Padding="24"
@@ -118,12 +116,12 @@
                                 Text="右侧内容区域"
                                 Style="{ThemeResource TitleTextBlockStyle}" />
                             <TextBlock
-                                Text="当前阶段只保留界面壳子：顶部地址栏、左侧 NavigationView、固定区域和文件树。"
+                                Text="当前阶段只保留界面壳子：顶部地址栏、左侧侧边栏、固定区域和文件树。"
                                 TextWrapping="WrapWholeWords" />
                         </StackPanel>
                     </Border>
                 </Grid>
             </Frame>
-        </NavigationView>
+        </Grid>
     </Grid>
 </Window>

@@ -7,96 +7,65 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <UserControl.Resources>
-        <Style x:Key="PinnedGroupToggleButtonStyle" TargetType="ToggleButton">
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="MinHeight" Value="0" />
-            <Setter Property="Background" Value="{ThemeResource ListViewItemBackground}" />
-            <Setter Property="Foreground" Value="{ThemeResource ListViewItemForeground}" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Grid>
-                            <ContentPresenter
-                                x:Name="ContentPresenter"
-                                Padding="{TemplateBinding Padding}"
-                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                                Content="{TemplateBinding Content}"
-                                ContentTemplate="{TemplateBinding ContentTemplate}"
-                                Foreground="{TemplateBinding Foreground}" />
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup x:Name="CommonStates">
-                                    <VisualState x:Name="Normal" />
-                                    <VisualState x:Name="PointerOver">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Foreground">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ListViewItemForegroundPointerOver}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                    <VisualState x:Name="Pressed">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Foreground">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ListViewItemForegroundPressed}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                    <VisualState x:Name="Disabled">
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Opacity" To="{ThemeResource ListViewItemDisabledThemeOpacity}" Duration="0" />
-                                        </Storyboard>
-                                    </VisualState>
-                                </VisualStateGroup>
-                                <VisualStateGroup x:Name="CheckStates">
-                                    <VisualState x:Name="Unchecked" />
-                                    <VisualState x:Name="Checked">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Foreground">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ListViewItemForegroundSelected}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                    <VisualState x:Name="Indeterminate" />
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="12,8,12,12" Spacing="4">
-            <ToggleButton
-                x:Name="PinnedGroupToggleButton"
-                Style="{StaticResource PinnedGroupToggleButtonStyle}"
-                BorderThickness="0"
-                Padding="0"
-                IsTabStop="False"
-                HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Stretch"
-                VerticalContentAlignment="Center"
-                UseSystemFocusVisuals="False">
+            <!-- 固定项组标题（可点击展开/折叠） -->
+            <Border
+                x:Name="PinnedGroupBorder"
+                Margin="4,2,4,2"
+                Padding="0,4,0,4"
+                CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                Background="Transparent"
+                PointerPressed="PinnedGroup_Click">
+                <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                    <Border
+                        x:Name="PinnedGroupSelectionIndicator"
+                        Width="3"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Stretch"
+                        Margin="0,2"
+                        CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                        Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                        Visibility="Collapsed" />
+                    <FontIcon
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        FontFamily="Segoe Fluent Icons"
+                        FontSize="10"
+                        Glyph="&#xE718;" />
+                    <TextBlock
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        Margin="14,0,0,0"
+                        Text="固定" />
+                    <FontIcon
+                        x:Name="PinnedChevron"
+                        Grid.Column="3"
+                        Width="12"
+                        Height="12"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        FontFamily="Segoe Fluent Icons"
+                        FontSize="10"
+                        Glyph="&#xE70E;" />
+                </Grid>
+            </Border>
+
+            <!-- 固定项列表（展开/折叠） -->
+            <StackPanel
+                x:Name="PinnedItemsPanel"
+                Visibility="Visible">
+                <!-- 桌面 -->
                 <Border
-                    x:Name="PinnedGroupBackgroundBorder"
+                    x:Name="DesktopItemBorder"
                     Margin="4,2,4,2"
-                    Background="{ThemeResource ListViewItemBackground}"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}">
-                    <Grid
-                        x:Name="PinnedGroupContentGrid"
-                        MinHeight="28"
-                        Padding="0,4,0,4"
-                        ColumnDefinitions="14,12,*,26"
-                        ColumnSpacing="0">
+                    Padding="0,4,0,4"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    Background="Transparent"
+                    PointerPressed="PinnedItem_Click">
+                    <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
                         <Border
-                            x:Name="PinnedGroupSelectionIndicator"
+                            x:Name="DesktopSelectionIndicator"
                             Width="3"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
@@ -104,55 +73,6 @@
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
                             Visibility="Collapsed" />
-                        <FontIcon
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
-                            Glyph="&#xE718;" />
-                        <TextBlock
-                            Grid.Column="2"
-                            VerticalAlignment="Center"
-                            Margin="14,0,0,0"
-                            Text="固定" />
-                        <FontIcon
-                            x:Name="PinnedGroupChevron"
-                            Grid.Column="3"
-                            Width="12"
-                            Height="12"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center"
-                            FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
-                            Glyph="&#xE70E;" />
-                    </Grid>
-                </Border>
-            </ToggleButton>
-
-            <ListView
-                x:Name="PinnedItemsListView"
-                Margin="0,0,0,4"
-                Background="Transparent"
-                BorderThickness="0"
-                Padding="0"
-                IsTabStop="False"
-                HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Stretch"
-                ScrollViewer.VerticalScrollMode="Disabled"
-                ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                ScrollViewer.HorizontalScrollMode="Disabled"
-                ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                SelectionMode="Single"
-                Visibility="Visible">
-                <ListViewItem
-                    IsSelected="True"
-                    UseSystemFocusVisuals="False"
-                    MinHeight="32"
-                    Padding="4,4,0,4"
-                    Margin="0"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Center">
-                    <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
                         <FontIcon
                             Grid.Column="1"
                             Width="12"
@@ -168,15 +88,26 @@
                             Margin="14,0,0,0"
                             Text="桌面" />
                     </Grid>
-                </ListViewItem>
-                <ListViewItem
-                    UseSystemFocusVisuals="False"
-                    MinHeight="32"
-                    Padding="4,4,0,4"
-                    Margin="0"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Center">
+                </Border>
+
+                <!-- 文档 -->
+                <Border
+                    x:Name="DocumentsItemBorder"
+                    Margin="4,2,4,2"
+                    Padding="0,4,0,4"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    Background="Transparent"
+                    PointerPressed="PinnedItem_Click">
                     <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                        <Border
+                            x:Name="DocumentsSelectionIndicator"
+                            Width="3"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            Margin="0,2"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            Visibility="Collapsed" />
                         <FontIcon
                             Grid.Column="1"
                             Width="12"
@@ -192,15 +123,26 @@
                             Margin="14,0,0,0"
                             Text="文档" />
                     </Grid>
-                </ListViewItem>
-                <ListViewItem
-                    UseSystemFocusVisuals="False"
-                    MinHeight="32"
-                    Padding="4,4,0,4"
-                    Margin="0"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Center">
+                </Border>
+
+                <!-- 下载 -->
+                <Border
+                    x:Name="DownloadsItemBorder"
+                    Margin="4,2,4,2"
+                    Padding="0,4,0,4"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    Background="Transparent"
+                    PointerPressed="PinnedItem_Click">
                     <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                        <Border
+                            x:Name="DownloadsSelectionIndicator"
+                            Width="3"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            Margin="0,2"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            Visibility="Collapsed" />
                         <FontIcon
                             Grid.Column="1"
                             Width="12"
@@ -216,15 +158,26 @@
                             Margin="14,0,0,0"
                             Text="下载" />
                     </Grid>
-                </ListViewItem>
-                <ListViewItem
-                    UseSystemFocusVisuals="False"
-                    MinHeight="32"
-                    Padding="4,4,0,4"
-                    Margin="0"
-                    HorizontalContentAlignment="Stretch"
-                    VerticalContentAlignment="Center">
+                </Border>
+
+                <!-- 图片 -->
+                <Border
+                    x:Name="PicturesItemBorder"
+                    Margin="4,2,4,2"
+                    Padding="0,4,0,4"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    Background="Transparent"
+                    PointerPressed="PinnedItem_Click">
                     <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                        <Border
+                            x:Name="PicturesSelectionIndicator"
+                            Width="3"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            Margin="0,2"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            Visibility="Collapsed" />
                         <FontIcon
                             Grid.Column="1"
                             Width="12"
@@ -240,12 +193,13 @@
                             Margin="14,0,0,0"
                             Text="图片" />
                     </Grid>
-                </ListViewItem>
-            </ListView>
+                </Border>
+            </StackPanel>
 
+            <!-- 文件树 -->
             <TreeView
                 x:Name="SidebarTreeView"
-                Margin="0"
+                Margin="0,8,0,0"
                 HorizontalAlignment="Stretch"
                 ScrollViewer.VerticalScrollMode="Disabled"
                 ScrollViewer.VerticalScrollBarVisibility="Hidden"
