@@ -12,24 +12,23 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="0,8,0,12" Spacing="0">
-            <!-- 固定项组标题（可点击展开/折叠） -->
+        <StackPanel x:Name="RootStackPanel" Margin="0,8,0,12" Spacing="2">
             <Border
                 x:Name="PinnedGroupBorder"
                 Margin="0,2"
                 Padding="0,4"
-                CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                 Background="Transparent"
+                CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                 PointerPressed="PinnedGroup_Click">
                 <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
                     <Border
                         x:Name="PinnedGroupSelectionIndicator"
                         Width="3"
+                        Margin="0,2"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Stretch"
-                        Margin="0,2"
-                        CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                         Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                        CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                         Visibility="Collapsed" />
                     <FontIcon
                         Grid.Column="1"
@@ -38,9 +37,10 @@
                         FontSize="10"
                         Glyph="&#xE718;" />
                     <TextBlock
+                        x:Name="PinnedGroupTextBlock"
                         Grid.Column="2"
-                        VerticalAlignment="Center"
                         Margin="14,0,0,0"
+                        VerticalAlignment="Center"
                         Text="固定" />
                     <FontIcon
                         x:Name="PinnedChevron"
@@ -55,27 +55,24 @@
                 </Grid>
             </Border>
 
-            <!-- 固定项列表（展开/折叠） -->
-            <StackPanel
-                x:Name="PinnedItemsPanel"
-                Visibility="Visible">
-                <!-- 桌面 -->
+            <StackPanel x:Name="PinnedItemsPanel" Visibility="Visible">
                 <Border
                     x:Name="DesktopItemBorder"
                     Margin="0,2"
                     Padding="0,4"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     Background="Transparent"
-                    PointerPressed="PinnedItem_Click">
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="PinnedItem_Click"
+                    Tag="Desktop">
                     <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
                         <Border
                             x:Name="DesktopSelectionIndicator"
                             Width="3"
+                            Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Margin="0,2"
-                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
                             Grid.Column="1"
@@ -87,30 +84,31 @@
                             FontSize="12"
                             Glyph="&#xE80F;" />
                         <TextBlock
+                            x:Name="DesktopTextBlock"
                             Grid.Column="2"
-                            VerticalAlignment="Center"
                             Margin="14,0,0,0"
+                            VerticalAlignment="Center"
                             Text="桌面" />
                     </Grid>
                 </Border>
 
-                <!-- 文档 -->
                 <Border
                     x:Name="DocumentsItemBorder"
                     Margin="0,2"
                     Padding="0,4"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     Background="Transparent"
-                    PointerPressed="PinnedItem_Click">
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="PinnedItem_Click"
+                    Tag="Documents">
                     <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
                         <Border
                             x:Name="DocumentsSelectionIndicator"
                             Width="3"
+                            Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Margin="0,2"
-                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
                             Grid.Column="1"
@@ -122,30 +120,31 @@
                             FontSize="12"
                             Glyph="&#xE8A5;" />
                         <TextBlock
+                            x:Name="DocumentsTextBlock"
                             Grid.Column="2"
-                            VerticalAlignment="Center"
                             Margin="14,0,0,0"
+                            VerticalAlignment="Center"
                             Text="文档" />
                     </Grid>
                 </Border>
 
-                <!-- 下载 -->
                 <Border
                     x:Name="DownloadsItemBorder"
                     Margin="0,2"
                     Padding="0,4"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     Background="Transparent"
-                    PointerPressed="PinnedItem_Click">
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="PinnedItem_Click"
+                    Tag="Downloads">
                     <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
                         <Border
                             x:Name="DownloadsSelectionIndicator"
                             Width="3"
+                            Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Margin="0,2"
-                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
                             Grid.Column="1"
@@ -157,30 +156,31 @@
                             FontSize="12"
                             Glyph="&#xE896;" />
                         <TextBlock
+                            x:Name="DownloadsTextBlock"
                             Grid.Column="2"
-                            VerticalAlignment="Center"
                             Margin="14,0,0,0"
+                            VerticalAlignment="Center"
                             Text="下载" />
                     </Grid>
                 </Border>
 
-                <!-- 图片 -->
                 <Border
                     x:Name="PicturesItemBorder"
                     Margin="0,2"
                     Padding="0,4"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     Background="Transparent"
-                    PointerPressed="PinnedItem_Click">
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="PinnedItem_Click"
+                    Tag="Pictures">
                     <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
                         <Border
                             x:Name="PicturesSelectionIndicator"
                             Width="3"
+                            Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Margin="0,2"
-                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
                             Grid.Column="1"
@@ -192,67 +192,57 @@
                             FontSize="12"
                             Glyph="&#xE91B;" />
                         <TextBlock
+                            x:Name="PicturesTextBlock"
                             Grid.Column="2"
-                            VerticalAlignment="Center"
                             Margin="14,0,0,0"
+                            VerticalAlignment="Center"
                             Text="图片" />
                     </Grid>
                 </Border>
             </StackPanel>
 
-            <!-- 文件树 -->
-            <TreeView
-                x:Name="SidebarTreeView"
-                Margin="0"
-                Padding="0"
-                HorizontalAlignment="Stretch"
-                ScrollViewer.VerticalScrollMode="Disabled"
-                ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                ScrollViewer.HorizontalScrollMode="Disabled"
-                ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                SelectionMode="Single">
-                <TreeView.ItemContainerStyle>
-                    <Style TargetType="TreeViewItem">
-                        <Setter Property="Padding" Value="0" />
-                        <Setter Property="Margin" Value="0" />
-                        <Setter Property="MinHeight" Value="24" />
-                    </Style>
-                </TreeView.ItemContainerStyle>
-                <TreeView.RootNodes>
-                    <TreeViewNode Content="电脑" IsExpanded="True">
-                        <TreeViewNode.Children>
-                            <TreeViewNode Content="桌面" />
-                            <TreeViewNode Content="文档" />
-                            <TreeViewNode Content="下载" />
-                            <TreeViewNode Content="图片" />
-                            <TreeViewNode Content="本地磁盘 (C:)" IsExpanded="True">
-                                <TreeViewNode.Children>
-                                    <TreeViewNode Content="Program Files" />
-                                    <TreeViewNode Content="Users" IsExpanded="True">
-                                        <TreeViewNode.Children>
-                                            <TreeViewNode Content="Demo" IsExpanded="True">
-                                                <TreeViewNode.Children>
-                                                    <TreeViewNode Content="Desktop" />
-                                                    <TreeViewNode Content="Documents" />
-                                                    <TreeViewNode Content="Downloads" />
-                                                    <TreeViewNode Content="Pictures" />
-                                                </TreeViewNode.Children>
-                                            </TreeViewNode>
-                                        </TreeViewNode.Children>
-                                    </TreeViewNode>
-                                </TreeViewNode.Children>
-                            </TreeViewNode>
-                            <TreeViewNode Content="数据盘 (D:)" IsExpanded="True">
-                                <TreeViewNode.Children>
-                                    <TreeViewNode Content="NorthFile" />
-                                    <TreeViewNode Content="Samples" />
-                                    <TreeViewNode Content="Archive" />
-                                </TreeViewNode.Children>
-                            </TreeViewNode>
-                        </TreeViewNode.Children>
-                    </TreeViewNode>
-                </TreeView.RootNodes>
-            </TreeView>
+            <StackPanel x:Name="TreeSectionPanel" Margin="0,6,0,0" Spacing="2">
+                <Border
+                    Padding="0"
+                    Background="Transparent"
+                    CornerRadius="{ThemeResource OverlayCornerRadius}">
+                    <Grid x:Name="TreeHostGrid" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="ExtrasSectionPanel" Margin="0,6,0,0" Spacing="2">
+                <Border
+                    x:Name="ExtrasGroupBorder"
+                    Margin="0,2"
+                    Padding="0,4"
+                    Background="Transparent"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}">
+                    <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                        <Border
+                            x:Name="ExtrasGroupSelectionIndicator"
+                            Width="3"
+                            Margin="0,2"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                            Visibility="Collapsed" />
+                        <FontIcon
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Glyph="&#xE712;" />
+                        <TextBlock
+                            x:Name="ExtrasHeaderTextBlock"
+                            Grid.Column="2"
+                            Margin="14,0,0,0"
+                            VerticalAlignment="Center"
+                            Text="其他" />
+                    </Grid>
+                </Border>
+                <StackPanel x:Name="ExtrasItemsPanel" Spacing="2" />
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

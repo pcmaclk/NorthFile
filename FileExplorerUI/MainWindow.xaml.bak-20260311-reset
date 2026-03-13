@@ -8,7 +8,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="NorthFile">
+    Title="FileExplorerUI">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -16,11 +16,12 @@
 
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8" Padding="8">
         <Grid
-            ColumnDefinitions="Auto,Auto,Auto,Auto,*,280"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,4*,1*"
             Height="36"
             ColumnSpacing="8">
             <Button
                 x:Name="BackButton"
+                Style="{StaticResource SubtleButtonStyle}"
                 Width="32"
                 Height="32"
                 Padding="0"
@@ -31,10 +32,10 @@
                     FontSize="12"
                     Glyph="&#xE72B;" />
             </Button>
-
             <Button
                 x:Name="ForwardButton"
                 Grid.Column="1"
+                Style="{StaticResource SubtleButtonStyle}"
                 Width="32"
                 Height="32"
                 Padding="0"
@@ -45,10 +46,10 @@
                     FontSize="12"
                     Glyph="&#xE72A;" />
             </Button>
-
             <Button
                 x:Name="UpButton"
                 Grid.Column="2"
+                Style="{StaticResource SubtleButtonStyle}"
                 Width="32"
                 Height="32"
                 Padding="0"
@@ -59,10 +60,10 @@
                     FontSize="12"
                     Glyph="&#xE74A;" />
             </Button>
-
             <Button
                 x:Name="LoadButton"
                 Grid.Column="3"
+                Style="{StaticResource SubtleButtonStyle}"
                 Width="32"
                 Height="32"
                 Padding="0"
@@ -73,16 +74,15 @@
                     FontSize="12"
                     Glyph="&#xE72C;" />
             </Button>
-
             <Grid Grid.Column="4">
                 <Border
                     x:Name="AddressBreadcrumbBorder"
                     Height="32"
                     Padding="6,0,72,0"
-                    Background="{ThemeResource TextControlBackground}"
+                    Background="#FFFBFBFB"
                     BorderBrush="{ThemeResource TextControlBorderBrush}"
                     BorderThickness="1"
-                    CornerRadius="8"
+                    CornerRadius="4"
                     SizeChanged="AddressBreadcrumbBorder_SizeChanged"
                     Tapped="AddressBreadcrumbBorder_Tapped">
                     <Grid
@@ -91,7 +91,8 @@
                         <Button
                             x:Name="OverflowBreadcrumbButton"
                             Grid.Column="0"
-                            Padding="6,0,6,1"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            Padding="6, 0, 6, 1"
                             Margin="0,0,4,0"
                             Visibility="Collapsed"
                             Click="OverflowBreadcrumbButton_Click"
@@ -102,8 +103,8 @@
                                 Glyph="&#xE712;" />
                         </Button>
                         <ItemsControl
-                            x:Name="BreadcrumbMeasureItemsControl"
                             Grid.Column="1"
+                            x:Name="BreadcrumbMeasureItemsControl"
                             Opacity="0"
                             IsHitTestVisible="False"
                             HorizontalAlignment="Left"
@@ -119,12 +120,18 @@
                                         ColumnDefinitions="Auto,Auto"
                                         Loaded="MeasureBreadcrumbItem_Loaded"
                                         SizeChanged="MeasureBreadcrumbItem_SizeChanged">
-                                        <Button Padding="10,0,10,1" IsHitTestVisible="False">
-                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                        <Button
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="10, 0, 10, 1"
+                                            IsHitTestVisible="False">
+                                            <TextBlock
+                                                Text="{Binding Label}"
+                                                TextTrimming="CharacterEllipsis" />
                                         </Button>
                                         <Button
                                             Grid.Column="1"
-                                            Padding="4,4,4,4"
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="4, 4, 4, 4"
                                             Visibility="{Binding ChevronVisibility}"
                                             IsHitTestVisible="False">
                                             <Button.Content>
@@ -139,8 +146,8 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <ItemsControl
-                            x:Name="BreadcrumbItemsControl"
                             Grid.Column="1"
+                            x:Name="BreadcrumbItemsControl"
                             Opacity="0"
                             ItemsSource="{Binding VisibleBreadcrumbs, ElementName=RootWindow}">
                             <ItemsControl.ItemsPanel>
@@ -152,14 +159,18 @@
                                 <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
                                     <Grid ColumnDefinitions="Auto,Auto">
                                         <Button
-                                            Padding="10,0,10,1"
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="10, 0, 10, 1"
                                             Click="BreadcrumbButton_Click"
                                             Tag="{Binding FullPath}">
-                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                Text="{Binding Label}"
+                                                TextTrimming="CharacterEllipsis" />
                                         </Button>
                                         <Button
                                             Grid.Column="1"
-                                            Padding="4,4,4,4"
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="4, 4, 4, 4"
                                             Visibility="{Binding ChevronVisibility}"
                                             Click="BreadcrumbChevronButton_Click"
                                             Tag="{Binding FullPath}">
@@ -179,14 +190,13 @@
 
                 <TextBox
                     x:Name="PathTextBox"
-                    Padding="12,7,36,8"
                     PlaceholderText="Address"
-                    Text="C:\"
                     Visibility="Collapsed"
                     KeyDown="PathTextBox_KeyDown"
-                    LostFocus="PathTextBox_LostFocus" />
+                    LostFocus="PathTextBox_LostFocus"
+                    Padding="12, 7, 36, 8"
+                    Text="C:\" />
             </Grid>
-
             <TextBox
                 x:Name="SearchTextBox"
                 Grid.Column="5"
@@ -201,118 +211,111 @@
             ColumnSpacing="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{x:Bind SidebarColumnWidth, Mode=OneWay}" />
+                <ColumnDefinition Width="0" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-
-            <Border
+            <NavigationView
+                x:Name="SidebarNavView"
                 Grid.Column="0"
-                Background="Transparent"
-                CornerRadius="12">
-                <Grid>
-                    <local:SidebarView x:Name="StyledSidebarView" />
-                    <NavigationView
-                        x:Name="SidebarNavView"
-                        Visibility="Collapsed"
-                        IsEnabled="False"
-                        IsSettingsVisible="False"
-                        IsBackButtonVisible="Collapsed"
-                        IsPaneToggleButtonVisible="False"
-                        AlwaysShowHeader="False"
-                        CompactPaneLength="32"
-                        OpenPaneLength="220"
-                        PaneDisplayMode="Left"
-                        SelectionChanged="SidebarNavView_SelectionChanged" />
-                </Grid>
-            </Border>
+                Margin="0,4,0,0"
+                IsSettingsVisible="False"
+                IsBackButtonVisible="Collapsed"
+                IsPaneToggleButtonVisible="False"
+                AlwaysShowHeader="False"
+                CompactPaneLength="32"
+                OpenPaneLength="220"
+                PaneDisplayMode="Left"
+                SelectionChanged="SidebarNavView_SelectionChanged" />
 
-            <Grid Grid.Column="1" Padding="8,0,0,0">
+            <Grid Grid.Column="2" Padding="8,0,0,0">
                 <Border
-                    Padding="8,8,0,8"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    CornerRadius="10"
+                    Background="#FFFFFFFF"
+                    BorderBrush="#FFDADDE3"
                     BorderThickness="1"
-                    CornerRadius="12">
+                    Padding="8, 8, 0, 8"
+                    >
                     <Grid RowDefinitions="Auto,*">
-                        <Border
-                            x:Name="DetailsHeaderBorder"
-                            Width="{x:Bind DetailsRowWidth, Mode=OneWay}"
-                            Margin="0"
-                            Padding="8,0,8,0"
-                            HorizontalAlignment="Left"
-                            Background="Transparent">
+                        <Border x:Name="DetailsHeaderBorder" BorderBrush="#FFE3E5E8" BorderThickness="0" Margin="0" Padding="8,0,8,0" HorizontalAlignment="Left" Background="Transparent" Width="{x:Bind DetailsRowWidth, Mode=OneWay}">
                             <Border.RenderTransform>
                                 <TranslateTransform x:Name="DetailsHeaderTranslateTransform" />
                             </Border.RenderTransform>
-                            <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
-                                <Grid x:Name="DetailsHeaderGrid" Height="28" Margin="0" HorizontalAlignment="Stretch">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
-                                        <ColumnDefinition Width="6" />
-                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
-                                        <ColumnDefinition Width="6" />
-                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
-                                        <ColumnDefinition Width="6" />
-                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
-                                        <ColumnDefinition Width="6" />
-                                    </Grid.ColumnDefinitions>
+                            <Border BorderBrush="#FFE3E5E8" BorderThickness="0,0,0,1">
+                                <Grid
+                                    x:Name="DetailsHeaderGrid"
+                                    Margin="0"
+                                    Height="28"
+                                    HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
+                                    <ColumnDefinition Width="6" />
+                                </Grid.ColumnDefinitions>
 
-                                    <Border Grid.Column="0" Padding="32,0,0,0" Background="Transparent">
-                                        <TextBlock
-                                            HorizontalAlignment="Left"
-                                            VerticalAlignment="Center"
-                                            FontSize="12"
-                                            Opacity="0.72"
-                                            Text="名称" />
-                                    </Border>
+                                <Border Grid.Column="0" Padding="32,0,0,0" Background="Transparent">
                                     <TextBlock
-                                        Grid.Column="2"
-                                        Margin="8,0,0,0"
-                                        HorizontalAlignment="Left"
+                                        Text="名称"
                                         VerticalAlignment="Center"
-                                        FontSize="12"
-                                        Opacity="0.72"
-                                        Text="类型" />
-                                    <TextBlock
-                                        Grid.Column="4"
-                                        Margin="8,0,0,0"
                                         HorizontalAlignment="Left"
-                                        VerticalAlignment="Center"
                                         FontSize="12"
-                                        Opacity="0.72"
-                                        Text="大小" />
-                                    <TextBlock
-                                        Grid.Column="6"
-                                        Margin="8,0,0,0"
-                                        HorizontalAlignment="Left"
-                                        VerticalAlignment="Center"
-                                        FontSize="12"
-                                        Opacity="0.72"
-                                        Text="修改日期" />
+                                        Foreground="#FF6F6F6F" />
+                                </Border>
+                                <TextBlock
+                                    Grid.Column="2"
+                                    Text="类型"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"
+                                    FontSize="12"
+                                    Foreground="#FF6F6F6F" />
+                                <TextBlock
+                                    Grid.Column="4"
+                                    Text="大小"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"
+                                    FontSize="12"
+                                    Foreground="#FF6F6F6F" />
+                                <TextBlock
+                                    Grid.Column="6"
+                                    Text="修改日期"
+                                    Margin="8,0,0,0"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"
+                                    FontSize="12"
+                                    Foreground="#FF6F6F6F" />
 
-                                    <local:ColumnSplitter
-                                        x:Name="HeaderSplitter1"
-                                        Grid.Column="1"
-                                        Tag="1"
-                                        PointerEntered="ColumnSplitterHover_PointerEntered"
-                                        PointerExited="ColumnSplitterHover_PointerExited" />
-                                    <local:ColumnSplitter
-                                        x:Name="HeaderSplitter2"
-                                        Grid.Column="3"
-                                        Tag="2"
-                                        PointerEntered="ColumnSplitterHover_PointerEntered"
-                                        PointerExited="ColumnSplitterHover_PointerExited" />
-                                    <local:ColumnSplitter
-                                        x:Name="HeaderSplitter3"
-                                        Grid.Column="5"
-                                        Tag="3"
-                                        PointerEntered="ColumnSplitterHover_PointerEntered"
-                                        PointerExited="ColumnSplitterHover_PointerExited" />
-                                    <local:ColumnSplitter
-                                        x:Name="HeaderSplitter4"
-                                        Grid.Column="7"
-                                        Tag="4"
-                                        PointerEntered="ColumnSplitterHover_PointerEntered"
-                                        PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter1"
+                                    Grid.Column="1"
+                                    Tag="1"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter2"
+                                    Grid.Column="3"
+                                    Tag="2"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter3"
+                                    Grid.Column="5"
+                                    Tag="3"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter4"
+                                    Grid.Column="7"
+                                    Tag="4"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+
+
                                 </Grid>
                             </Border>
                         </Border>
@@ -320,21 +323,21 @@
                         <ListView
                             x:Name="EntriesListView"
                             Grid.Row="1"
-                            Margin="0,8,0,0"
                             HorizontalAlignment="Stretch"
-                            Background="Transparent"
-                            DoubleTapped="EntriesListView_DoubleTapped"
-                            ContextRequested="EntriesListView_ContextRequested"
+                            Margin="0,8,0,0"
                             IsItemClickEnabled="False"
-                            Loaded="EntriesListView_Loaded"
+                            SelectionMode="Single"
+                            Background="Transparent"
                             Padding="0"
                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
                             ScrollViewer.HorizontalScrollMode="Enabled"
                             ScrollViewer.VerticalScrollBarVisibility="Visible"
                             ScrollViewer.VerticalScrollMode="Enabled"
-                            SelectionMode="Single">
+                            DoubleTapped="EntriesListView_DoubleTapped"
+                            ContextRequested="EntriesListView_ContextRequested"
+                            Loaded="EntriesListView_Loaded">
                             <ListView.ItemContainerStyle>
-                                <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                                <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
                                     <Setter Property="HorizontalAlignment" Value="Left" />
                                     <Setter Property="Width" Value="{Binding ElementName=RootWindow, Path=DetailsRowWidth}" />
                                     <Setter Property="Padding" Value="0" />
@@ -352,10 +355,16 @@
                                     x:Name="EntriesContextFlyout"
                                     Opening="EntriesContextFlyout_Opening"
                                     Closed="EntriesContextFlyout_Closed">
-                                    <MenuFlyoutItem Click="ContextRename_Click" Text="Rename" />
-                                    <MenuFlyoutItem Click="ContextDelete_Click" Text="Delete" />
+                                    <MenuFlyoutItem
+                                        Click="ContextRename_Click"
+                                        Text="Rename" />
+                                    <MenuFlyoutItem
+                                        Click="ContextDelete_Click"
+                                        Text="Delete" />
                                     <MenuFlyoutSeparator />
-                                    <MenuFlyoutItem Click="ContextRefresh_Click" Text="Refresh" />
+                                    <MenuFlyoutItem
+                                        Click="ContextRefresh_Click"
+                                        Text="Refresh" />
                                 </MenuFlyout>
                             </ListView.ContextFlyout>
                             <ListView.ItemTemplate>
@@ -377,14 +386,18 @@
                                                 <ColumnDefinition Width="6" />
                                             </Grid.ColumnDefinitions>
 
-                                            <Grid Grid.Column="0" Margin="6,0,0,0" VerticalAlignment="Center" ColumnDefinitions="18,8,*">
+                                            <Grid
+                                                Grid.Column="0"
+                                                ColumnDefinitions="18,8,*"
+                                                Margin="6,0,0,0"
+                                                VerticalAlignment="Center">
                                                 <TextBlock
                                                     Grid.Column="0"
                                                     Width="18"
-                                                    VerticalAlignment="Center"
                                                     FontFamily="Segoe Fluent Icons"
                                                     FontSize="14"
                                                     Foreground="{Binding IconForeground}"
+                                                    VerticalAlignment="Center"
                                                     Text="{Binding IconGlyph}" />
                                                 <TextBlock
                                                     Grid.Column="2"
@@ -417,46 +430,54 @@
                     </Grid>
                 </Border>
 
-                <local:ColumnSplitter
-                    x:Name="SidebarSplitter"
-                    Width="8"
-                    Margin="-4,0,0,0"
-                    HorizontalAlignment="Left"
-                    ShowGuide="False"
-                    VerticalAlignment="Stretch"
-                    PointerEntered="ColumnSplitterHover_PointerEntered"
-                    PointerExited="ColumnSplitterHover_PointerExited" />
-
                 <Border
                     x:Name="CommandDockPanel"
                     Width="360"
-                    Margin="10"
                     Padding="10"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Top"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="10"
-                    PointerExited="CommandDockPanel_PointerExited"
-                    Visibility="Collapsed">
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Visibility="Collapsed"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Margin="10"
+                    PointerExited="CommandDockPanel_PointerExited">
                     <StackPanel Spacing="8">
-                        <TextBlock FontWeight="SemiBold" Text="Command Dock" />
+                        <TextBlock
+                            FontWeight="SemiBold"
+                            Text="Command Dock" />
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                            <Button x:Name="RenameButton" Grid.Column="0" Click="RenameButton_Click" Content="Rename" />
-                            <Button x:Name="DeleteButton" Grid.Column="1" Click="DeleteButton_Click" Content="Delete" />
-                            <Button x:Name="NextButton" Grid.Column="2" Click="NextButton_Click" Content="Load More" />
+                            <Button
+                                x:Name="RenameButton"
+                                Grid.Column="0"
+                                Click="RenameButton_Click"
+                                Content="Rename" />
+                            <Button
+                                x:Name="DeleteButton"
+                                Grid.Column="1"
+                                Click="DeleteButton_Click"
+                                Content="Delete" />
+                            <Button
+                                x:Name="NextButton"
+                                Grid.Column="2"
+                                Click="NextButton_Click"
+                                Content="Load More" />
                         </Grid>
-                        <TextBox x:Name="RenameTextBox" PlaceholderText="new name" />
-                        <CheckBox x:Name="RecursiveDeleteCheckBox" Content="Recursive delete" />
+                        <TextBox
+                            x:Name="RenameTextBox"
+                            PlaceholderText="new name" />
+                        <CheckBox
+                            x:Name="RecursiveDeleteCheckBox"
+                            Content="Recursive delete" />
 
                         <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
                             <RadioButton
                                 GroupName="DockSide"
                                 Tag="Top"
                                 Checked="DockRadio_Checked"
-                                Content="Top"
-                                IsChecked="True" />
+                                IsChecked="True"
+                                Content="Top" />
                             <RadioButton
                                 Grid.Column="1"
                                 GroupName="DockSide"
@@ -472,24 +493,38 @@
                             <ToggleSwitch
                                 x:Name="CommandAutoHideSwitch"
                                 Grid.Column="3"
-                                Header="Auto hide"
                                 HorizontalAlignment="Right"
-                                Toggled="CommandAutoHideSwitch_Toggled" />
+                                Toggled="CommandAutoHideSwitch_Toggled"
+                                Header="Auto hide" />
                         </Grid>
                     </StackPanel>
                 </Border>
 
                 <Button
                     x:Name="CommandPeekButton"
-                    Margin="10"
+                    Visibility="Collapsed"
+                    Content="Commands"
+                    Click="CommandPeekButton_Click"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Top"
-                    Click="CommandPeekButton_Click"
-                    Content="Commands"
-                    Visibility="Collapsed" />
+                    Margin="10" />
             </Grid>
+
+            <local:ColumnSplitter
+                x:Name="SidebarSplitter"
+                Grid.Column="2"
+                Width="8"
+                Margin="4,0,0,0"
+                HorizontalAlignment="Left"
+                ShowGuide="False"
+                PointerEntered="ColumnSplitterHover_PointerEntered"
+                PointerExited="ColumnSplitterHover_PointerExited" />
         </Grid>
 
-        <TextBlock x:Name="StatusTextBlock" Grid.Row="2" Text="加载中..." TextWrapping="Wrap" />
+        <TextBlock
+            x:Name="StatusTextBlock"
+            Grid.Row="2"
+            TextWrapping="Wrap"
+            Text="加载中..." />
     </Grid>
 </Window>

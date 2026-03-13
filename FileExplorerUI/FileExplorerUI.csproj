@@ -8,13 +8,13 @@
     <Product>NorthFile</Product>
     <Title>NorthFile</Title>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Platforms>x86;x64;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
     <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
     <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
     <EnableMsixTooling>false</EnableMsixTooling>
     <Nullable>enable</Nullable>
@@ -46,6 +46,18 @@
     <RustEngineOutputDir Condition="'$(Configuration)' == 'Debug'">..\rust_engine\target\debug</RustEngineOutputDir>
     <RustEngineOutputDir Condition="'$(Configuration)' != 'Debug'">..\rust_engine\target\release</RustEngineOutputDir>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="..\rust_engine\target\debug\rust_engine.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="..\rust_engine\target\debug\rust_engine.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="..\rust_engine\target\debug\rust_engine.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="..\rust_engine\target\debug\rust_engine.dll" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="$(RustEngineOutputDir)\rust_engine.dll" Link="rust_engine.dll">

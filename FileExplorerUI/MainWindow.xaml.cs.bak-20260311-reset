@@ -46,6 +46,7 @@ namespace FileExplorerUI
         private CancellationTokenSource? _sidebarTreeCts;
         private bool _suppressSidebarTreeSelection;
         private readonly Dictionary<string, string> _sidebarTreeSelectionMemory = new(StringComparer.OrdinalIgnoreCase);
+        private bool _sidebarTreeNavigateOnNextSelection;
         private bool _suppressSidebarNavSelection;
 
         private const double SidebarExpandedDefaultWidth = 220;
@@ -281,7 +282,6 @@ namespace FileExplorerUI
 
             UpdateNavButtonsState();
             this.AppWindow.Title = $"NorthFile | Engine {_engineVersion}";
-            StyledSidebarView.NavigateRequested += StyledSidebarView_NavigateRequested;
             BuildSidebarItems();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
@@ -564,7 +564,7 @@ namespace FileExplorerUI
             SidebarNavView.SelectedItem = selected;
             _suppressSidebarNavSelection = false;
 
-            StyledSidebarView.SetSelectedPath(target);
+            _sidebarTreeNavigateOnNextSelection = false;
             _ = SelectSidebarTreePathAsync(target);
         }
 
@@ -787,7 +787,6 @@ namespace FileExplorerUI
             LoadButton.IsEnabled = false;
             NextButton.IsEnabled = false;
             SidebarNavView.IsEnabled = false;
-            StyledSidebarView.IsEnabled = false;
 
             try
             {
@@ -903,7 +902,6 @@ namespace FileExplorerUI
                 LoadButton.IsEnabled = true;
                 NextButton.IsEnabled = _hasMore;
                 SidebarNavView.IsEnabled = true;
-                StyledSidebarView.IsEnabled = true;
             }
         }
 
@@ -977,11 +975,6 @@ namespace FileExplorerUI
             _sidebarQuickAccessPaths.Clear();
             _sidebarDrivePaths.Clear();
 
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-            string picturesPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
-
             NavigationViewItem CreateLeaf(string label, string path, Symbol icon, bool inQuickAccess, bool inDrives)
             {
                 var item = new NavigationViewItem
@@ -1008,27 +1001,36 @@ namespace FileExplorerUI
                 Icon = new SymbolIcon(Symbol.Favorite),
                 SelectsOnInvoked = false
             };
-            quickAccess.MenuItems.Add(CreateLeaf("桌面", desktopPath, Symbol.Home, true, false));
-            quickAccess.MenuItems.Add(CreateLeaf("文档", documentsPath, Symbol.Document, true, false));
-            quickAccess.MenuItems.Add(CreateLeaf("下载", downloadsPath, Symbol.Download, true, false));
+            quickAccess.MenuItems.Add(CreateLeaf("桌面", Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Symbol.Home, true, false));
+            quickAccess.MenuItems.Add(CreateLeaf("文档", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), Symbol.Document, true, false));
+            quickAccess.MenuItems.Add(CreateLeaf("下载", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"), Symbol.Download, true, false));
             SidebarNavView.MenuItems.Add(quickAccess);
+
+            var drives = new NavigationViewItem
+            {
+                Content = "驱动器",
+                Icon = new SymbolIcon(Symbol.Library),
+                SelectsOnInvoked = false
+            };
+            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            {
+                if (!drive.IsReady)
+                {
+                    continue;
+                }
+                string letter = drive.Name.TrimEnd('\\');
+                drives.MenuItems.Add(CreateLeaf($"本地磁盘 ({letter})", drive.RootDirectory.FullName, Symbol.MapDrive, false, true));
+            }
+            SidebarNavView.MenuItems.Add(drives);
 
             SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = "云盘", Icon = new SymbolIcon(Symbol.World), SelectsOnInvoked = false });
             SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = "网络", Icon = new SymbolIcon(Symbol.Globe), SelectsOnInvoked = false });
             SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = "标签", Icon = new SymbolIcon(Symbol.Tag), SelectsOnInvoked = false });
 
-            StyledSidebarView.ConfigurePinnedPaths(desktopPath, documentsPath, downloadsPath, picturesPath);
-            StyledSidebarView.SetExtraItems(new[]
-            {
-                new SidebarNavItemModel("cloud", "云盘", null, "\uE753", selectable: false),
-                new SidebarNavItemModel("network", "网络", null, "\uE774", selectable: false),
-                new SidebarNavItemModel("tags", "标签", null, "\uE8EC", selectable: false)
-            });
-
             EnsureSidebarTreeView();
             if (_sidebarTreeView is not null)
             {
-                StyledSidebarView.AttachTreeView(_sidebarTreeView);
+                SidebarNavView.PaneCustomContent = _sidebarTreeView;
                 _ = PopulateSidebarTreeRootsAsync();
             }
 
@@ -1052,10 +1054,10 @@ namespace FileExplorerUI
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
             _sidebarTreeView.SelectionChanged += SidebarTree_SelectionChanged;
-            _sidebarTreeView.Expanding += SidebarTree_Expanding;
-            _sidebarTreeView.Collapsed += SidebarTree_Collapsed;
-            _sidebarTreeView.ItemInvoked += SidebarTree_ItemInvoked;
-            StyledSidebarView.AttachTreeView(_sidebarTreeView);
+            _sidebarTreeView.AddHandler(
+                UIElement.PointerReleasedEvent,
+                new PointerEventHandler(SidebarTree_PointerReleased),
+                true);
         }
 
         private async Task PopulateSidebarTreeRootsAsync()
@@ -1205,10 +1207,7 @@ namespace FileExplorerUI
                     {
                         if (current.HasUnrealizedChildren)
                         {
-                            if (current.Content is SidebarTreeEntry currentEntry)
-                            {
-                                await PopulateSidebarTreeChildrenAsync(current, currentEntry.FullPath, CancellationToken.None);
-                            }
+                            await PopulateSidebarTreeChildrenAsync(current, walk, CancellationToken.None);
                         }
                         foreach (TreeViewNode child in current.Children)
                         {
@@ -1276,77 +1275,24 @@ namespace FileExplorerUI
             );
         }
 
-        private void SidebarTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
+        private async void SidebarTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
         {
             if (_suppressSidebarTreeSelection)
             {
                 _suppressSidebarTreeSelection = false;
                 return;
             }
-        }
 
-        private async void SidebarTree_Expanding(TreeView sender, TreeViewExpandingEventArgs args)
-        {
-            if (args.Node.Content is not SidebarTreeEntry entry || !args.Node.HasUnrealizedChildren)
+            if (sender.SelectedNode?.Content is not SidebarTreeEntry entry)
             {
                 return;
             }
 
-            try
-            {
-                await PopulateSidebarTreeChildrenAsync(args.Node, entry.FullPath, CancellationToken.None);
-                await RestoreSidebarTreeSelectionAsync(args.Node);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatus($"Sidebar tree expand failed: {ex.Message}");
-            }
-        }
-
-        private void SidebarTree_Collapsed(TreeView sender, TreeViewCollapsedEventArgs args)
-        {
-            if (_sidebarTreeView is null || args.Node.Content is not SidebarTreeEntry entry)
+            if (!_sidebarTreeNavigateOnNextSelection)
             {
                 return;
             }
-
-            TreeViewNode? selected = _sidebarTreeView.SelectedNode;
-            if (selected is not null &&
-                !ReferenceEquals(selected, args.Node) &&
-                IsTreeNodeDescendant(args.Node, selected) &&
-                selected.Content is SidebarTreeEntry selectedEntry)
-            {
-                _sidebarTreeSelectionMemory[entry.FullPath] = selectedEntry.FullPath;
-            }
-
-            _suppressSidebarTreeSelection = true;
-            _sidebarTreeView.SelectedNode = args.Node;
-            _suppressSidebarTreeSelection = false;
-        }
-
-        private async void SidebarTree_ItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
-        {
-            SidebarTreeEntry? entry = args.InvokedItem switch
-            {
-                SidebarTreeEntry direct => direct,
-                TreeViewNode node when node.Content is SidebarTreeEntry nested => nested,
-                _ => sender.SelectedNode?.Content as SidebarTreeEntry
-            };
-
-            if (entry is null)
-            {
-                return;
-            }
-
-            await NavigateSidebarTreeEntryAsync(entry);
-        }
-
-        private async Task NavigateSidebarTreeEntryAsync(SidebarTreeEntry entry)
-        {
-            if (string.Equals(entry.FullPath, "shell:mycomputer", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
+            _sidebarTreeNavigateOnNextSelection = false;
 
             Debug.WriteLine($"[Tree] Selected: {entry.FullPath}");
             if (_isLoading)
@@ -1371,6 +1317,72 @@ namespace FileExplorerUI
             }
         }
 
+        private void SidebarTree_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (_sidebarTreeView is null)
+            {
+                return;
+            }
+
+            DependencyObject? origin = e.OriginalSource as DependencyObject;
+            if (origin is null)
+            {
+                return;
+            }
+
+            TreeViewItem? item = FindAncestor<TreeViewItem>(origin);
+            if (item?.DataContext is not TreeViewNode node)
+            {
+                return;
+            }
+
+            ToggleButton? toggle = FindAncestor<ToggleButton>(origin);
+            bool wasExpanded = node.IsExpanded;
+            _sidebarTreeNavigateOnNextSelection = toggle is null;
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                if (node.Content is not SidebarTreeEntry entry)
+                {
+                    return;
+                }
+
+                await Task.Yield();
+                bool isExpanded = node.IsExpanded;
+                bool expandedNow = !wasExpanded && isExpanded;
+                bool collapsedNow = wasExpanded && !isExpanded;
+
+                if (expandedNow)
+                {
+                    Debug.WriteLine($"[Tree] Expanded: {entry.FullPath}");
+                    if (node.HasUnrealizedChildren)
+                    {
+                        await PopulateSidebarTreeChildrenAsync(node, entry.FullPath, CancellationToken.None);
+                    }
+                    await RestoreSidebarTreeSelectionAsync(node);
+                    return;
+                }
+
+                if (collapsedNow)
+                {
+                    Debug.WriteLine($"[Tree] Collapsed: {entry.FullPath}");
+                    TreeViewNode? selected = _sidebarTreeView.SelectedNode;
+                    if (selected is not null &&
+                        !ReferenceEquals(selected, node) &&
+                        IsTreeNodeDescendant(node, selected) &&
+                        selected.Content is SidebarTreeEntry selectedEntry)
+                    {
+                        _sidebarTreeSelectionMemory[entry.FullPath] = selectedEntry.FullPath;
+                        Debug.WriteLine($"[Tree] Collapse: {entry.FullPath} remember {selectedEntry.FullPath}");
+                    }
+
+                    _suppressSidebarTreeSelection = true;
+                    _sidebarTreeView.SelectedNode = node;
+                    _suppressSidebarTreeSelection = false;
+                    Debug.WriteLine($"[Tree] Collapsed select: {entry.FullPath}");
+                }
+            });
+        }
+
 
         private async Task RestoreSidebarTreeSelectionAsync(TreeViewNode node)
         {
@@ -1386,6 +1398,7 @@ namespace FileExplorerUI
 
             _sidebarTreeSelectionMemory.Remove(entry.FullPath);
             Debug.WriteLine($"[Tree] Restore: {entry.FullPath} -> {target}");
+            _sidebarTreeNavigateOnNextSelection = false;
             await SelectSidebarTreePathAsync(target);
         }
 
@@ -1433,36 +1446,6 @@ namespace FileExplorerUI
             catch (Exception ex)
             {
                 UpdateStatus($"Sidebar nav failed: {ex.Message}");
-            }
-        }
-
-        private async void StyledSidebarView_NavigateRequested(object? sender, SidebarNavigateRequestedEventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(e.Path))
-            {
-                return;
-            }
-
-            if (_isLoading)
-            {
-                UpdateStatus("Sidebar nav ignored: loading in progress.");
-                return;
-            }
-
-            if (IsCurrentPath(e.Path))
-            {
-                StyledSidebarView.SetSelectedPath(_currentPath);
-                return;
-            }
-
-            try
-            {
-                await NavigateToPathAsync(e.Path, pushHistory: true);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatus($"Sidebar nav failed: {ex.Message}");
-                StyledSidebarView.SetSelectedPath(_currentPath);
             }
         }
 
@@ -1568,12 +1551,10 @@ namespace FileExplorerUI
         {
             if (_isSidebarCompact == compact)
             {
-                StyledSidebarView.SetCompact(compact);
                 return;
             }
 
             _isSidebarCompact = compact;
-            StyledSidebarView.SetCompact(compact);
             if (SidebarNavView is not null)
             {
                 SidebarNavView.PaneDisplayMode = compact ? NavigationViewPaneDisplayMode.LeftCompact : NavigationViewPaneDisplayMode.Left;
@@ -1608,7 +1589,7 @@ namespace FileExplorerUI
                 _suppressSidebarNavSelection = false;
             }
 
-            StyledSidebarView.SetSelectedPath(_currentPath);
+            _sidebarTreeNavigateOnNextSelection = false;
             _ = SelectSidebarTreePathAsync(_currentPath);
         }
 
@@ -3513,4 +3494,3 @@ namespace FileExplorerUI
     }
 
 }
-
