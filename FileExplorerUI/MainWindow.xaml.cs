@@ -1294,7 +1294,7 @@ namespace FileExplorerUI
 
             try
             {
-                await PopulateSidebarTreeChildrenAsync(args.Node, entry.FullPath, CancellationToken.None);
+                await PopulateSidebarTreeChildrenAsync(args.Node, entry.FullPath, CancellationToken.None, expandAfterLoad: true);
                 await RestoreSidebarTreeSelectionAsync(args.Node);
             }
             catch (Exception ex)
