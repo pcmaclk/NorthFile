@@ -7,13 +7,17 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
+    <UserControl.Resources>
+        <Thickness x:Key="TreeViewItemPresenterMargin">0</Thickness>
+    </UserControl.Resources>
+
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="12,8,12,12" Spacing="4">
+        <StackPanel Margin="0,8,0,12" Spacing="0">
             <!-- 固定项组标题（可点击展开/折叠） -->
             <Border
                 x:Name="PinnedGroupBorder"
-                Margin="4,2,4,2"
-                Padding="0,4,0,4"
+                Margin="0,2"
+                Padding="0,4"
                 CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                 Background="Transparent"
                 PointerPressed="PinnedGroup_Click">
@@ -58,8 +62,8 @@
                 <!-- 桌面 -->
                 <Border
                     x:Name="DesktopItemBorder"
-                    Margin="4,2,4,2"
-                    Padding="0,4,0,4"
+                    Margin="0,2"
+                    Padding="0,4"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     Background="Transparent"
                     PointerPressed="PinnedItem_Click">
@@ -93,8 +97,8 @@
                 <!-- 文档 -->
                 <Border
                     x:Name="DocumentsItemBorder"
-                    Margin="4,2,4,2"
-                    Padding="0,4,0,4"
+                    Margin="0,2"
+                    Padding="0,4"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     Background="Transparent"
                     PointerPressed="PinnedItem_Click">
@@ -128,8 +132,8 @@
                 <!-- 下载 -->
                 <Border
                     x:Name="DownloadsItemBorder"
-                    Margin="4,2,4,2"
-                    Padding="0,4,0,4"
+                    Margin="0,2"
+                    Padding="0,4"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     Background="Transparent"
                     PointerPressed="PinnedItem_Click">
@@ -163,8 +167,8 @@
                 <!-- 图片 -->
                 <Border
                     x:Name="PicturesItemBorder"
-                    Margin="4,2,4,2"
-                    Padding="0,4,0,4"
+                    Margin="0,2"
+                    Padding="0,4"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     Background="Transparent"
                     PointerPressed="PinnedItem_Click">
@@ -199,13 +203,21 @@
             <!-- 文件树 -->
             <TreeView
                 x:Name="SidebarTreeView"
-                Margin="0,8,0,0"
+                Margin="0"
+                Padding="0"
                 HorizontalAlignment="Stretch"
                 ScrollViewer.VerticalScrollMode="Disabled"
                 ScrollViewer.VerticalScrollBarVisibility="Hidden"
                 ScrollViewer.HorizontalScrollMode="Disabled"
                 ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                 SelectionMode="Single">
+                <TreeView.ItemContainerStyle>
+                    <Style TargetType="TreeViewItem">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0" />
+                        <Setter Property="MinHeight" Value="24" />
+                    </Style>
+                </TreeView.ItemContainerStyle>
                 <TreeView.RootNodes>
                     <TreeViewNode Content="电脑" IsExpanded="True">
                         <TreeViewNode.Children>
