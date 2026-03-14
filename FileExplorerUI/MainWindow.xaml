@@ -24,6 +24,7 @@
                 Width="32"
                 Height="32"
                 Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
                 Click="BackButton_Click"
                 ToolTipService.ToolTip="Back">
                 <FontIcon
@@ -38,6 +39,7 @@
                 Width="32"
                 Height="32"
                 Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
                 Click="ForwardButton_Click"
                 ToolTipService.ToolTip="Forward">
                 <FontIcon
@@ -52,6 +54,7 @@
                 Width="32"
                 Height="32"
                 Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
                 Click="UpButton_Click"
                 ToolTipService.ToolTip="Up">
                 <FontIcon
@@ -66,6 +69,7 @@
                 Width="32"
                 Height="32"
                 Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
                 Click="LoadButton_Click"
                 ToolTipService.ToolTip="Go">
                 <FontIcon
@@ -93,6 +97,7 @@
                             Grid.Column="0"
                             Padding="6,0,6,1"
                             Margin="0,0,4,0"
+                            Style="{ThemeResource SubtleButtonStyle}"
                             Visibility="Collapsed"
                             Click="OverflowBreadcrumbButton_Click"
                             ToolTipService.ToolTip="Show hidden path parts">
@@ -153,6 +158,7 @@
                                     <Grid ColumnDefinitions="Auto,Auto">
                                         <Button
                                             Padding="10,0,10,1"
+                                            Style="{ThemeResource SubtleButtonStyle}"
                                             Click="BreadcrumbButton_Click"
                                             Tag="{Binding FullPath}">
                                             <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
@@ -160,6 +166,7 @@
                                         <Button
                                             Grid.Column="1"
                                             Padding="4,4,4,4"
+                                            Style="{ThemeResource SubtleButtonStyle}"
                                             Visibility="{Binding ChevronVisibility}"
                                             Click="BreadcrumbChevronButton_Click"
                                             Tag="{Binding FullPath}">
@@ -225,9 +232,9 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Column="1" Padding="8,0,0,0">
+            <Grid Grid.Column="1" Padding="0">
                 <Border
-                    Padding="8,8,0,8"
+                    Padding="4,8,0,8"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
@@ -258,6 +265,7 @@
 
                                     <Border Grid.Column="0" Padding="32,0,0,0" Background="Transparent">
                                         <TextBlock
+                                            x:Name="NameHeaderTextBlock"
                                             HorizontalAlignment="Left"
                                             VerticalAlignment="Center"
                                             FontSize="12"
@@ -265,6 +273,7 @@
                                             Text="名称" />
                                     </Border>
                                     <TextBlock
+                                        x:Name="TypeHeaderTextBlock"
                                         Grid.Column="2"
                                         Margin="8,0,0,0"
                                         HorizontalAlignment="Left"
@@ -273,6 +282,7 @@
                                         Opacity="0.72"
                                         Text="类型" />
                                     <TextBlock
+                                        x:Name="SizeHeaderTextBlock"
                                         Grid.Column="4"
                                         Margin="8,0,0,0"
                                         HorizontalAlignment="Left"
@@ -281,6 +291,7 @@
                                         Opacity="0.72"
                                         Text="大小" />
                                     <TextBlock
+                                        x:Name="ModifiedHeaderTextBlock"
                                         Grid.Column="6"
                                         Margin="8,0,0,0"
                                         HorizontalAlignment="Left"

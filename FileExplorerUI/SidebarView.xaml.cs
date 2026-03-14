@@ -15,6 +15,9 @@ namespace FileExplorerUI
         private readonly List<TextBlock> _labelBlocks = new();
         private readonly List<TextBlock> _headerBlocks = new();
         private bool _isPinnedExpanded = true;
+        private bool _isCloudExpanded = true;
+        private bool _isNetworkExpanded = true;
+        private bool _isTagsExpanded = true;
         private bool _isCompact;
         private string? _selectedPath;
 
@@ -24,13 +27,24 @@ namespace FileExplorerUI
         {
             InitializeComponent();
 
-            _headerBlocks.Add(ExtrasHeaderTextBlock);
             _headerBlocks.Add(PinnedGroupTextBlock);
+            _headerBlocks.Add(CloudHeaderTextBlock);
+            _headerBlocks.Add(NetworkHeaderTextBlock);
+            _headerBlocks.Add(TagsHeaderTextBlock);
 
             RegisterStaticItem("Desktop", DesktopItemBorder, DesktopSelectionIndicator, DesktopTextBlock, SidebarSection.Pinned);
             RegisterStaticItem("Documents", DocumentsItemBorder, DocumentsSelectionIndicator, DocumentsTextBlock, SidebarSection.Pinned);
             RegisterStaticItem("Downloads", DownloadsItemBorder, DownloadsSelectionIndicator, DownloadsTextBlock, SidebarSection.Pinned);
             RegisterStaticItem("Pictures", PicturesItemBorder, PicturesSelectionIndicator, PicturesTextBlock, SidebarSection.Pinned);
+            RegisterStaticItem("OneDrive", OneDriveItemBorder, OneDriveSelectionIndicator, OneDriveTextBlock, SidebarSection.Extra, selectable: false);
+            RegisterStaticItem("TagWork", TagWorkItemBorder, TagWorkSelectionIndicator, TagWorkTextBlock, SidebarSection.Extra, selectable: false);
+            RegisterStaticItem("TagFocus", TagFocusItemBorder, TagFocusSelectionIndicator, TagFocusTextBlock, SidebarSection.Extra, selectable: false);
+            RegisterStaticItem("TagArchive", TagArchiveItemBorder, TagArchiveSelectionIndicator, TagArchiveTextBlock, SidebarSection.Extra, selectable: false);
+
+            RegisterGroupHover(PinnedGroupBorder);
+            RegisterGroupHover(CloudGroupBorder);
+            RegisterGroupHover(NetworkGroupBorder);
+            RegisterGroupHover(TagsGroupBorder);
         }
 
         public void ConfigurePinnedPaths(string desktopPath, string documentsPath, string downloadsPath, string picturesPath)
@@ -44,7 +58,7 @@ namespace FileExplorerUI
 
         public void SetExtraItems(IEnumerable<SidebarNavItemModel> items)
         {
-            PopulateDynamicItems(ExtrasItemsPanel, items, SidebarSection.Extra);
+            // Extras are statically composed in XAML to match the pinned-group presentation.
         }
 
         public void AttachTreeView(TreeView treeView)
@@ -55,7 +69,7 @@ namespace FileExplorerUI
             }
 
             treeView.Margin = new Thickness(0);
-            treeView.Padding = new Thickness(0);
+            treeView.Padding = new Thickness(0, 0, 8, 0);
             treeView.HorizontalAlignment = HorizontalAlignment.Stretch;
             treeView.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Disabled);
             treeView.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
@@ -85,7 +99,9 @@ namespace FileExplorerUI
             }
 
             PinnedChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            ExtrasHeaderTextBlock.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            CloudChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            NetworkChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            TagsChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public void SetSelectedPath(string? path)
@@ -148,10 +164,12 @@ namespace FileExplorerUI
             selected.Border.Background = SelectedBackgroundBrush();
         }
 
-        private void RegisterStaticItem(string key, Border border, Border indicator, TextBlock labelBlock, SidebarSection section)
+        private void RegisterStaticItem(string key, Border border, Border indicator, TextBlock labelBlock, SidebarSection section, bool selectable = true)
         {
+            border.PointerEntered += Item_PointerEntered;
+            border.PointerExited += Item_PointerExited;
             _labelBlocks.Add(labelBlock);
-            _visualItems.Add(new SidebarVisualItem(key, null, border, indicator, labelBlock, section, Selectable: true));
+            _visualItems.Add(new SidebarVisualItem(key, null, border, indicator, labelBlock, section, selectable));
         }
 
         private void PopulateDynamicItems(StackPanel panel, IEnumerable<SidebarNavItemModel> items, SidebarSection section)
@@ -172,7 +190,10 @@ namespace FileExplorerUI
 
         private Border CreateDynamicItem(SidebarNavItemModel item, SidebarSection section, out Border indicator, out TextBlock labelBlock)
         {
-            var grid = new Grid();
+            var grid = new Grid
+            {
+                ColumnSpacing = 0
+            };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -219,6 +240,7 @@ namespace FileExplorerUI
                 Padding = new Thickness(0, 4, 0, 4),
                 Background = new SolidColorBrush(Colors.Transparent),
                 CornerRadius = (CornerRadius)Application.Current.Resources["ListViewItemCornerRadius"],
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 Child = grid,
                 Tag = item
             };
@@ -227,6 +249,9 @@ namespace FileExplorerUI
             {
                 border.PointerPressed += DynamicItem_Click;
             }
+
+            border.PointerEntered += Item_PointerEntered;
+            border.PointerExited += Item_PointerExited;
 
             return border;
         }
@@ -239,15 +264,40 @@ namespace FileExplorerUI
 
             if (!_isPinnedExpanded)
             {
-                ClearSelection();
-                PinnedGroupSelectionIndicator.Visibility = Visibility.Visible;
-                PinnedGroupBorder.Background = SelectedBackgroundBrush();
+                SetSelectedPath(_selectedPath);
                 return;
             }
 
-            PinnedGroupSelectionIndicator.Visibility = Visibility.Collapsed;
-            PinnedGroupBorder.Background = TransparentBrush();
             SetSelectedPath(_selectedPath);
+        }
+
+        private void CloudGroup_Click(object sender, PointerRoutedEventArgs e)
+        {
+            _isCloudExpanded = !_isCloudExpanded;
+            CloudItemsPanel.Visibility = _isCloudExpanded ? Visibility.Visible : Visibility.Collapsed;
+            CloudChevron.Glyph = _isCloudExpanded ? "\uE70E" : "\uE70D";
+        }
+
+        private void NetworkGroup_Click(object sender, PointerRoutedEventArgs e)
+        {
+            if (NetworkItemsPanel.Children.Count == 0)
+            {
+                NetworkItemsPanel.Visibility = Visibility.Collapsed;
+                _isNetworkExpanded = !_isNetworkExpanded;
+                NetworkChevron.Glyph = _isNetworkExpanded ? "\uE70E" : "\uE70D";
+                return;
+            }
+
+            _isNetworkExpanded = !_isNetworkExpanded;
+            NetworkItemsPanel.Visibility = _isNetworkExpanded ? Visibility.Visible : Visibility.Collapsed;
+            NetworkChevron.Glyph = _isNetworkExpanded ? "\uE70E" : "\uE70D";
+        }
+
+        private void TagsGroup_Click(object sender, PointerRoutedEventArgs e)
+        {
+            _isTagsExpanded = !_isTagsExpanded;
+            TagsItemsPanel.Visibility = _isTagsExpanded ? Visibility.Visible : Visibility.Collapsed;
+            TagsChevron.Glyph = _isTagsExpanded ? "\uE70E" : "\uE70D";
         }
 
         private void PinnedItem_Click(object sender, PointerRoutedEventArgs e)
@@ -291,6 +341,123 @@ namespace FileExplorerUI
             }
         }
 
+        private void RegisterGroupHover(Border border)
+        {
+            border.PointerEntered += Group_PointerEntered;
+            border.PointerExited += Group_PointerExited;
+        }
+
+        private void Group_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not Border border)
+            {
+                return;
+            }
+
+            if (IsGroupSelected(border))
+            {
+                return;
+            }
+
+            border.Background = HoverBackgroundBrush();
+        }
+
+        private void Group_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not Border border)
+            {
+                return;
+            }
+
+            if (IsGroupSelected(border))
+            {
+                border.Background = SelectedBackgroundBrush();
+                return;
+            }
+
+            border.Background = TransparentBrush();
+        }
+
+        private bool IsGroupSelected(Border border)
+        {
+            if (ReferenceEquals(border, PinnedGroupBorder))
+            {
+                return PinnedGroupSelectionIndicator.Visibility == Visibility.Visible;
+            }
+
+            return false;
+        }
+
+        private void Item_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not Border border)
+            {
+                return;
+            }
+
+            SidebarVisualItem? item = FindVisualItem(border);
+            if (item is not null && IsItemSelected(item))
+            {
+                return;
+            }
+
+            border.Background = HoverBackgroundBrush();
+        }
+
+        private void Item_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not Border border)
+            {
+                return;
+            }
+
+            SidebarVisualItem? item = FindVisualItem(border);
+            if (item is not null && IsItemSelected(item))
+            {
+                border.Background = SelectedBackgroundBrush();
+                return;
+            }
+
+            border.Background = TransparentBrush();
+        }
+
+        private SidebarVisualItem? FindVisualItem(Border border)
+        {
+            foreach (SidebarVisualItem item in _visualItems)
+            {
+                if (ReferenceEquals(item.Border, border))
+                {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+
+        private bool IsItemSelected(SidebarVisualItem item)
+        {
+            if (string.IsNullOrWhiteSpace(_selectedPath) || !item.Selectable)
+            {
+                return false;
+            }
+
+            string? itemPath = item.Path;
+            if (string.IsNullOrWhiteSpace(itemPath) && item.Section == SidebarSection.Pinned)
+            {
+                _pinnedPaths.TryGetValue(item.Key, out itemPath);
+            }
+
+            if (string.IsNullOrWhiteSpace(itemPath))
+            {
+                return false;
+            }
+
+            string current = NormalizePath(_selectedPath);
+            string candidate = NormalizePath(itemPath);
+            return string.Equals(candidate, current, StringComparison.OrdinalIgnoreCase)
+                || current.StartsWith(candidate + "\\", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string NormalizePath(string path)
         {
             try
@@ -306,6 +473,16 @@ namespace FileExplorerUI
         private static Brush SelectedBackgroundBrush()
         {
             return (Brush)Application.Current.Resources["ListViewItemBackgroundSelected"];
+        }
+
+        private static Brush HoverBackgroundBrush()
+        {
+            if (Application.Current.Resources.TryGetValue("ListViewItemBackgroundPointerOver", out object? brush) && brush is Brush resolved)
+            {
+                return resolved;
+            }
+
+            return TransparentBrush();
         }
 
         private static Brush TransparentBrush()

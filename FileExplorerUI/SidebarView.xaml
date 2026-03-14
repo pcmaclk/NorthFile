@@ -8,10 +8,10 @@
     mc:Ignorable="d">
 
     <UserControl.Resources>
-        <Thickness x:Key="TreeViewItemPresenterMargin">0</Thickness>
+        <Thickness x:Key="TreeViewItemPresenterMargin">0,2,0,2</Thickness>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer Padding="0,0,12,0" VerticalScrollBarVisibility="Auto">
         <StackPanel x:Name="RootStackPanel" Margin="0,8,0,12" Spacing="2">
             <Border
                 x:Name="PinnedGroupBorder"
@@ -201,7 +201,7 @@
                 </Border>
             </StackPanel>
 
-            <StackPanel x:Name="TreeSectionPanel" Margin="0,6,0,0" Spacing="2">
+            <StackPanel x:Name="TreeSectionPanel" Margin="0,10,0,0" Spacing="2">
                 <Border
                     Padding="0"
                     Background="Transparent"
@@ -210,16 +210,17 @@
                 </Border>
             </StackPanel>
 
-            <StackPanel x:Name="ExtrasSectionPanel" Margin="0,6,0,0" Spacing="2">
+            <StackPanel x:Name="ExtrasSectionPanel" Margin="0,10,0,0" Spacing="6">
                 <Border
-                    x:Name="ExtrasGroupBorder"
+                    x:Name="CloudGroupBorder"
                     Margin="0,2"
                     Padding="0,4"
                     Background="Transparent"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}">
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="CloudGroup_Click">
                     <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
                         <Border
-                            x:Name="ExtrasGroupSelectionIndicator"
+                            x:Name="CloudGroupSelectionIndicator"
                             Width="3"
                             Margin="0,2"
                             HorizontalAlignment="Left"
@@ -232,16 +233,252 @@
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
                             FontSize="10"
-                            Glyph="&#xE712;" />
+                            Glyph="&#xE753;" />
                         <TextBlock
-                            x:Name="ExtrasHeaderTextBlock"
+                            x:Name="CloudHeaderTextBlock"
                             Grid.Column="2"
                             Margin="14,0,0,0"
                             VerticalAlignment="Center"
-                            Text="其他" />
+                            Text="云盘" />
+                        <FontIcon
+                            x:Name="CloudChevron"
+                            Grid.Column="3"
+                            Width="12"
+                            Height="12"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Glyph="&#xE70E;" />
                     </Grid>
                 </Border>
-                <StackPanel x:Name="ExtrasItemsPanel" Spacing="2" />
+                <StackPanel x:Name="CloudItemsPanel" Spacing="2">
+                    <Border
+                        x:Name="OneDriveItemBorder"
+                        Margin="0,2"
+                        Padding="0,4"
+                        Background="Transparent"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        Tag="OneDrive">
+                        <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                            <Border
+                                x:Name="OneDriveSelectionIndicator"
+                                Width="3"
+                                Margin="0,2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                                Visibility="Collapsed" />
+                            <FontIcon
+                                Grid.Column="1"
+                                Width="12"
+                                Height="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE753;" />
+                            <TextBlock
+                                x:Name="OneDriveTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="OneDrive" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <Border
+                    x:Name="NetworkGroupBorder"
+                    Margin="0,2"
+                    Padding="0,4"
+                    Background="Transparent"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="NetworkGroup_Click">
+                    <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                        <Border
+                            x:Name="NetworkGroupSelectionIndicator"
+                            Width="3"
+                            Margin="0,2"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                            Visibility="Collapsed" />
+                        <FontIcon
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Glyph="&#xE774;" />
+                        <TextBlock
+                            x:Name="NetworkHeaderTextBlock"
+                            Grid.Column="2"
+                            Margin="14,0,0,0"
+                            VerticalAlignment="Center"
+                            Text="网络" />
+                        <FontIcon
+                            x:Name="NetworkChevron"
+                            Grid.Column="3"
+                            Width="12"
+                            Height="12"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Glyph="&#xE70E;" />
+                    </Grid>
+                </Border>
+                <StackPanel x:Name="NetworkItemsPanel" Spacing="2" Visibility="Collapsed" />
+
+                <Border
+                    x:Name="TagsGroupBorder"
+                    Margin="0,2"
+                    Padding="0,4"
+                    Background="Transparent"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="TagsGroup_Click">
+                    <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                        <Border
+                            x:Name="TagsGroupSelectionIndicator"
+                            Width="3"
+                            Margin="0,2"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                            Visibility="Collapsed" />
+                        <FontIcon
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Glyph="&#xE8EC;" />
+                        <TextBlock
+                            x:Name="TagsHeaderTextBlock"
+                            Grid.Column="2"
+                            Margin="14,0,0,0"
+                            VerticalAlignment="Center"
+                            Text="标签" />
+                        <FontIcon
+                            x:Name="TagsChevron"
+                            Grid.Column="3"
+                            Width="12"
+                            Height="12"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Glyph="&#xE70E;" />
+                    </Grid>
+                </Border>
+                <StackPanel x:Name="TagsItemsPanel" Spacing="2">
+                    <Border
+                        x:Name="TagWorkItemBorder"
+                        Margin="0,2"
+                        Padding="0,4"
+                        Background="Transparent"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        Tag="TagWork">
+                        <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                            <Border
+                                x:Name="TagWorkSelectionIndicator"
+                                Width="3"
+                                Margin="0,2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                                Visibility="Collapsed" />
+                            <FontIcon
+                                Grid.Column="1"
+                                Width="12"
+                                Height="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE8EC;" />
+                            <TextBlock
+                                x:Name="TagWorkTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="工作" />
+                        </Grid>
+                    </Border>
+
+                    <Border
+                        x:Name="TagFocusItemBorder"
+                        Margin="0,2"
+                        Padding="0,4"
+                        Background="Transparent"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        Tag="TagFocus">
+                        <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                            <Border
+                                x:Name="TagFocusSelectionIndicator"
+                                Width="3"
+                                Margin="0,2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                                Visibility="Collapsed" />
+                            <FontIcon
+                                Grid.Column="1"
+                                Width="12"
+                                Height="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE8EC;" />
+                            <TextBlock
+                                x:Name="TagFocusTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="重点" />
+                        </Grid>
+                    </Border>
+
+                    <Border
+                        x:Name="TagArchiveItemBorder"
+                        Margin="0,2"
+                        Padding="0,4"
+                        Background="Transparent"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        Tag="TagArchive">
+                        <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                            <Border
+                                x:Name="TagArchiveSelectionIndicator"
+                                Width="3"
+                                Margin="0,2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                                Visibility="Collapsed" />
+                            <FontIcon
+                                Grid.Column="1"
+                                Width="12"
+                                Height="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE8EC;" />
+                            <TextBlock
+                                x:Name="TagArchiveTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="归档" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

@@ -56,6 +56,7 @@ namespace FileExplorerUI
         private const double SidebarSplitterWidth = 0;
         private const double SidebarMinContentWidth = 520;
         private const int SidebarTreeMaxChildren = 5000;
+        private const string ShellMyComputerPath = "shell:mycomputer";
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -171,7 +172,7 @@ namespace FileExplorerUI
         private bool _isLoading;
         private bool _entriesFlyoutOpen;
         private bool _entriesPointerHooked;
-        private string _currentPath = @"C:\";
+        private string _currentPath = ShellMyComputerPath;
         private uint _currentPageSize = InitialPageSize;
         private uint _lastFetchMs;
         private uint _totalEntries;
@@ -267,6 +268,7 @@ namespace FileExplorerUI
         public MainWindow()
         {
             InitializeComponent();
+            PathTextBox.Text = ShellMyComputerPath;
             RegisterColumnSplitterHandlers(HeaderSplitter1);
             RegisterColumnSplitterHandlers(HeaderSplitter2);
             RegisterColumnSplitterHandlers(HeaderSplitter3);
@@ -714,7 +716,7 @@ namespace FileExplorerUI
 
         private async Task LoadFirstPageAsync()
         {
-            _currentPath = string.IsNullOrWhiteSpace(PathTextBox.Text) ? @"C:\" : PathTextBox.Text.Trim();
+            _currentPath = string.IsNullOrWhiteSpace(PathTextBox.Text) ? ShellMyComputerPath : PathTextBox.Text.Trim();
             if (!_sidebarInitialized)
             {
                 BuildSidebarItems();
@@ -724,18 +726,46 @@ namespace FileExplorerUI
             {
                 UpdateSidebarSelectionOnly();
             }
-            UpdateUsnCapability(_currentPath);
-            ConfigureDirectoryWatcher(_currentPath);
-            EnsureRefreshFallbackInvalidation(_currentPath, "manual_load");
             _currentPageSize = InitialPageSize;
             _lastFetchMs = 0;
             UpdateBreadcrumbs(_currentPath);
+            UpdateDetailsHeaders();
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                _usnCapability = default;
+                ConfigureDirectoryWatcher(string.Empty);
+                PopulateMyComputerEntries();
+                return;
+            }
+
+            UpdateUsnCapability(_currentPath);
+            ConfigureDirectoryWatcher(_currentPath);
+            EnsureRefreshFallbackInvalidation(_currentPath, "manual_load");
             await LoadPageAsync(_currentPath, cursor: 0, append: false);
         }
 
         private async Task NavigateToPathAsync(string path, bool pushHistory)
         {
             string target = string.IsNullOrWhiteSpace(path) ? @"C:\" : path.Trim();
+            if (string.Equals(target, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                if (pushHistory && !string.Equals(_currentPath, target, StringComparison.OrdinalIgnoreCase))
+                {
+                    _backStack.Push(_currentPath);
+                    _forwardStack.Clear();
+                }
+
+                _currentPath = ShellMyComputerPath;
+                PathTextBox.Text = ShellMyComputerPath;
+                _currentQuery = string.Empty;
+                SearchTextBox.Text = string.Empty;
+                UpdateBreadcrumbs(_currentPath);
+                UpdateNavButtonsState();
+                _ = SelectSidebarTreePathAsync(_currentPath);
+                await LoadFirstPageAsync();
+                return;
+            }
+
             if (!Directory.Exists(target))
             {
                 SetPathInputInvalid();
@@ -743,6 +773,11 @@ namespace FileExplorerUI
                 return;
             }
             SetPathInputValid();
+
+            if (!await CanReadDirectoryAsync(target))
+            {
+                return;
+            }
 
             if (pushHistory && !string.Equals(_currentPath, target, StringComparison.OrdinalIgnoreCase))
             {
@@ -912,6 +947,26 @@ namespace FileExplorerUI
             StatusTextBlock.Text = message;
         }
 
+        private void UpdateDetailsHeaders()
+        {
+            if (NameHeaderTextBlock is null || TypeHeaderTextBlock is null || SizeHeaderTextBlock is null || ModifiedHeaderTextBlock is null)
+            {
+                return;
+            }
+
+            NameHeaderTextBlock.Text = "名称";
+            TypeHeaderTextBlock.Text = "类型";
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                SizeHeaderTextBlock.Text = "总大小";
+                ModifiedHeaderTextBlock.Text = "可用空间";
+                return;
+            }
+
+            SizeHeaderTextBlock.Text = "大小";
+            ModifiedHeaderTextBlock.Text = "修改日期";
+        }
+
         private static void LogPerfSnapshot(
             string mode,
             string path,
@@ -1073,6 +1128,7 @@ namespace FileExplorerUI
             _sidebarTreeView.RootNodes.Clear();
             var computerEntry = new SidebarTreeEntry("我的电脑", "shell:mycomputer");
             var computerNode = CreateSidebarTreeNode(computerEntry, hasUnrealizedChildren: false);
+            computerNode.IsExpanded = true;
             _sidebarTreeView.RootNodes.Add(computerNode);
 
             foreach (DriveInfo drive in DriveInfo.GetDrives())
@@ -1084,7 +1140,7 @@ namespace FileExplorerUI
                 string root = drive.RootDirectory.FullName;
                 string label = drive.Name.TrimEnd('\\');
                 var rootEntry = new SidebarTreeEntry(label, root);
-                computerNode.Children.Add(CreateSidebarTreeNode(rootEntry, hasUnrealizedChildren: true));
+                computerNode.Children.Add(CreateSidebarTreeNode(rootEntry, hasUnrealizedChildren: DirectoryHasChildDirectories(root)));
             }
 
             await SelectSidebarTreePathAsync(_currentPath);
@@ -1125,7 +1181,7 @@ namespace FileExplorerUI
             node.Children.Clear();
             foreach (SidebarTreeEntry child in children)
             {
-                node.Children.Add(CreateSidebarTreeNode(child, hasUnrealizedChildren: true));
+                node.Children.Add(CreateSidebarTreeNode(child, hasUnrealizedChildren: DirectoryHasChildDirectories(child.FullPath)));
             }
             node.HasUnrealizedChildren = false;
             if (expandAfterLoad)
@@ -1142,6 +1198,23 @@ namespace FileExplorerUI
             }
 
             string target = string.IsNullOrWhiteSpace(path) ? @"C:\" : path.Trim();
+            if (string.Equals(target, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (TreeViewNode node in _sidebarTreeView.RootNodes)
+                {
+                    if (node.Content is SidebarTreeEntry entry &&
+                        string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _suppressSidebarTreeSelection = true;
+                        _sidebarTreeView.SelectedNode = node;
+                        _suppressSidebarTreeSelection = false;
+                        return;
+                    }
+                }
+
+                return;
+            }
+
             string root = Path.GetPathRoot(target) ?? string.Empty;
             if (string.IsNullOrEmpty(root))
             {
@@ -1165,7 +1238,14 @@ namespace FileExplorerUI
                 return;
             }
 
-            computer.IsExpanded = true;
+            current = computer;
+            if (!computer.IsExpanded)
+            {
+                _suppressSidebarTreeSelection = true;
+                _sidebarTreeView.SelectedNode = current;
+                _suppressSidebarTreeSelection = false;
+                return;
+            }
 
             foreach (TreeViewNode node in computer.Children)
             {
@@ -1189,6 +1269,11 @@ namespace FileExplorerUI
                 string walk = root;
                 foreach (string part in parts)
                 {
+                    if (!ReferenceEquals(current, computer) && !current.IsExpanded)
+                    {
+                        break;
+                    }
+
                     walk = Path.Combine(walk, part);
                     TreeViewNode? next = null;
                     foreach (TreeViewNode child in current.Children)
@@ -1203,7 +1288,7 @@ namespace FileExplorerUI
 
                     if (next is null)
                     {
-                        if (current.HasUnrealizedChildren)
+                        if (current.HasUnrealizedChildren && current.IsExpanded)
                         {
                             if (current.Content is SidebarTreeEntry currentEntry)
                             {
@@ -1227,13 +1312,15 @@ namespace FileExplorerUI
                     }
 
                     current = next;
-                    if (current.HasUnrealizedChildren)
+
+                    if (!string.Equals(walk, target, StringComparison.OrdinalIgnoreCase) && !current.IsExpanded)
+                    {
+                        break;
+                    }
+
+                    if (current.HasUnrealizedChildren && current.IsExpanded)
                     {
                         await PopulateSidebarTreeChildrenAsync(current, walk, CancellationToken.None);
-                    }
-                    if (!string.Equals(walk, target, StringComparison.OrdinalIgnoreCase))
-                    {
-                        current.IsExpanded = true;
                     }
                 }
             }
@@ -1276,6 +1363,102 @@ namespace FileExplorerUI
             );
         }
 
+        private static bool DirectoryHasChildDirectories(string path)
+        {
+            try
+            {
+                using IEnumerator<string> enumerator = Directory.EnumerateDirectories(path).GetEnumerator();
+                return enumerator.MoveNext();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async Task<bool> CanReadDirectoryAsync(string path)
+        {
+            try
+            {
+                (bool ok, FileBatchPage _, int rustErrorCode, string rustErrorMessage) = await Task.Run(
+                    () =>
+                    {
+                        bool success = RustBatchInterop.TryReadDirectoryRowsAuto(
+                            path,
+                            0,
+                            1,
+                            _lastFetchMs,
+                            _currentSortMode,
+                            out FileBatchPage page,
+                            out int code,
+                            out string message
+                        );
+                        return (success, page, code, message);
+                    }
+                );
+
+                if (ok)
+                {
+                    return true;
+                }
+
+                if (IsRustAccessDenied(rustErrorCode, rustErrorMessage))
+                {
+                    UpdateStatus($"Path: {path} | Access denied.");
+                    return false;
+                }
+
+                UpdateStatus($"Path: {path} | Error: Rust error {rustErrorCode}: {rustErrorMessage}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Path: {path} | Error: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void PopulateMyComputerEntries()
+        {
+            _entries.Clear();
+            foreach (DriveInfo drive in DriveInfo.GetDrives())
+            {
+                if (!drive.IsReady)
+                {
+                    continue;
+                }
+
+                string root = drive.RootDirectory.FullName;
+                string label = drive.Name.TrimEnd('\\');
+                string type = string.IsNullOrWhiteSpace(drive.VolumeLabel)
+                    ? "本地磁盘"
+                    : $"{drive.VolumeLabel} ({drive.DriveFormat})";
+
+                _entries.Add(new EntryViewModel
+                {
+                    Name = label,
+                    FullPath = root,
+                    Type = type,
+                    IconGlyph = "\uE7F8",
+                    IconForeground = FolderIconBrush,
+                    MftRef = 0,
+                    SizeText = FormatBytes(drive.TotalSize),
+                    ModifiedText = FormatBytes(drive.AvailableFreeSpace),
+                    IsDirectory = true,
+                    IsLink = false,
+                    IsLoaded = true,
+                    IsMetadataLoaded = true
+                });
+            }
+
+            _totalEntries = (uint)_entries.Count;
+            _nextCursor = 0;
+            _hasMore = false;
+            EntriesListView.SelectedItem = null;
+            this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Drives: {_entries.Count}";
+            UpdateStatus($"我的电脑下 {_entries.Count} 个驱动器");
+        }
+
         private void SidebarTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
         {
             if (_suppressSidebarTreeSelection)
@@ -1287,14 +1470,17 @@ namespace FileExplorerUI
 
         private async void SidebarTree_Expanding(TreeView sender, TreeViewExpandingEventArgs args)
         {
-            if (args.Node.Content is not SidebarTreeEntry entry || !args.Node.HasUnrealizedChildren)
+            if (args.Node.Content is not SidebarTreeEntry entry)
             {
                 return;
             }
 
             try
             {
-                await PopulateSidebarTreeChildrenAsync(args.Node, entry.FullPath, CancellationToken.None, expandAfterLoad: true);
+                if (args.Node.HasUnrealizedChildren)
+                {
+                    await PopulateSidebarTreeChildrenAsync(args.Node, entry.FullPath, CancellationToken.None, expandAfterLoad: true);
+                }
                 await RestoreSidebarTreeSelectionAsync(args.Node);
             }
             catch (Exception ex)
@@ -1310,6 +1496,7 @@ namespace FileExplorerUI
                 return;
             }
 
+            bool shouldSelectCollapsedNode = false;
             TreeViewNode? selected = _sidebarTreeView.SelectedNode;
             if (selected is not null &&
                 !ReferenceEquals(selected, args.Node) &&
@@ -1317,11 +1504,20 @@ namespace FileExplorerUI
                 selected.Content is SidebarTreeEntry selectedEntry)
             {
                 _sidebarTreeSelectionMemory[entry.FullPath] = selectedEntry.FullPath;
+                shouldSelectCollapsedNode = true;
+            }
+            else if (IsPathWithin(_currentPath, entry.FullPath))
+            {
+                _sidebarTreeSelectionMemory[entry.FullPath] = _currentPath;
+                shouldSelectCollapsedNode = true;
             }
 
-            _suppressSidebarTreeSelection = true;
-            _sidebarTreeView.SelectedNode = args.Node;
-            _suppressSidebarTreeSelection = false;
+            if (shouldSelectCollapsedNode)
+            {
+                _suppressSidebarTreeSelection = true;
+                _sidebarTreeView.SelectedNode = args.Node;
+                _suppressSidebarTreeSelection = false;
+            }
         }
 
         private async void SidebarTree_ItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
@@ -1343,8 +1539,16 @@ namespace FileExplorerUI
 
         private async Task NavigateSidebarTreeEntryAsync(SidebarTreeEntry entry)
         {
-            if (string.Equals(entry.FullPath, "shell:mycomputer", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
+                _currentPath = ShellMyComputerPath;
+                PathTextBox.Text = ShellMyComputerPath;
+                _currentQuery = string.Empty;
+                SearchTextBox.Text = string.Empty;
+                UpdateBreadcrumbs(_currentPath);
+                UpdateNavButtonsState();
+                _ = SelectSidebarTreePathAsync(_currentPath);
+                await LoadFirstPageAsync();
                 return;
             }
 
@@ -1355,7 +1559,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (IsCurrentPath(entry.FullPath))
+            if (IsExactCurrentPath(entry.FullPath))
             {
                 return;
             }
@@ -1401,6 +1605,32 @@ namespace FileExplorerUI
                 current = current.Parent;
             }
             return false;
+        }
+
+        private static bool IsPathWithin(string candidate, string ancestor)
+        {
+            if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(ancestor))
+            {
+                return false;
+            }
+
+            if (ancestor.StartsWith("shell:", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Equals(ancestor, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(candidate, ancestor, StringComparison.OrdinalIgnoreCase);
+            }
+
+            try
+            {
+                string normalizedCandidate = Path.GetFullPath(candidate).TrimEnd('\\');
+                string normalizedAncestor = Path.GetFullPath(ancestor).TrimEnd('\\');
+                return string.Equals(normalizedCandidate, normalizedAncestor, StringComparison.OrdinalIgnoreCase)
+                    || normalizedCandidate.StartsWith(normalizedAncestor + "\\", StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private async void SidebarNavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -1623,6 +1853,12 @@ namespace FileExplorerUI
                 return false;
             }
 
+            if (string.Equals(candidate, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Equals(candidate, _currentPath, StringComparison.OrdinalIgnoreCase);
+            }
+
             string curr = Path.GetFullPath(_currentPath).TrimEnd('\\');
             string cand = Path.GetFullPath(candidate).TrimEnd('\\');
             if (string.Equals(curr, cand, StringComparison.OrdinalIgnoreCase))
@@ -1631,6 +1867,25 @@ namespace FileExplorerUI
             }
             // Highlight sidebar parent items too (e.g. inside Downloads subtree).
             return curr.StartsWith(cand + "\\", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsExactCurrentPath(string candidate)
+        {
+            if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(_currentPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string curr = Path.GetFullPath(_currentPath).TrimEnd('\\');
+                string cand = Path.GetFullPath(candidate).TrimEnd('\\');
+                return string.Equals(curr, cand, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void ApplyCommandDockLayout()
@@ -2128,6 +2383,7 @@ namespace FileExplorerUI
                 _entries.Add(new EntryViewModel
                 {
                     Name = "...",
+                    FullPath = string.Empty,
                     Type = "",
                     IconGlyph = "\uE9CE",
                     IconForeground = FileIconBrush,
@@ -2161,6 +2417,7 @@ namespace FileExplorerUI
                 _entries[startIndex + i] = new EntryViewModel
                 {
                     Name = row.Name,
+                    FullPath = Path.Combine(_currentPath, row.Name),
                     Type = GetEntryTypeText(row.Name, row.IsDirectory, row.IsLink),
                     IconGlyph = GetEntryIconGlyph(row.IsDirectory, row.IsLink, row.Name),
                     IconForeground = GetEntryIconBrush(row.IsDirectory, row.IsLink, row.Name),
@@ -2459,6 +2716,7 @@ namespace FileExplorerUI
             _entries[index] = new EntryViewModel
             {
                 Name = newName,
+                FullPath = Path.Combine(_currentPath, newName),
                 Type = current.Type,
                 IconGlyph = current.IconGlyph,
                 IconForeground = current.IconForeground,
@@ -2494,6 +2752,12 @@ namespace FileExplorerUI
 
         private async Task RefreshCurrentDirectoryInBackgroundAsync()
         {
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                PopulateMyComputerEntries();
+                return;
+            }
+
             try
             {
                 UpdateUsnCapability(_currentPath);
@@ -2509,12 +2773,38 @@ namespace FileExplorerUI
 
         private async void EntriesListView_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
         {
-            if (EntriesListView.SelectedItem is not EntryViewModel row || !row.IsLoaded)
+            EntryViewModel? row = null;
+            ListViewItem? item = null;
+            if (e.OriginalSource is DependencyObject source)
+            {
+                item = FindAncestor<ListViewItem>(source);
+            }
+
+            if (item is null)
+            {
+                Point pos = e.GetPosition(EntriesListView);
+                item = FindListViewItemAt(pos);
+            }
+
+            if (item?.DataContext is EntryViewModel tappedEntry)
+            {
+                row = tappedEntry;
+                EntriesListView.SelectedItem = tappedEntry;
+                item.IsSelected = true;
+            }
+            else
+            {
+                row = EntriesListView.SelectedItem as EntryViewModel;
+            }
+
+            if (row is null || !row.IsLoaded)
             {
                 return;
             }
 
-            string targetPath = Path.Combine(_currentPath, row.Name);
+            string targetPath = string.IsNullOrWhiteSpace(row.FullPath)
+                ? Path.Combine(_currentPath, row.Name)
+                : row.FullPath;
             if (row.IsDirectory)
             {
                 await NavigateToPathAsync(targetPath, pushHistory: true);
@@ -2630,10 +2920,22 @@ namespace FileExplorerUI
 
         private async void UpButton_Click(object sender, RoutedEventArgs e)
         {
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateStatus("Already at root.");
+                return;
+            }
+
+            if (IsDriveRoot(_currentPath))
+            {
+                await NavigateToPathAsync(ShellMyComputerPath, pushHistory: true);
+                return;
+            }
+
             string? parent = Directory.GetParent(_currentPath)?.FullName;
             if (string.IsNullOrEmpty(parent))
             {
-                UpdateStatus("Already at root.");
+                await NavigateToPathAsync(ShellMyComputerPath, pushHistory: true);
                 return;
             }
             await NavigateToPathAsync(parent, pushHistory: true);
@@ -2947,6 +3249,20 @@ namespace FileExplorerUI
                 OverflowBreadcrumbButton.Visibility = Visibility.Collapsed;
             }
 
+            if (string.Equals(path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Breadcrumbs.Add(new BreadcrumbItemViewModel
+                {
+                    Label = "我的电脑",
+                    FullPath = ShellMyComputerPath,
+                    HasChildren = false,
+                    ChevronVisibility = Visibility.Collapsed,
+                    IsLast = true,
+                    MeasuredWidth = 0
+                });
+                return;
+            }
+
             string fullPath = Path.GetFullPath(path);
             string root = Path.GetPathRoot(fullPath) ?? string.Empty;
             if (!string.IsNullOrEmpty(root))
@@ -3225,6 +3541,7 @@ namespace FileExplorerUI
     public sealed class EntryViewModel : INotifyPropertyChanged
     {
         private string _name = string.Empty;
+        private string _fullPath = string.Empty;
         private string _type = string.Empty;
         private string _iconGlyph = "\uE8A5";
         private Brush _iconForeground = new SolidColorBrush(Colors.DimGray);
@@ -3249,6 +3566,20 @@ namespace FileExplorerUI
                 }
                 _name = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Name)));
+            }
+        }
+
+        public string FullPath
+        {
+            get => _fullPath;
+            set
+            {
+                if (_fullPath == value)
+                {
+                    return;
+                }
+                _fullPath = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FullPath)));
             }
         }
 
