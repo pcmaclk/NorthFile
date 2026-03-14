@@ -50,8 +50,7 @@ namespace FileExplorerUI
 
         private const double SidebarExpandedDefaultWidth = 220;
         private const double SidebarExpandedMinWidth = 32;
-        private const double SidebarExpandedMaxWidth = 360;
-        private const double SidebarCompactWidth = 32;
+        private const double SidebarCompactWidth = 40;
         private const double SidebarCompactThreshold = SidebarCompactWidth;
         private const double SidebarSplitterWidth = 0;
         private const double SidebarMinContentWidth = 520;
@@ -1779,7 +1778,7 @@ namespace FileExplorerUI
                 else
                 {
                     _sidebarPinnedCompact = false;
-                    _sidebarPreferredExpandedWidth = Math.Clamp(dragWidth, SidebarExpandedMinWidth, SidebarExpandedMaxWidth);
+                    _sidebarPreferredExpandedWidth = Math.Max(dragWidth, SidebarExpandedMinWidth);
                 }
             }
 
@@ -1788,7 +1787,7 @@ namespace FileExplorerUI
             double clampedWidth = Math.Min(_sidebarPreferredExpandedWidth, maxSidebarWidth);
             double finalWidth = compact
                 ? SidebarCompactWidth
-                : Math.Clamp(clampedWidth, SidebarExpandedMinWidth, SidebarExpandedMaxWidth);
+                : Math.Max(clampedWidth, SidebarExpandedMinWidth);
 
             SidebarColumnWidth = new GridLength(finalWidth);
             ApplySidebarCompactState(compact);
@@ -1809,7 +1808,7 @@ namespace FileExplorerUI
                 SidebarNavView.PaneDisplayMode = compact ? NavigationViewPaneDisplayMode.LeftCompact : NavigationViewPaneDisplayMode.Left;
                 SidebarNavView.IsPaneOpen = !compact;
                 SidebarNavView.CompactPaneLength = SidebarCompactWidth;
-                SidebarNavView.OpenPaneLength = compact ? SidebarCompactWidth : Math.Max(180, SidebarColumnWidth.Value);
+                SidebarNavView.OpenPaneLength = compact ? SidebarCompactWidth : SidebarColumnWidth.Value;
             }
         }
 

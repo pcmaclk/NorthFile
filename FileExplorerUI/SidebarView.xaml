@@ -9,10 +9,15 @@
 
     <UserControl.Resources>
         <Thickness x:Key="TreeViewItemPresenterMargin">0,2,0,2</Thickness>
+        <Style x:Key="CompactMenuFlyoutPresenterStyle" TargetType="MenuFlyoutPresenter">
+            <Setter Property="MaxHeight" Value="420" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Visible" />
+            <Setter Property="ScrollViewer.VerticalScrollMode" Value="Auto" />
+        </Style>
     </UserControl.Resources>
 
-    <ScrollViewer Padding="0,0,12,0" VerticalScrollBarVisibility="Auto">
-        <StackPanel x:Name="RootStackPanel" Margin="0,8,0,12" Spacing="2">
+    <ScrollViewer x:Name="SidebarScrollViewer" Padding="0,0,12,0" VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="RootStackPanel" Margin="0,6,0,8" Spacing="2">
             <Border
                 x:Name="PinnedGroupBorder"
                 Margin="0,2"
@@ -20,7 +25,7 @@
                 Background="Transparent"
                 CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                 PointerPressed="PinnedGroup_Click">
-                <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                <Grid x:Name="PinnedGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
                     <Border
                         x:Name="PinnedGroupSelectionIndicator"
                         Width="3"
@@ -31,7 +36,9 @@
                         CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                         Visibility="Collapsed" />
                     <FontIcon
+                        x:Name="PinnedGroupIcon"
                         Grid.Column="1"
+                        HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         FontFamily="Segoe Fluent Icons"
                         FontSize="10"
@@ -203,6 +210,35 @@
 
             <StackPanel x:Name="TreeSectionPanel" Margin="0,10,0,0" Spacing="2">
                 <Border
+                    x:Name="TreeCompactBorder"
+                    Margin="0,2"
+                    Padding="0,4"
+                    Background="Transparent"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="TreeCompactBorder_PointerPressed"
+                    Visibility="Collapsed">
+                    <Grid x:Name="TreeCompactGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                        <Border
+                            x:Name="TreeCompactSelectionIndicator"
+                            Width="3"
+                            Margin="0,2"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                            Visibility="Collapsed" />
+                        <FontIcon
+                            x:Name="TreeCompactIcon"
+                            Grid.Column="1"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="12"
+                            Glyph="&#xE7F8;" />
+                    </Grid>
+                </Border>
+                <Border
+                    x:Name="TreeHostBorder"
                     Padding="0"
                     Background="Transparent"
                     CornerRadius="{ThemeResource OverlayCornerRadius}">
@@ -218,7 +254,7 @@
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="CloudGroup_Click">
-                    <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                    <Grid x:Name="CloudGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
                         <Border
                             x:Name="CloudGroupSelectionIndicator"
                             Width="3"
@@ -229,7 +265,9 @@
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
+                            x:Name="CloudGroupIcon"
                             Grid.Column="1"
+                            HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
                             FontSize="10"
@@ -296,7 +334,7 @@
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="NetworkGroup_Click">
-                    <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                    <Grid x:Name="NetworkGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
                         <Border
                             x:Name="NetworkGroupSelectionIndicator"
                             Width="3"
@@ -307,7 +345,9 @@
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
+                            x:Name="NetworkGroupIcon"
                             Grid.Column="1"
+                            HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
                             FontSize="10"
@@ -339,7 +379,7 @@
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="TagsGroup_Click">
-                    <Grid ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                    <Grid x:Name="TagsGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
                         <Border
                             x:Name="TagsGroupSelectionIndicator"
                             Width="3"
@@ -350,7 +390,9 @@
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
+                            x:Name="TagsGroupIcon"
                             Grid.Column="1"
+                            HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
                             FontSize="10"

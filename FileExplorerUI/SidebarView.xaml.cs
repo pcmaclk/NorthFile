@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace FileExplorerUI
 {
@@ -20,12 +21,15 @@ namespace FileExplorerUI
         private bool _isTagsExpanded = true;
         private bool _isCompact;
         private string? _selectedPath;
+        private TreeView? _attachedTreeView;
+        private readonly CompactSidebarMenuController _compactMenuController = new();
 
         public event EventHandler<SidebarNavigateRequestedEventArgs>? NavigateRequested;
 
         public SidebarView()
         {
             InitializeComponent();
+            _compactMenuController.NavigateRequested += (_, path) => NavigateToPath(path);
 
             _headerBlocks.Add(PinnedGroupTextBlock);
             _headerBlocks.Add(CloudHeaderTextBlock);
@@ -42,9 +46,16 @@ namespace FileExplorerUI
             RegisterStaticItem("TagArchive", TagArchiveItemBorder, TagArchiveSelectionIndicator, TagArchiveTextBlock, SidebarSection.Extra, selectable: false);
 
             RegisterGroupHover(PinnedGroupBorder);
+            RegisterGroupHover(TreeCompactBorder);
             RegisterGroupHover(CloudGroupBorder);
             RegisterGroupHover(NetworkGroupBorder);
             RegisterGroupHover(TagsGroupBorder);
+
+            ToolTipService.SetToolTip(PinnedGroupBorder, "固定");
+            ToolTipService.SetToolTip(CloudGroupBorder, "云盘");
+            ToolTipService.SetToolTip(NetworkGroupBorder, "网络");
+            ToolTipService.SetToolTip(TagsGroupBorder, "标签");
+            ToolTipService.SetToolTip(TreeCompactBorder, "我的电脑");
         }
 
         public void ConfigurePinnedPaths(string desktopPath, string documentsPath, string downloadsPath, string picturesPath)
@@ -63,6 +74,7 @@ namespace FileExplorerUI
 
         public void AttachTreeView(TreeView treeView)
         {
+            _attachedTreeView = treeView;
             if (treeView.Parent is Panel currentParent)
             {
                 currentParent.Children.Remove(treeView);
@@ -82,12 +94,15 @@ namespace FileExplorerUI
 
         public void SetCompact(bool compact)
         {
-            if (_isCompact == compact)
+            _isCompact = compact;
+            if (!compact)
             {
-                return;
+                _compactMenuController.Hide();
             }
 
-            _isCompact = compact;
+            SidebarScrollViewer.Padding = compact ? new Thickness(0, 0, 0, 0) : new Thickness(0, 0, 12, 0);
+            TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            TreeHostBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             foreach (TextBlock block in _labelBlocks)
             {
                 block.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
@@ -102,6 +117,20 @@ namespace FileExplorerUI
             CloudChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             NetworkChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             TagsChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+
+            ApplyGroupHeaderLayout(PinnedGroupBorder, PinnedGroupGrid, PinnedGroupSelectionIndicator, PinnedGroupIcon, compact);
+            ApplyGroupHeaderLayout(TreeCompactBorder, TreeCompactGrid, TreeCompactSelectionIndicator, TreeCompactIcon, compact);
+            ApplyGroupHeaderLayout(CloudGroupBorder, CloudGroupGrid, CloudGroupSelectionIndicator, CloudGroupIcon, compact);
+            ApplyGroupHeaderLayout(NetworkGroupBorder, NetworkGroupGrid, NetworkGroupSelectionIndicator, NetworkGroupIcon, compact);
+            ApplyGroupHeaderLayout(TagsGroupBorder, TagsGroupGrid, TagsGroupSelectionIndicator, TagsGroupIcon, compact);
+
+            PinnedItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isPinnedExpanded ? Visibility.Visible : Visibility.Collapsed);
+            CloudItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isCloudExpanded ? Visibility.Visible : Visibility.Collapsed);
+            NetworkItemsPanel.Visibility = compact
+                ? Visibility.Collapsed
+                : (_isNetworkExpanded && NetworkItemsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed);
+            TagsItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isTagsExpanded ? Visibility.Visible : Visibility.Collapsed);
+            SetSelectedPath(_selectedPath);
         }
 
         public void SetSelectedPath(string? path)
@@ -258,6 +287,12 @@ namespace FileExplorerUI
 
         private void PinnedGroup_Click(object sender, PointerRoutedEventArgs e)
         {
+            if (_isCompact)
+            {
+                ShowPinnedCompactFlyout(PinnedGroupBorder);
+                return;
+            }
+
             _isPinnedExpanded = !_isPinnedExpanded;
             PinnedItemsPanel.Visibility = _isPinnedExpanded ? Visibility.Visible : Visibility.Collapsed;
             PinnedChevron.Glyph = _isPinnedExpanded ? "\uE70E" : "\uE70D";
@@ -273,6 +308,17 @@ namespace FileExplorerUI
 
         private void CloudGroup_Click(object sender, PointerRoutedEventArgs e)
         {
+            if (_isCompact)
+            {
+                ShowStaticItemsFlyout(
+                    CloudGroupBorder,
+                    new[]
+                    {
+                        new CompactFlyoutItem("OneDrive", "\uE753", null, false)
+                    });
+                return;
+            }
+
             _isCloudExpanded = !_isCloudExpanded;
             CloudItemsPanel.Visibility = _isCloudExpanded ? Visibility.Visible : Visibility.Collapsed;
             CloudChevron.Glyph = _isCloudExpanded ? "\uE70E" : "\uE70D";
@@ -280,6 +326,17 @@ namespace FileExplorerUI
 
         private void NetworkGroup_Click(object sender, PointerRoutedEventArgs e)
         {
+            if (_isCompact)
+            {
+                ShowStaticItemsFlyout(
+                    NetworkGroupBorder,
+                    new[]
+                    {
+                        new CompactFlyoutItem("暂无项目", "\uE774", null, false)
+                    });
+                return;
+            }
+
             if (NetworkItemsPanel.Children.Count == 0)
             {
                 NetworkItemsPanel.Visibility = Visibility.Collapsed;
@@ -295,9 +352,32 @@ namespace FileExplorerUI
 
         private void TagsGroup_Click(object sender, PointerRoutedEventArgs e)
         {
+            if (_isCompact)
+            {
+                ShowStaticItemsFlyout(
+                    TagsGroupBorder,
+                    new[]
+                    {
+                        new CompactFlyoutItem("工作", "\uE8EC", null, false),
+                        new CompactFlyoutItem("重点", "\uE8EC", null, false),
+                        new CompactFlyoutItem("归档", "\uE8EC", null, false)
+                    });
+                return;
+            }
+
             _isTagsExpanded = !_isTagsExpanded;
             TagsItemsPanel.Visibility = _isTagsExpanded ? Visibility.Visible : Visibility.Collapsed;
             TagsChevron.Glyph = _isTagsExpanded ? "\uE70E" : "\uE70D";
+        }
+
+        private void TreeCompactBorder_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (!_isCompact)
+            {
+                return;
+            }
+
+            ShowTreeCompactFlyout(TreeCompactBorder);
         }
 
         private void PinnedItem_Click(object sender, PointerRoutedEventArgs e)
@@ -490,7 +570,155 @@ namespace FileExplorerUI
             return new SolidColorBrush(Colors.Transparent);
         }
 
+        private void ShowPinnedCompactFlyout(FrameworkElement target)
+        {
+            _compactMenuController.Show(target, BuildPinnedCompactItems());
+        }
+
+        private void ShowStaticItemsFlyout(FrameworkElement target, IReadOnlyList<CompactFlyoutItem> items)
+        {
+            _compactMenuController.Show(target, BuildStaticCompactItems(items));
+        }
+
+        private void ShowTreeCompactFlyout(FrameworkElement target)
+        {
+            _compactMenuController.Show(target, BuildTreeCompactItems());
+        }
+
+        private IReadOnlyList<CompactSidebarMenuItem> BuildPinnedCompactItems()
+        {
+            return new[]
+            {
+                CreatePinnedCompactItem("桌面", "\uE80F", "Desktop"),
+                CreatePinnedCompactItem("文档", "\uE8A5", "Documents"),
+                CreatePinnedCompactItem("下载", "\uE896", "Downloads"),
+                CreatePinnedCompactItem("图片", "\uE91B", "Pictures")
+            };
+        }
+
+        private CompactSidebarMenuItem CreatePinnedCompactItem(string label, string glyph, string key)
+        {
+            bool available = _pinnedPaths.TryGetValue(key, out string? path) && !string.IsNullOrWhiteSpace(path);
+            return new CompactSidebarMenuItem(label, glyph, available ? path : null, null, available);
+        }
+
+        private IReadOnlyList<CompactSidebarMenuItem> BuildStaticCompactItems(IReadOnlyList<CompactFlyoutItem> items)
+        {
+            var result = new List<CompactSidebarMenuItem>(items.Count);
+            foreach (CompactFlyoutItem item in items)
+            {
+                result.Add(new CompactSidebarMenuItem(item.Label, item.Glyph, item.Path, null, item.Selectable));
+            }
+
+            return result;
+        }
+
+        private IReadOnlyList<CompactSidebarMenuItem> BuildTreeCompactItems()
+        {
+            var result = new List<CompactSidebarMenuItem>();
+            if (_attachedTreeView is null || _attachedTreeView.RootNodes.Count == 0)
+            {
+                return result;
+            }
+
+            foreach (TreeViewNode root in _attachedTreeView.RootNodes)
+            {
+                if (root.Content is not SidebarTreeEntry rootEntry || !string.Equals(rootEntry.FullPath, "shell:mycomputer", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                foreach (TreeViewNode driveNode in root.Children)
+                {
+                    if (driveNode.Content is SidebarTreeEntry driveEntry)
+                    {
+                        result.Add(CreateTreeCompactItem(driveEntry, depth: 0));
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private CompactSidebarMenuItem CreateTreeCompactItem(SidebarTreeEntry entry, int depth)
+        {
+            const int maxDepth = 2;
+            const int maxItemsPerLevel = 24;
+
+            List<CompactSidebarMenuItem>? children = null;
+            if (depth < maxDepth)
+            {
+                List<SidebarTreeEntry> childEntries = EnumerateDirectoryEntries(entry.FullPath, maxItemsPerLevel);
+                if (childEntries.Count > 0)
+                {
+                    children = new List<CompactSidebarMenuItem>(childEntries.Count);
+                    foreach (SidebarTreeEntry child in childEntries)
+                    {
+                        children.Add(CreateTreeCompactItem(child, depth + 1));
+                    }
+                }
+            }
+
+            return new CompactSidebarMenuItem(entry.Name, "\uE8B7", entry.FullPath, children, true);
+        }
+
+        private static List<SidebarTreeEntry> EnumerateDirectoryEntries(string path, int maxItems)
+        {
+            var entries = new List<SidebarTreeEntry>();
+            try
+            {
+                foreach (string dir in Directory.EnumerateDirectories(path))
+                {
+                    string name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar));
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        name = dir.TrimEnd('\\');
+                    }
+
+                    entries.Add(new SidebarTreeEntry(name, dir));
+                    if (entries.Count >= maxItems)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return entries;
+        }
+
+        private void NavigateToPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            SetSelectedPath(path);
+            NavigateRequested?.Invoke(this, new SidebarNavigateRequestedEventArgs(path));
+        }
+
+        private static void ApplyGroupHeaderLayout(Border border, Grid grid, Border indicator, FontIcon icon, bool compact)
+        {
+            border.Width = compact ? 32 : double.NaN;
+            border.Height = compact ? 32 : double.NaN;
+            border.Padding = compact ? new Thickness(0) : new Thickness(0, 4, 0, 4);
+            border.Margin = compact ? new Thickness(0, 2, 0, 2) : new Thickness(0, 2, 0, 2);
+            border.HorizontalAlignment = HorizontalAlignment.Left;
+
+            indicator.Visibility = compact ? Visibility.Collapsed : indicator.Visibility;
+            icon.FontSize = compact ? 12 : 10;
+
+            grid.ColumnDefinitions[0].Width = compact ? new GridLength(0) : new GridLength(14);
+            grid.ColumnDefinitions[1].Width = compact ? new GridLength(32) : new GridLength(12);
+            grid.ColumnDefinitions[2].Width = compact ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+            grid.ColumnDefinitions[3].Width = compact ? new GridLength(0) : new GridLength(26);
+        }
+
         private sealed record SidebarVisualItem(string Key, string? Path, Border Border, Border Indicator, TextBlock Label, SidebarSection Section, bool Selectable);
+        private sealed record CompactFlyoutItem(string Label, string Glyph, string? Path, bool Selectable);
 
         private enum SidebarSection
         {
