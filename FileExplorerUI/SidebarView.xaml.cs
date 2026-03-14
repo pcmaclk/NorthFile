@@ -642,27 +642,27 @@ namespace FileExplorerUI
 
         private CompactSidebarMenuItem CreateTreeCompactItem(SidebarTreeEntry entry, int depth)
         {
-            const int maxDepth = 2;
-            const int maxItemsPerLevel = 24;
+            bool hasChildren = EnumerateDirectoryEntries(entry.FullPath, 1).Count > 0;
+            Func<IReadOnlyList<CompactSidebarMenuItem>>? loader = hasChildren
+                ? () => LoadTreeCompactChildren(entry.FullPath, depth + 1)
+                : null;
 
-            List<CompactSidebarMenuItem>? children = null;
-            if (depth < maxDepth)
-            {
-                List<SidebarTreeEntry> childEntries = EnumerateDirectoryEntries(entry.FullPath, maxItemsPerLevel);
-                if (childEntries.Count > 0)
-                {
-                    children = new List<CompactSidebarMenuItem>(childEntries.Count);
-                    foreach (SidebarTreeEntry child in childEntries)
-                    {
-                        children.Add(CreateTreeCompactItem(child, depth + 1));
-                    }
-                }
-            }
-
-            return new CompactSidebarMenuItem(entry.Name, "\uE8B7", entry.FullPath, children, true);
+            return new CompactSidebarMenuItem(entry.Name, "\uE8B7", entry.FullPath, null, true, loader);
         }
 
-        private static List<SidebarTreeEntry> EnumerateDirectoryEntries(string path, int maxItems)
+        private IReadOnlyList<CompactSidebarMenuItem> LoadTreeCompactChildren(string path, int depth)
+        {
+            List<SidebarTreeEntry> childEntries = EnumerateDirectoryEntries(path);
+            var children = new List<CompactSidebarMenuItem>(childEntries.Count);
+            foreach (SidebarTreeEntry child in childEntries)
+            {
+                children.Add(CreateTreeCompactItem(child, depth));
+            }
+
+            return children;
+        }
+
+        private static List<SidebarTreeEntry> EnumerateDirectoryEntries(string path, int? maxItems = null)
         {
             var entries = new List<SidebarTreeEntry>();
             try
@@ -676,7 +676,7 @@ namespace FileExplorerUI
                     }
 
                     entries.Add(new SidebarTreeEntry(name, dir));
-                    if (entries.Count >= maxItems)
+                    if (maxItems.HasValue && entries.Count >= maxItems.Value)
                     {
                         break;
                     }
@@ -706,7 +706,7 @@ namespace FileExplorerUI
             border.Height = compact ? 32 : double.NaN;
             border.Padding = compact ? new Thickness(0) : new Thickness(0, 4, 0, 4);
             border.Margin = compact ? new Thickness(0, 2, 0, 2) : new Thickness(0, 2, 0, 2);
-            border.HorizontalAlignment = HorizontalAlignment.Left;
+            border.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
 
             indicator.Visibility = compact ? Visibility.Collapsed : indicator.Visibility;
             icon.FontSize = compact ? 12 : 10;

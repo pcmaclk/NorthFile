@@ -1125,7 +1125,7 @@ namespace FileExplorerUI
             _sidebarTreeCts = cts;
 
             _sidebarTreeView.RootNodes.Clear();
-            var computerEntry = new SidebarTreeEntry("我的电脑", "shell:mycomputer");
+            var computerEntry = new SidebarTreeEntry("我的电脑", "shell:mycomputer", "\uE7F4");
             var computerNode = CreateSidebarTreeNode(computerEntry, hasUnrealizedChildren: false);
             computerNode.IsExpanded = true;
             _sidebarTreeView.RootNodes.Add(computerNode);
@@ -1161,7 +1161,7 @@ namespace FileExplorerUI
                 "<DataTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" " +
                 "xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
                 "<StackPanel Orientation=\"Horizontal\" Spacing=\"6\">" +
-                "<FontIcon FontFamily=\"Segoe Fluent Icons\" FontSize=\"12\" Glyph=\"&#xE8B7;\" Foreground=\"#FF8C6B24\" />" +
+                "<FontIcon FontFamily=\"Segoe Fluent Icons\" FontSize=\"12\" Glyph=\"{Binding Content.IconGlyph}\" />" +
                 "<TextBlock Text=\"{Binding Content.Name}\" TextTrimming=\"CharacterEllipsis\" />" +
                 "</StackPanel>" +
                 "</DataTemplate>";
@@ -3822,14 +3822,16 @@ namespace FileExplorerUI
 
     public sealed class SidebarTreeEntry
     {
-        public SidebarTreeEntry(string name, string fullPath)
+        public SidebarTreeEntry(string name, string fullPath, string iconGlyph = "\uE8B7")
         {
             Name = name;
             FullPath = fullPath;
+            IconGlyph = iconGlyph;
         }
 
         public string Name { get; }
         public string FullPath { get; }
+        public string IconGlyph { get; }
     }
 
 

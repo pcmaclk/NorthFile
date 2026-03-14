@@ -234,7 +234,7 @@
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
                             FontSize="12"
-                            Glyph="&#xE7F8;" />
+                            Glyph="&#xE7F4;" />
                     </Grid>
                 </Border>
                 <Border

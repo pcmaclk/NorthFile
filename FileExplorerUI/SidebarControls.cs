@@ -356,367 +356,201 @@ namespace FileExplorerUI
         string Glyph,
         string? Path,
         IReadOnlyList<CompactSidebarMenuItem>? Children = null,
-        bool IsEnabled = true);
+        bool IsEnabled = true,
+        Func<IReadOnlyList<CompactSidebarMenuItem>>? ChildrenLoader = null)
+    {
+        public bool HasChildren => (Children?.Count ?? 0) > 0 || ChildrenLoader is not null;
+    }
 
     internal sealed class CompactSidebarMenuController
     {
-        private readonly List<Popup> _popups = new();
-        private readonly Brush _backgroundBrush;
-        private readonly Brush _borderBrush;
-        private readonly Brush _textBrush;
-        private readonly Brush _hoverBrush;
-        private readonly Brush _submenuHoverBrush;
-        private readonly Brush _normalItemBrush;
-        private readonly CornerRadius _cornerRadius;
+        private readonly List<MenuFlyout> _flyouts = new();
+        private Style? _menuFlyoutPresenterStyle;
 
         public event EventHandler<string>? NavigateRequested;
-
-        public CompactSidebarMenuController()
-        {
-            _backgroundBrush = EnsureOpaqueBrush(ResolveBrush("LayerFillColorDefaultBrush", "CardBackgroundFillColorDefaultBrush"));
-            _borderBrush = ResolveBrush("MenuFlyoutPresenterBorderBrush", "CardStrokeColorDefaultBrush");
-            _textBrush = ResolveBrush("MenuFlyoutItemForeground", "TextFillColorPrimaryBrush");
-            _hoverBrush = ResolveBrush("MenuFlyoutItemBackgroundPointerOver", "ListViewItemBackgroundPointerOver");
-            _submenuHoverBrush = ResolveBrush("MenuFlyoutSubItemBackgroundSubMenuOpened", "MenuFlyoutItemBackgroundPointerOver");
-            _normalItemBrush = EnsureOpaqueBrush(ResolveBrush("MenuFlyoutItemBackground", "SystemControlTransparentBrush"), fallbackAlpha: 0x01);
-            _cornerRadius = ResolveCornerRadius("OverlayCornerRadius", 8);
-        }
 
         public void Show(FrameworkElement anchor, IReadOnlyList<CompactSidebarMenuItem> items)
         {
             Hide();
 
-            Popup popup = CreatePopup(anchor, items, depth: 0);
-            _popups.Add(popup);
-            popup.IsOpen = true;
+            MenuFlyout rootFlyout = CreateFlyout(items, depth: 0);
+            _flyouts.Add(rootFlyout);
+            rootFlyout.Closed += Flyout_Closed;
+            rootFlyout.ShowAt(anchor, new FlyoutShowOptions
+            {
+                Placement = FlyoutPlacementMode.RightEdgeAlignedTop
+            });
         }
 
         public void Hide()
         {
-            Popup[] snapshot = _popups.ToArray();
-            _popups.Clear();
-            foreach (Popup popup in snapshot)
+            MenuFlyout[] snapshot = _flyouts.ToArray();
+            _flyouts.Clear();
+            foreach (MenuFlyout flyout in snapshot)
             {
-                popup.Closed -= Popup_Closed;
-                popup.IsOpen = false;
+                flyout.Closed -= Flyout_Closed;
+                flyout.Hide();
             }
         }
 
-        private Popup CreatePopup(FrameworkElement anchor, IReadOnlyList<CompactSidebarMenuItem> items, int depth)
+        private MenuFlyout CreateFlyout(IReadOnlyList<CompactSidebarMenuItem> items, int depth)
         {
-            var panel = new StackPanel
+            var flyout = new MenuFlyout();
+            if (TryGetMenuFlyoutPresenterStyle(out Style? presenterStyle))
             {
-                Spacing = 2
-            };
-
+                flyout.MenuFlyoutPresenterStyle = presenterStyle;
+            }
             foreach (CompactSidebarMenuItem item in items)
             {
-                panel.Children.Add(CreateRow(item, depth));
+                flyout.Items.Add(CreateMenuItemBase(item, depth));
             }
-
-            var viewer = new ScrollViewer
-            {
-                MaxHeight = 420,
-                MinWidth = 240,
-                Background = _backgroundBrush,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
-                VerticalScrollMode = ScrollMode.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                HorizontalScrollMode = ScrollMode.Disabled,
-                Content = panel
-            };
-
-            var border = new Border
-            {
-                Background = _backgroundBrush,
-                BorderBrush = _borderBrush,
-                BorderThickness = new Thickness(1),
-                BackgroundSizing = BackgroundSizing.InnerBorderEdge,
-                CornerRadius = _cornerRadius,
-                Padding = new Thickness(4, 4, 0, 4),
-                Shadow = new ThemeShadow(),
-                Translation = new Vector3(0, 0, 16),
-                Child = viewer
-            };
-
-            void UpdateScrollSpacing()
-            {
-                bool hasVerticalOverflow = viewer.ScrollableHeight > 0
-                    || viewer.ExtentHeight > viewer.ViewportHeight + 0.5;
-                viewer.Padding = hasVerticalOverflow
-                    ? new Thickness(0, 0, 10, 0)
-                    : new Thickness(0);
-                border.Padding = hasVerticalOverflow
-                    ? new Thickness(4, 4, 0, 4)
-                    : new Thickness(4);
-            }
-
-            viewer.Loaded += (_, _) =>
-            {
-                viewer.UpdateLayout();
-                UpdateScrollSpacing();
-            };
-            viewer.SizeChanged += (_, _) => UpdateScrollSpacing();
-            panel.SizeChanged += (_, _) => UpdateScrollSpacing();
-
-            Point point = GetPopupAnchorPoint(anchor, depth);
-            double width = GetPopupAnchorWidth(anchor, depth);
-            double popupHeight = EstimatePopupHeight(items);
-            double viewportHeight = anchor.XamlRoot?.Size.Height ?? 0;
-            double verticalOffset = point.Y;
-            if (viewportHeight > 0)
-            {
-                const double viewportMargin = 20;
-                double maxTop = Math.Max(viewportMargin, viewportHeight - popupHeight - viewportMargin);
-                verticalOffset = Math.Clamp(verticalOffset, viewportMargin, maxTop);
-            }
-
-            var popup = new Popup
-            {
-                XamlRoot = anchor.XamlRoot,
-                Child = border,
-                HorizontalOffset = point.X + width + (depth == 0 ? 4 : -3),
-                VerticalOffset = verticalOffset,
-                IsLightDismissEnabled = depth == 0
-            };
-            popup.Closed += Popup_Closed;
-            return popup;
+            return flyout;
         }
 
-        private FrameworkElement CreateRow(CompactSidebarMenuItem item, int depth)
+        private MenuFlyoutItemBase CreateMenuItemBase(CompactSidebarMenuItem item, int depth, bool materializeChildren = true)
         {
-            var icon = new FontIcon
+            if (item.HasChildren)
             {
-                FontFamily = new FontFamily("Segoe Fluent Icons"),
-                Glyph = item.Glyph,
-                FontSize = 12,
-                Width = 16,
-                Height = 16,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
+                var subItem = new MenuFlyoutSubItem
+                {
+                    Text = item.Label,
+                    IsEnabled = item.IsEnabled
+                };
 
-            var text = new TextBlock
-            {
-                Text = item.Label,
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Foreground = _textBrush
-            };
-
-            var grid = new Grid
-            {
-                ColumnSpacing = 8,
-                MinWidth = 220
-            };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            Grid.SetColumn(icon, 0);
-            Grid.SetColumn(text, 1);
-            grid.Children.Add(icon);
-            grid.Children.Add(text);
-
-            if (item.Children is { Count: > 0 })
-            {
-                var chevron = new FontIcon
+                subItem.Icon = new FontIcon
                 {
                     FontFamily = new FontFamily("Segoe Fluent Icons"),
-                    Glyph = "\uE76C",
-                    FontSize = 10,
-                    VerticalAlignment = VerticalAlignment.Center
+                    Glyph = item.Glyph,
+                    FontSize = 12
                 };
-                Grid.SetColumn(chevron, 2);
-                grid.Children.Add(chevron);
+
+                if (materializeChildren)
+                {
+                    PopulateSubItem(subItem, item, depth);
+                }
+                else
+                {
+                    subItem.Items.Add(new MenuFlyoutItem
+                    {
+                        Text = "Loading...",
+                        IsEnabled = false
+                    });
+
+                    bool populated = false;
+                    void PopulateOnDemand()
+                    {
+                        if (populated)
+                        {
+                            return;
+                        }
+
+                        populated = true;
+                        PopulateSubItem(subItem, item, depth);
+                    }
+
+                    subItem.AddHandler(
+                        UIElement.PointerEnteredEvent,
+                        new PointerEventHandler((_, _) => PopulateOnDemand()),
+                        handledEventsToo: true);
+                    subItem.AddHandler(
+                        UIElement.PointerPressedEvent,
+                        new PointerEventHandler((_, _) => PopulateOnDemand()),
+                        handledEventsToo: true);
+                }
+
+                subItem.AddHandler(
+                    UIElement.TappedEvent,
+                    new TappedEventHandler((_, e) =>
+                    {
+                        if (string.IsNullOrWhiteSpace(item.Path))
+                        {
+                            return;
+                        }
+
+                        e.Handled = true;
+                        Hide();
+                        NavigateRequested?.Invoke(this, item.Path);
+                    }),
+                    handledEventsToo: true);
+
+                return subItem;
             }
 
-            var background = new Border
+            return CreateLeafMenuItem(item.Label, item.Glyph, item.Path, item.IsEnabled);
+        }
+
+        private void PopulateSubItem(MenuFlyoutSubItem subItem, CompactSidebarMenuItem item, int depth)
+        {
+            subItem.Items.Clear();
+
+            IReadOnlyList<CompactSidebarMenuItem> children = item.Children
+                ?? item.ChildrenLoader?.Invoke()
+                ?? Array.Empty<CompactSidebarMenuItem>();
+
+            foreach (CompactSidebarMenuItem child in children)
             {
-                Background = _normalItemBrush,
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(8, 6, 8, 6),
-                Child = grid,
-                Opacity = item.IsEnabled ? 1 : 0.55
+                subItem.Items.Add(CreateMenuItemBase(child, depth + 1, materializeChildren: false));
+            }
+        }
+
+        private MenuFlyoutItem CreateLeafMenuItem(string label, string glyph, string? path, bool isEnabled)
+        {
+            var menuItem = new MenuFlyoutItem
+            {
+                Text = label,
+                IsEnabled = isEnabled
             };
 
-            background.PointerEntered += (_, _) =>
+            menuItem.Icon = new FontIcon
             {
-                background.Background = item.IsEnabled
-                    ? (item.Children is { Count: > 0 } ? _submenuHoverBrush : _hoverBrush)
-                    : _normalItemBrush;
-                OpenChildrenForRow(background, item, depth + 1);
+                FontFamily = new FontFamily("Segoe Fluent Icons"),
+                Glyph = glyph,
+                FontSize = 12
             };
-            background.PointerExited += (_, _) =>
+
+            menuItem.Click += (_, _) =>
             {
-                background.Background = _normalItemBrush;
-            };
-            background.Tapped += (_, _) =>
-            {
-                if (!item.IsEnabled || string.IsNullOrWhiteSpace(item.Path))
+                if (string.IsNullOrWhiteSpace(path))
                 {
                     return;
                 }
 
                 Hide();
-                NavigateRequested?.Invoke(this, item.Path);
+                NavigateRequested?.Invoke(this, path);
             };
 
-            return background;
+            return menuItem;
         }
 
-        private void OpenChildrenForRow(FrameworkElement row, CompactSidebarMenuItem item, int depth)
+        private bool TryGetMenuFlyoutPresenterStyle(out Style? presenterStyle)
         {
-            ClosePopupsFromDepth(depth);
+            if (_menuFlyoutPresenterStyle is not null)
+            {
+                presenterStyle = _menuFlyoutPresenterStyle;
+                return true;
+            }
 
-            if (item.Children is not { Count: > 0 })
+            if (Application.Current.Resources.TryGetValue("CompactSidebarMenuFlyoutPresenterStyle", out object? styleObj) &&
+                styleObj is Style style)
+            {
+                _menuFlyoutPresenterStyle = style;
+                presenterStyle = style;
+                return true;
+            }
+
+            presenterStyle = null;
+            return false;
+        }
+
+        private void Flyout_Closed(object? sender, object e)
+        {
+            if (sender is not MenuFlyout flyout)
             {
                 return;
             }
 
-            Popup popup = CreatePopup(row, item.Children, depth);
-            _popups.Add(popup);
-            popup.IsOpen = true;
-        }
-
-        private void ClosePopupsFromDepth(int depth)
-        {
-            while (_popups.Count > depth)
-            {
-                int index = _popups.Count - 1;
-                Popup popup = _popups[index];
-                _popups.RemoveAt(index);
-                popup.Closed -= Popup_Closed;
-                popup.IsOpen = false;
-            }
-        }
-
-        private void Popup_Closed(object? sender, object e)
-        {
-            if (sender is not Popup popup)
-            {
-                return;
-            }
-
-            popup.Closed -= Popup_Closed;
-            if (_popups.Contains(popup))
-            {
-                Hide();
-            }
-        }
-
-        private static Point GetAnchorPoint(FrameworkElement element)
-        {
-            GeneralTransform transform = element.TransformToVisual(null);
-            return transform.TransformPoint(new Point(0, 0));
-        }
-
-        private static Point GetPopupAnchorPoint(FrameworkElement anchor, int depth)
-        {
-            if (depth > 0)
-            {
-                Point rowPoint = GetAnchorPoint(anchor);
-                FrameworkElement? current = anchor;
-                while (current is not null)
-                {
-                    if (current.Parent is Popup popup && popup.Child is FrameworkElement popupChild)
-                    {
-                        Point popupPoint = GetAnchorPoint(popupChild);
-                        return new Point(popupPoint.X, rowPoint.Y);
-                    }
-
-                    current = current.Parent as FrameworkElement;
-                }
-            }
-
-            return GetAnchorPoint(anchor);
-        }
-
-        private static double GetPopupAnchorWidth(FrameworkElement anchor, int depth)
-        {
-            if (depth > 0)
-            {
-                FrameworkElement? current = anchor;
-                while (current is not null)
-                {
-                    if (current.Parent is Popup popup && popup.Child is FrameworkElement popupChild && popupChild.ActualWidth > 0)
-                    {
-                        return popupChild.ActualWidth;
-                    }
-
-                    current = current.Parent as FrameworkElement;
-                }
-            }
-
-            return anchor.ActualWidth > 0 ? anchor.ActualWidth : 32;
-        }
-
-        private static double EstimatePopupHeight(IReadOnlyList<CompactSidebarMenuItem> items)
-        {
-            const double rowHeight = 40;
-            const double spacing = 2;
-            const double chrome = 20;
-            if (items.Count == 0)
-            {
-                return chrome;
-            }
-
-            return Math.Min(420, chrome + (items.Count * rowHeight) + ((items.Count - 1) * spacing));
-        }
-
-        private static Brush ResolveBrush(string primaryKey, string fallbackKey)
-        {
-            if (Application.Current.Resources.TryGetValue(primaryKey, out object? primary) && primary is Brush primaryBrush)
-            {
-                return primaryBrush;
-            }
-
-            if (Application.Current.Resources.TryGetValue(fallbackKey, out object? fallback) && fallback is Brush fallbackBrush)
-            {
-                return fallbackBrush;
-            }
-
-            if (primaryKey.Contains("Background", StringComparison.OrdinalIgnoreCase))
-            {
-                return new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xF7, 0xF7, 0xF7));
-            }
-
-            if (primaryKey.Contains("Border", StringComparison.OrdinalIgnoreCase))
-            {
-                return new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xD8, 0xD8, 0xD8));
-            }
-
-            return new SolidColorBrush(Microsoft.UI.Colors.Black);
-        }
-
-        private static CornerRadius ResolveCornerRadius(string key, double fallback)
-        {
-            if (Application.Current.Resources.TryGetValue(key, out object? value) && value is CornerRadius resolved)
-            {
-                return resolved;
-            }
-
-            return new CornerRadius(fallback);
-        }
-
-        private static Brush EnsureOpaqueBrush(Brush brush, byte fallbackAlpha = 0xFF)
-        {
-            if (brush is SolidColorBrush solid)
-            {
-                Windows.UI.Color color = solid.Color;
-                if (color.A == 0)
-                {
-                    color = Microsoft.UI.ColorHelper.FromArgb(fallbackAlpha, 0xF7, 0xF7, 0xF7);
-                    return new SolidColorBrush(color);
-                }
-
-                if (color.A < 0xE8)
-                {
-                    color = Microsoft.UI.ColorHelper.FromArgb(0xF8, color.R, color.G, color.B);
-                    return new SolidColorBrush(color);
-                }
-            }
-
-            return brush;
+            flyout.Closed -= Flyout_Closed;
+            _flyouts.Remove(flyout);
         }
     }
 }
