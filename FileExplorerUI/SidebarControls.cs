@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -372,7 +373,7 @@ namespace FileExplorerUI
 
         public CompactSidebarMenuController()
         {
-            _backgroundBrush = EnsureOpaqueBrush(ResolveBrush("MenuFlyoutPresenterBackground", "LayerFillColorDefaultBrush"));
+            _backgroundBrush = EnsureOpaqueBrush(ResolveBrush("LayerFillColorDefaultBrush", "CardBackgroundFillColorDefaultBrush"));
             _borderBrush = ResolveBrush("MenuFlyoutPresenterBorderBrush", "CardStrokeColorDefaultBrush");
             _textBrush = ResolveBrush("MenuFlyoutItemForeground", "TextFillColorPrimaryBrush");
             _hoverBrush = ResolveBrush("MenuFlyoutItemBackgroundPointerOver", "ListViewItemBackgroundPointerOver");
@@ -417,7 +418,6 @@ namespace FileExplorerUI
             {
                 MaxHeight = 420,
                 MinWidth = 240,
-                Padding = new Thickness(0, 0, 8, 0),
                 Background = _backgroundBrush,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
                 VerticalScrollMode = ScrollMode.Auto,
@@ -431,13 +431,36 @@ namespace FileExplorerUI
                 Background = _backgroundBrush,
                 BorderBrush = _borderBrush,
                 BorderThickness = new Thickness(1),
+                BackgroundSizing = BackgroundSizing.InnerBorderEdge,
                 CornerRadius = _cornerRadius,
-                Padding = new Thickness(4, 4, 2, 4),
+                Padding = new Thickness(4, 4, 0, 4),
+                Shadow = new ThemeShadow(),
+                Translation = new Vector3(0, 0, 16),
                 Child = viewer
             };
 
-            Point point = GetAnchorPoint(anchor);
-            double width = anchor.ActualWidth <= 0 ? 32 : anchor.ActualWidth;
+            void UpdateScrollSpacing()
+            {
+                bool hasVerticalOverflow = viewer.ScrollableHeight > 0
+                    || viewer.ExtentHeight > viewer.ViewportHeight + 0.5;
+                viewer.Padding = hasVerticalOverflow
+                    ? new Thickness(0, 0, 10, 0)
+                    : new Thickness(0);
+                border.Padding = hasVerticalOverflow
+                    ? new Thickness(4, 4, 0, 4)
+                    : new Thickness(4);
+            }
+
+            viewer.Loaded += (_, _) =>
+            {
+                viewer.UpdateLayout();
+                UpdateScrollSpacing();
+            };
+            viewer.SizeChanged += (_, _) => UpdateScrollSpacing();
+            panel.SizeChanged += (_, _) => UpdateScrollSpacing();
+
+            Point point = GetPopupAnchorPoint(anchor, depth);
+            double width = GetPopupAnchorWidth(anchor, depth);
             double popupHeight = EstimatePopupHeight(items);
             double viewportHeight = anchor.XamlRoot?.Size.Height ?? 0;
             double verticalOffset = point.Y;
@@ -452,7 +475,7 @@ namespace FileExplorerUI
             {
                 XamlRoot = anchor.XamlRoot,
                 Child = border,
-                HorizontalOffset = point.X + width + (depth == 0 ? 4 : 10),
+                HorizontalOffset = point.X + width + (depth == 0 ? 4 : -3),
                 VerticalOffset = verticalOffset,
                 IsLightDismissEnabled = depth == 0
             };
@@ -585,6 +608,46 @@ namespace FileExplorerUI
         {
             GeneralTransform transform = element.TransformToVisual(null);
             return transform.TransformPoint(new Point(0, 0));
+        }
+
+        private static Point GetPopupAnchorPoint(FrameworkElement anchor, int depth)
+        {
+            if (depth > 0)
+            {
+                Point rowPoint = GetAnchorPoint(anchor);
+                FrameworkElement? current = anchor;
+                while (current is not null)
+                {
+                    if (current.Parent is Popup popup && popup.Child is FrameworkElement popupChild)
+                    {
+                        Point popupPoint = GetAnchorPoint(popupChild);
+                        return new Point(popupPoint.X, rowPoint.Y);
+                    }
+
+                    current = current.Parent as FrameworkElement;
+                }
+            }
+
+            return GetAnchorPoint(anchor);
+        }
+
+        private static double GetPopupAnchorWidth(FrameworkElement anchor, int depth)
+        {
+            if (depth > 0)
+            {
+                FrameworkElement? current = anchor;
+                while (current is not null)
+                {
+                    if (current.Parent is Popup popup && popup.Child is FrameworkElement popupChild && popupChild.ActualWidth > 0)
+                    {
+                        return popupChild.ActualWidth;
+                    }
+
+                    current = current.Parent as FrameworkElement;
+                }
+            }
+
+            return anchor.ActualWidth > 0 ? anchor.ActualWidth : 32;
         }
 
         private static double EstimatePopupHeight(IReadOnlyList<CompactSidebarMenuItem> items)

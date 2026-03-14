@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 - Refined tree navigation behavior: real expandability detection, separate expand vs navigate handling, and better collapsed-parent selection fallback.
 - Added compact sidebar mode with icon-only groups, a dedicated "My Computer" compact entry, and custom multi-level popup menus for compact navigation.
 - Tuned compact popup menu positioning, viewport clamping, submenu behavior, and menu-like styling to better match WinUI menu interactions.
+- Compact popup menus now align submenu placement against the parent popup frame, keep top alignment with the hovered item, and dynamically adjust right-side scroll spacing when overflow is present.
+- Compact popup menu visuals now use a custom flyout-like shadow/border treatment, but still rely on a custom popup implementation rather than native `MenuFlyout`.
 
 ## [0.1.0] - 2026-03-05
 - Week1: browsing/navigation/paging/rename/delete stability and cache invalidation.
