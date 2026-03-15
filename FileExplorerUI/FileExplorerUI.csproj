@@ -71,4 +71,24 @@
     <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
+
+  <Target Name="CopyWinUIPublishArtifacts" AfterTargets="Publish">
+    <ItemGroup>
+      <WinUIGeneratedFiles Include="$(OutDir)*.xbf" />
+      <WinUIGeneratedFiles Include="$(OutDir)*.pri" />
+      <WinUIAssetFiles Include="$(OutDir)Assets\**\*" />
+    </ItemGroup>
+
+    <Copy
+      SourceFiles="@(WinUIGeneratedFiles)"
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true"
+      Condition="'@(WinUIGeneratedFiles)' != ''" />
+
+    <Copy
+      SourceFiles="@(WinUIAssetFiles)"
+      DestinationFiles="@(WinUIAssetFiles->'$(PublishDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')"
+      SkipUnchangedFiles="true"
+      Condition="'@(WinUIAssetFiles)' != ''" />
+  </Target>
 </Project>
