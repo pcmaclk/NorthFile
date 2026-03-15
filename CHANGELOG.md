@@ -13,6 +13,14 @@ All notable changes to this project will be documented in this file.
   - the overlay editor now uses a custom lightweight textbox template and overlay container chrome instead of the default row layout
   - focus handling now keeps pointer interaction inside the rename editor stable and returns Enter-submit focus to the file list instead of the toolbar
   - renaming a directory from the right-hand list now refreshes the matching expanded branch in the left tree immediately
+  - the left tree now supports context-menu rename for regular folders and refreshes the parent branch immediately after success
+  - finishing a left-tree rename now restores a pointer-style tree focus instead of leaving a keyboard focus rectangle on the selected node
+  - renaming a directory from the right-hand list now updates the matching left-tree node in place and falls back to refreshing only the expanded parent branch when needed
+  - renaming a directory from the left tree now updates the matching row in the right-hand list when the current folder is its parent
+  - left-tree rename dialog exit now returns focus to the sidebar surface instead of the tree item itself to reduce keyboard-focus flashing
+  - left-tree rename no longer uses a modal dialog and now edits through a code-created `Canvas + Border + TextBox` overlay anchored to the tree item text
+  - left-tree rename overlay now uses the same white-box, thin-border editor chrome as the main list rename overlay
+  - left-tree rename editor dimensions and positioning now follow the tree item's text block instead of the whole node container
 - Added FM-01 new-file support with:
   - a top toolbar entry and list context-menu entry
   - service-backed empty-file creation
