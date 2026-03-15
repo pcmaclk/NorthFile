@@ -18,6 +18,8 @@
 
     <ScrollViewer x:Name="SidebarScrollViewer" Padding="0,0,12,0" VerticalScrollBarVisibility="Auto">
         <StackPanel x:Name="RootStackPanel" Margin="0,6,0,8" Spacing="2">
+            <StackPanel x:Name="CompactButtonsPanel" Spacing="2" Visibility="Collapsed" />
+
             <Border
                 x:Name="PinnedGroupBorder"
                 Margin="0,2"
@@ -42,7 +44,7 @@
                         VerticalAlignment="Center"
                         FontFamily="Segoe Fluent Icons"
                         FontSize="10"
-                        Glyph="&#xE718;" />
+                        Glyph="&#xE734;" />
                     <TextBlock
                         x:Name="PinnedGroupTextBlock"
                         Grid.Column="2"
@@ -208,7 +210,7 @@
                 </Border>
             </StackPanel>
 
-            <StackPanel x:Name="TreeSectionPanel" Margin="0,10,0,0" Spacing="2">
+            <StackPanel x:Name="TreeSectionPanel" Margin="0,6,0,0" Spacing="2">
                 <Border
                     x:Name="TreeCompactBorder"
                     Margin="0,2"
@@ -246,7 +248,7 @@
                 </Border>
             </StackPanel>
 
-            <StackPanel x:Name="ExtrasSectionPanel" Margin="0,10,0,0" Spacing="6">
+            <StackPanel x:Name="ExtrasSectionPanel" Margin="0,6,0,0" Spacing="6">
                 <Border
                     x:Name="CloudGroupBorder"
                     Margin="0,2"

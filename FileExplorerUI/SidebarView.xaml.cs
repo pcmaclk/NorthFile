@@ -23,6 +23,7 @@ namespace FileExplorerUI
         private string? _selectedPath;
         private TreeView? _attachedTreeView;
         private readonly CompactSidebarMenuController _compactMenuController = new();
+        private bool _compactButtonsAttached;
 
         public event EventHandler<SidebarNavigateRequestedEventArgs>? NavigateRequested;
 
@@ -100,7 +101,17 @@ namespace FileExplorerUI
                 _compactMenuController.Hide();
             }
 
+            if (compact)
+            {
+                AttachCompactButtons();
+            }
+            else
+            {
+                DetachCompactButtons();
+            }
+
             SidebarScrollViewer.Padding = compact ? new Thickness(0, 0, 0, 0) : new Thickness(0, 0, 12, 0);
+            CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             TreeHostBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             foreach (TextBlock block in _labelBlocks)
@@ -133,12 +144,68 @@ namespace FileExplorerUI
             SetSelectedPath(_selectedPath);
         }
 
+        private void AttachCompactButtons()
+        {
+            if (_compactButtonsAttached)
+            {
+                return;
+            }
+
+            RemoveFromParent(PinnedGroupBorder);
+            RemoveFromParent(TreeCompactBorder);
+            RemoveFromParent(CloudGroupBorder);
+            RemoveFromParent(NetworkGroupBorder);
+            RemoveFromParent(TagsGroupBorder);
+
+            CompactButtonsPanel.Children.Clear();
+            CompactButtonsPanel.Children.Add(PinnedGroupBorder);
+            CompactButtonsPanel.Children.Add(TreeCompactBorder);
+            CompactButtonsPanel.Children.Add(CloudGroupBorder);
+            CompactButtonsPanel.Children.Add(NetworkGroupBorder);
+            CompactButtonsPanel.Children.Add(TagsGroupBorder);
+            _compactButtonsAttached = true;
+        }
+
+        private void DetachCompactButtons()
+        {
+            if (!_compactButtonsAttached)
+            {
+                return;
+            }
+
+            RemoveFromParent(PinnedGroupBorder);
+            RemoveFromParent(TreeCompactBorder);
+            RemoveFromParent(CloudGroupBorder);
+            RemoveFromParent(NetworkGroupBorder);
+            RemoveFromParent(TagsGroupBorder);
+
+            RootStackPanel.Children.Insert(1, PinnedGroupBorder);
+            TreeSectionPanel.Children.Insert(0, TreeCompactBorder);
+            ExtrasSectionPanel.Children.Insert(0, CloudGroupBorder);
+            ExtrasSectionPanel.Children.Insert(2, NetworkGroupBorder);
+            ExtrasSectionPanel.Children.Insert(4, TagsGroupBorder);
+            _compactButtonsAttached = false;
+        }
+
+        private static void RemoveFromParent(FrameworkElement element)
+        {
+            if (element.Parent is Panel panel)
+            {
+                panel.Children.Remove(element);
+            }
+        }
+
         public void SetSelectedPath(string? path)
         {
             _selectedPath = path;
             ClearSelection();
 
             if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            if (_isCompact)
             {
                 return;
             }
@@ -703,15 +770,15 @@ namespace FileExplorerUI
         private static void ApplyGroupHeaderLayout(Border border, Grid grid, Border indicator, FontIcon icon, bool compact)
         {
             border.Width = compact ? 32 : double.NaN;
-            border.Height = compact ? 32 : double.NaN;
-            border.Padding = compact ? new Thickness(0) : new Thickness(0, 4, 0, 4);
+            border.Height = double.NaN;
+            border.Padding = new Thickness(0, 4, 0, 4);
             border.Margin = compact ? new Thickness(0, 2, 0, 2) : new Thickness(0, 2, 0, 2);
             border.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
 
             indicator.Visibility = compact ? Visibility.Collapsed : indicator.Visibility;
-            icon.FontSize = compact ? 12 : 10;
+            icon.FontSize = 12;
 
-            grid.ColumnDefinitions[0].Width = compact ? new GridLength(0) : new GridLength(14);
+            grid.ColumnDefinitions[0].Width = compact ? new GridLength(0) : new GridLength(10);
             grid.ColumnDefinitions[1].Width = compact ? new GridLength(32) : new GridLength(12);
             grid.ColumnDefinitions[2].Width = compact ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
             grid.ColumnDefinitions[3].Width = compact ? new GridLength(0) : new GridLength(26);
