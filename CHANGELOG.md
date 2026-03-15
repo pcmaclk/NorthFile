@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
   - left-tree rename no longer uses a modal dialog and now edits through a code-created `Canvas + Border + TextBox` overlay anchored to the tree item text
   - left-tree rename overlay now uses the same white-box, thin-border editor chrome as the main list rename overlay
   - left-tree rename editor dimensions and positioning now follow the tree item's text block instead of the whole node container
+  - left-tree rename overlay now waits briefly for tree-item layout, reuses the same lightweight textbox template as the list rename overlay, and clamps editor width to the visible sidebar surface so the inline editor opens reliably
 - Added FM-01 new-file support with:
   - a top toolbar entry and list context-menu entry
   - service-backed empty-file creation

@@ -55,6 +55,7 @@ namespace FileExplorerUI
         private Canvas? _sidebarTreeRenameOverlayCanvas;
         private Border? _sidebarTreeRenameOverlayBorder;
         private TextBox? _sidebarTreeRenameTextBox;
+        private ControlTemplate? _renameOverlayTextBoxTemplate;
         private SidebarTreeEntry? _activeSidebarTreeRenameEntry;
         private bool _isCommittingSidebarTreeRename;
 
@@ -69,6 +70,9 @@ namespace FileExplorerUI
         private const string ShellMyComputerPath = "shell:mycomputer";
         private const double SidebarTreeRenameOffsetX = -2;
         private const double SidebarTreeRenameOffsetY = 0;
+        private const double SidebarTreeRenameMinWidth = 140;
+        private const double SidebarTreeRenameWidthPadding = 12;
+        private const double SidebarTreeRenameRightMargin = 8;
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -1306,6 +1310,54 @@ namespace FileExplorerUI
             return (DataTemplate)XamlReader.Load(xaml);
         }
 
+        private ControlTemplate? GetRenameOverlayTextBoxTemplate()
+        {
+            if (_renameOverlayTextBoxTemplate is not null)
+            {
+                return _renameOverlayTextBoxTemplate;
+            }
+
+            const string xaml =
+                "<ControlTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" " +
+                "xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" " +
+                "TargetType=\"TextBox\">" +
+                "<Grid>" +
+                "<Border x:Name=\"BorderElement\" " +
+                "Background=\"Transparent\" " +
+                "BorderBrush=\"Transparent\" " +
+                "BorderThickness=\"0\" " +
+                "Control.IsTemplateFocusTarget=\"True\" />" +
+                "<ScrollViewer x:Name=\"ContentElement\" " +
+                "AutomationProperties.AccessibilityView=\"Raw\" " +
+                "Foreground=\"{TemplateBinding Foreground}\" " +
+                "HorizontalAlignment=\"{TemplateBinding HorizontalContentAlignment}\" " +
+                "HorizontalScrollBarVisibility=\"{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}\" " +
+                "HorizontalScrollMode=\"{TemplateBinding ScrollViewer.HorizontalScrollMode}\" " +
+                "IsDeferredScrollingEnabled=\"{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}\" " +
+                "IsHorizontalRailEnabled=\"{TemplateBinding ScrollViewer.IsHorizontalRailEnabled}\" " +
+                "IsTabStop=\"False\" " +
+                "IsVerticalRailEnabled=\"{TemplateBinding ScrollViewer.IsVerticalRailEnabled}\" " +
+                "Margin=\"{TemplateBinding BorderThickness}\" " +
+                "Padding=\"{TemplateBinding Padding}\" " +
+                "VerticalAlignment=\"{TemplateBinding VerticalContentAlignment}\" " +
+                "VerticalScrollBarVisibility=\"{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}\" " +
+                "VerticalScrollMode=\"{TemplateBinding ScrollViewer.VerticalScrollMode}\" " +
+                "ZoomMode=\"Disabled\" />" +
+                "</Grid>" +
+                "</ControlTemplate>";
+
+            try
+            {
+                _renameOverlayTextBoxTemplate = (ControlTemplate)XamlReader.Load(xaml);
+            }
+            catch
+            {
+                _renameOverlayTextBoxTemplate = null;
+            }
+
+            return _renameOverlayTextBoxTemplate;
+        }
+
         private async Task PopulateSidebarTreeChildrenAsync(TreeViewNode node, string path, CancellationToken ct, bool expandAfterLoad = false)
         {
             List<SidebarTreeEntry> children = await _explorerService.EnumerateSidebarDirectoriesAsync(path, ct, SidebarTreeMaxChildren);
@@ -1728,9 +1780,6 @@ namespace FileExplorerUI
             }
 
             _pendingSidebarTreeContextEntry = entry;
-            _suppressSidebarTreeSelection = true;
-            _sidebarTreeView.SelectedNode = node;
-            _suppressSidebarTreeSelection = false;
 
             if (e.TryGetPosition(_sidebarTreeView, out Point point))
             {
@@ -3255,24 +3304,52 @@ namespace FileExplorerUI
 
             _activeSidebarTreeRenameEntry = entry;
             _sidebarTreeRenameTextBox!.Text = entry.Name;
-            if (FindDescendantByName<TextBlock>(item, "SidebarTreeNameTextBlock") is not TextBlock anchor)
+
+            for (int attempt = 0; attempt < 4; attempt++)
             {
-                UpdateStatus("Rename failed: tree text anchor is not available.");
+                await Task.Delay(16);
+                item.UpdateLayout();
+                _sidebarTreeView.UpdateLayout();
+                _sidebarTreeRenameOverlayCanvas.UpdateLayout();
+
+                if (FindDescendantByName<TextBlock>(item, "SidebarTreeNameTextBlock") is not TextBlock anchor)
+                {
+                    continue;
+                }
+
+                GeneralTransform transform = anchor.TransformToVisual(_sidebarTreeRenameOverlayCanvas);
+                Rect bounds = transform.TransformBounds(new Rect(0, 0, anchor.ActualWidth, anchor.ActualHeight));
+                if (bounds.Width <= 0 || bounds.Height <= 0)
+                {
+                    continue;
+                }
+
+                double overlayHeight = _sidebarTreeRenameOverlayBorder!.ActualHeight > 0
+                    ? _sidebarTreeRenameOverlayBorder.ActualHeight
+                    : (_sidebarTreeRenameOverlayBorder.Height > 0 ? _sidebarTreeRenameOverlayBorder.Height : bounds.Height);
+                double left = Math.Max(0, bounds.X + SidebarTreeRenameOffsetX);
+                double targetWidth = Math.Max(SidebarTreeRenameMinWidth, bounds.Width + SidebarTreeRenameWidthPadding);
+                if (_sidebarTreeRenameOverlayCanvas.ActualWidth > 0)
+                {
+                    double availableWidth = Math.Max(0, _sidebarTreeRenameOverlayCanvas.ActualWidth - left - SidebarTreeRenameRightMargin);
+                    if (availableWidth <= 0)
+                    {
+                        continue;
+                    }
+
+                    targetWidth = Math.Min(targetWidth, availableWidth);
+                }
+
+                Canvas.SetLeft(_sidebarTreeRenameOverlayBorder, left);
+                Canvas.SetTop(_sidebarTreeRenameOverlayBorder, Math.Max(0, bounds.Y + ((bounds.Height - overlayHeight) / 2) + SidebarTreeRenameOffsetY));
+                _sidebarTreeRenameOverlayBorder.Width = targetWidth;
+                _sidebarTreeRenameOverlayBorder.Visibility = Visibility.Visible;
+                _sidebarTreeRenameTextBox.Focus(FocusState.Programmatic);
+                _sidebarTreeRenameTextBox.SelectAll();
                 return;
             }
 
-            GeneralTransform transform = anchor.TransformToVisual(_sidebarTreeRenameOverlayCanvas);
-            Rect bounds = transform.TransformBounds(new Rect(0, 0, anchor.ActualWidth, anchor.ActualHeight));
-            double overlayHeight = _sidebarTreeRenameOverlayBorder!.ActualHeight > 0
-                ? _sidebarTreeRenameOverlayBorder.ActualHeight
-                : (_sidebarTreeRenameOverlayBorder.Height > 0 ? _sidebarTreeRenameOverlayBorder.Height : bounds.Height);
-            Canvas.SetLeft(_sidebarTreeRenameOverlayBorder, bounds.X + SidebarTreeRenameOffsetX);
-            Canvas.SetTop(_sidebarTreeRenameOverlayBorder, Math.Max(0, bounds.Y + ((bounds.Height - overlayHeight) / 2) + SidebarTreeRenameOffsetY));
-            _sidebarTreeRenameOverlayBorder.Width = Math.Max(140, bounds.Width + 12);
-            _sidebarTreeRenameOverlayBorder.Visibility = Visibility.Visible;
-            await Task.Yield();
-            _sidebarTreeRenameTextBox.Focus(FocusState.Programmatic);
-            _sidebarTreeRenameTextBox.SelectAll();
+            UpdateStatus("Rename failed: tree text anchor is not available.");
         }
 
         private void EnsureSidebarTreeRenameOverlay()
@@ -3308,6 +3385,11 @@ namespace FileExplorerUI
                 TextAlignment = TextAlignment.Left,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
+            if (GetRenameOverlayTextBoxTemplate() is ControlTemplate renameOverlayTextBoxTemplate)
+            {
+                _sidebarTreeRenameTextBox.Template = renameOverlayTextBoxTemplate;
+            }
+
             _sidebarTreeRenameTextBox.Resources["TextControlBackground"] = new SolidColorBrush(Colors.Transparent);
             _sidebarTreeRenameTextBox.Resources["TextControlBackgroundPointerOver"] = new SolidColorBrush(Colors.Transparent);
             _sidebarTreeRenameTextBox.Resources["TextControlBackgroundFocused"] = new SolidColorBrush(Colors.Transparent);
