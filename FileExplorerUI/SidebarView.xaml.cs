@@ -3,14 +3,17 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using FileExplorerUI.Services;
 using System;
 using System.Collections.Generic;
-using System.IO;
 
 namespace FileExplorerUI
 {
     public sealed partial class SidebarView : UserControl
     {
+        private const int CompactTreeProbeLimit = 1;
+        private const int CompactTreeChildLimit = 200;
+        private readonly ExplorerService _explorerService = new();
         private readonly Dictionary<string, string> _pinnedPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<SidebarVisualItem> _visualItems = new();
         private readonly List<TextBlock> _labelBlocks = new();
@@ -715,7 +718,10 @@ namespace FileExplorerUI
 
         private CompactSidebarMenuItem CreateTreeCompactItem(SidebarTreeEntry entry, int depth)
         {
-            bool hasChildren = EnumerateDirectoryEntries(entry.FullPath, 1).Count > 0;
+            bool hasChildren = _explorerService.EnumerateSidebarDirectoriesAsync(entry.FullPath, default, CompactTreeProbeLimit)
+                .GetAwaiter()
+                .GetResult()
+                .Count > 0;
             Func<IReadOnlyList<CompactSidebarMenuItem>>? loader = hasChildren
                 ? () => LoadTreeCompactChildren(entry.FullPath, depth + 1)
                 : null;
@@ -725,7 +731,9 @@ namespace FileExplorerUI
 
         private IReadOnlyList<CompactSidebarMenuItem> LoadTreeCompactChildren(string path, int depth)
         {
-            List<SidebarTreeEntry> childEntries = EnumerateDirectoryEntries(path);
+            List<SidebarTreeEntry> childEntries = _explorerService.EnumerateSidebarDirectoriesAsync(path, default, CompactTreeChildLimit)
+                .GetAwaiter()
+                .GetResult();
             var children = new List<CompactSidebarMenuItem>(childEntries.Count);
             foreach (SidebarTreeEntry child in childEntries)
             {
@@ -733,33 +741,6 @@ namespace FileExplorerUI
             }
 
             return children;
-        }
-
-        private static List<SidebarTreeEntry> EnumerateDirectoryEntries(string path, int? maxItems = null)
-        {
-            var entries = new List<SidebarTreeEntry>();
-            try
-            {
-                foreach (string dir in Directory.EnumerateDirectories(path))
-                {
-                    string name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar));
-                    if (string.IsNullOrWhiteSpace(name))
-                    {
-                        name = dir.TrimEnd('\\');
-                    }
-
-                    entries.Add(new SidebarTreeEntry(name, dir));
-                    if (maxItems.HasValue && entries.Count >= maxItems.Value)
-                    {
-                        break;
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return entries;
         }
 
         private void NavigateToPath(string path)

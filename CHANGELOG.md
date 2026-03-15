@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Fixed a WinUI XAML compile regression in the rename overlay editor by simplifying the overlay host back to a minimal safe shape.
+- Added a shared `ExplorerService` layer so the main window now calls a dedicated service for directory reads, search reads, tree loading, breadcrumb directory lookup, rename/delete, and USN/cache operations instead of calling Rust/file-system APIs inline.
+- Moved compact sidebar tree flyout directory enumeration onto the same `ExplorerService` abstraction so sidebar navigation and the main explorer surface now share one backend access path.
+- Changed existing item rename from dialog-based flow to inline list editing, including Enter/Escape/LostFocus handling, selection retention, and reuse of the existing rename backend path.
+- Refined rename again to use a dedicated name-column overlay editor:
+  - the editor is positioned over the filename cell instead of reshaping the row template
+  - context-menu rename now opens in one step after the flyout closes
+  - the overlay editor now uses a custom lightweight textbox template and overlay container chrome instead of the default row layout
+  - focus handling now keeps pointer interaction inside the rename editor stable and returns Enter-submit focus to the file list instead of the toolbar
+- Added FM-01 new-file support with:
+  - a top toolbar entry and list context-menu entry
+  - service-backed empty-file creation
+  - local list insertion that keeps the created item selected and visible
+  - immediate reuse of the existing rename prompt after creation
+  - readable validation for empty, invalid, and duplicate names during the immediate rename step
+- Added FM-02 new-folder support with:
+  - a top toolbar entry and list context-menu entry
+  - service-backed folder creation
+  - reuse of the same immediate rename prompt introduced for new files
+  - local folder row insertion with selection retention
+  - sidebar tree refresh alignment after folder create/rename
 
 ## [0.1.1] - 2026-03-15
 - WinUI sidebar refactor: pinned/tree/cloud/network/tags groups now use the revised shell styling with collapsible groups.

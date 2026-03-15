@@ -19,7 +19,7 @@
         RowSpacing="8"
         Padding="8,8,8,0">
         <Grid
-            ColumnDefinitions="Auto,Auto,Auto,Auto,*,280"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,280"
             Height="36"
             ColumnSpacing="8">
             <Button
@@ -81,7 +81,37 @@
                     Glyph="&#xE72C;" />
             </Button>
 
-            <Grid Grid.Column="4">
+            <Button
+                x:Name="NewFileButton"
+                Grid.Column="4"
+                Width="32"
+                Height="32"
+                Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
+                Click="NewFileButton_Click"
+                ToolTipService.ToolTip="New file">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE7C3;" />
+            </Button>
+
+            <Button
+                x:Name="NewFolderButton"
+                Grid.Column="5"
+                Width="32"
+                Height="32"
+                Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
+                Click="NewFolderButton_Click"
+                ToolTipService.ToolTip="New folder">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE8B7;" />
+            </Button>
+
+            <Grid Grid.Column="6">
                 <Border
                     x:Name="AddressBreadcrumbBorder"
                     Height="32"
@@ -199,7 +229,7 @@
 
             <TextBox
                 x:Name="SearchTextBox"
-                Grid.Column="5"
+                Grid.Column="7"
                 Height="32"
                 PlaceholderText="Search in current folder"
                 KeyDown="SearchTextBox_KeyDown" />
@@ -372,6 +402,9 @@
                                     x:Name="EntriesContextFlyout"
                                     Opening="EntriesContextFlyout_Opening"
                                     Closed="EntriesContextFlyout_Closed">
+                                    <MenuFlyoutItem Click="ContextNewFile_Click" Text="New File" />
+                                    <MenuFlyoutItem Click="ContextNewFolder_Click" Text="New Folder" />
+                                    <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Click="ContextRename_Click" Text="Rename" />
                                     <MenuFlyoutItem Click="ContextDelete_Click" Text="Delete" />
                                     <MenuFlyoutSeparator />
@@ -407,6 +440,7 @@
                                                     Foreground="{Binding IconForeground}"
                                                     Text="{Binding IconGlyph}" />
                                                 <TextBlock
+                                                    x:Name="EntryNameTextBlock"
                                                     Grid.Column="2"
                                                     Margin="0,0,4,0"
                                                     VerticalAlignment="Center"
@@ -434,6 +468,64 @@
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
+
+                        <Canvas x:Name="RenameOverlayCanvas" Grid.Row="1" Margin="0,8,0,0">
+                            <Border
+                                x:Name="RenameOverlayBorder"
+                                Width="160"
+                                Height="24"
+                                Background="White"
+                                BorderBrush="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                BorderThickness="1"
+                                Padding="1,0,0,1"
+                                CornerRadius="0"
+                                Visibility="Collapsed">
+                                <TextBox
+                                    x:Name="RenameOverlayTextBox"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0"
+                                    FontSize="14"
+                                    HorizontalContentAlignment="Left"
+                                    KeyDown="RenameOverlayTextBox_KeyDown"
+                                    LostFocus="RenameOverlayTextBox_LostFocus"
+                                    MinHeight="24"
+                                    Padding="0"
+                                    TextAlignment="Left"
+                                    Margin="0,-1,0,0"
+                                    VerticalContentAlignment="Center">
+                                    <TextBox.Template>
+                                        <ControlTemplate TargetType="TextBox">
+                                            <Grid>
+                                                <Border
+                                                    x:Name="BorderElement"
+                                                    Background="Transparent"
+                                                    BorderBrush="Transparent"
+                                                    BorderThickness="0"
+                                                    Control.IsTemplateFocusTarget="True" />
+                                                <ScrollViewer
+                                                    x:Name="ContentElement"
+                                                    AutomationProperties.AccessibilityView="Raw"
+                                                    Foreground="{TemplateBinding Foreground}"
+                                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                    HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                                    HorizontalScrollMode="{TemplateBinding ScrollViewer.HorizontalScrollMode}"
+                                                    IsDeferredScrollingEnabled="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
+                                                    IsHorizontalRailEnabled="{TemplateBinding ScrollViewer.IsHorizontalRailEnabled}"
+                                                    IsTabStop="False"
+                                                    IsVerticalRailEnabled="{TemplateBinding ScrollViewer.IsVerticalRailEnabled}"
+                                                    Margin="{TemplateBinding BorderThickness}"
+                                                    Padding="{TemplateBinding Padding}"
+                                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                    VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
+                                                    VerticalScrollMode="{TemplateBinding ScrollViewer.VerticalScrollMode}"
+                                                    ZoomMode="Disabled" />
+                                            </Grid>
+                                        </ControlTemplate>
+                                    </TextBox.Template>
+                                </TextBox>
+                            </Border>
+                        </Canvas>
                     </Grid>
                 </Border>
 
