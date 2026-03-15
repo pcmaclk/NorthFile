@@ -1310,6 +1310,62 @@ namespace FileExplorerUI
             }
         }
 
+        private TreeViewNode? FindSidebarTreeNodeByPath(string path)
+        {
+            if (_sidebarTreeView is null)
+            {
+                return null;
+            }
+
+            foreach (TreeViewNode root in _sidebarTreeView.RootNodes)
+            {
+                TreeViewNode? match = FindSidebarTreeNodeByPath(root, path);
+                if (match is not null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private static TreeViewNode? FindSidebarTreeNodeByPath(TreeViewNode node, string path)
+        {
+            if (node.Content is SidebarTreeEntry entry &&
+                string.Equals(entry.FullPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return node;
+            }
+
+            foreach (TreeViewNode child in node.Children)
+            {
+                TreeViewNode? match = FindSidebarTreeNodeByPath(child, path);
+                if (match is not null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private async Task RefreshSidebarTreeChildrenForPathAsync(string path)
+        {
+            TreeViewNode? node = FindSidebarTreeNodeByPath(path);
+            if (node is null || node.Content is not SidebarTreeEntry entry)
+            {
+                return;
+            }
+
+            if (!node.IsExpanded && !node.HasUnrealizedChildren && node.Children.Count == 0)
+            {
+                return;
+            }
+
+            await PopulateSidebarTreeChildrenAsync(node, entry.FullPath, CancellationToken.None, expandAfterLoad: node.IsExpanded);
+            await SelectSidebarTreePathAsync(_currentPath);
+        }
+
         private async Task SelectSidebarTreePathAsync(string path)
         {
             if (_sidebarTreeView is null)
@@ -3619,6 +3675,7 @@ namespace FileExplorerUI
                 }
                 if (entry.IsDirectory)
                 {
+                    await RefreshSidebarTreeChildrenForPathAsync(_currentPath);
                     _ = SelectSidebarTreePathAsync(_currentPath);
                 }
                 UpdateStatus($"Rename success: {entry.Name} -> {newName}");

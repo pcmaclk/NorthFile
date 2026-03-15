@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
   - context-menu rename now opens in one step after the flyout closes
   - the overlay editor now uses a custom lightweight textbox template and overlay container chrome instead of the default row layout
   - focus handling now keeps pointer interaction inside the rename editor stable and returns Enter-submit focus to the file list instead of the toolbar
+  - renaming a directory from the right-hand list now refreshes the matching expanded branch in the left tree immediately
 - Added FM-01 new-file support with:
   - a top toolbar entry and list context-menu entry
   - service-backed empty-file creation
