@@ -112,6 +112,11 @@ namespace FileExplorerUI
 
             SidebarScrollViewer.Padding = compact ? new Thickness(0, 0, 0, 0) : new Thickness(0, 0, 12, 0);
             CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            PinnedSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            TreeSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            CloudSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            NetworkSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            TagsSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             TreeHostBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
             foreach (TextBlock block in _labelBlocks)
@@ -179,11 +184,11 @@ namespace FileExplorerUI
             RemoveFromParent(NetworkGroupBorder);
             RemoveFromParent(TagsGroupBorder);
 
-            RootStackPanel.Children.Insert(1, PinnedGroupBorder);
+            PinnedSectionPanel.Children.Insert(0, PinnedGroupBorder);
             TreeSectionPanel.Children.Insert(0, TreeCompactBorder);
-            ExtrasSectionPanel.Children.Insert(0, CloudGroupBorder);
-            ExtrasSectionPanel.Children.Insert(2, NetworkGroupBorder);
-            ExtrasSectionPanel.Children.Insert(4, TagsGroupBorder);
+            CloudSectionPanel.Children.Insert(0, CloudGroupBorder);
+            NetworkSectionPanel.Children.Insert(0, NetworkGroupBorder);
+            TagsSectionPanel.Children.Insert(0, TagsGroupBorder);
             _compactButtonsAttached = false;
         }
 
@@ -332,6 +337,7 @@ namespace FileExplorerUI
 
             var border = new Border
             {
+                Height = 32,
                 Margin = new Thickness(0, 2, 0, 2),
                 Padding = new Thickness(0, 4, 0, 4),
                 Background = new SolidColorBrush(Colors.Transparent),
@@ -770,7 +776,7 @@ namespace FileExplorerUI
         private static void ApplyGroupHeaderLayout(Border border, Grid grid, Border indicator, FontIcon icon, bool compact)
         {
             border.Width = compact ? 32 : double.NaN;
-            border.Height = double.NaN;
+            border.Height = 32;
             border.Padding = new Thickness(0, 4, 0, 4);
             border.Margin = compact ? new Thickness(0, 2, 0, 2) : new Thickness(0, 2, 0, 2);
             border.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;

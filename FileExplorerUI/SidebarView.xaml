@@ -8,206 +8,214 @@
     mc:Ignorable="d">
 
     <UserControl.Resources>
+        <Thickness x:Key="TreeViewItemBorderThemeThickness">0</Thickness>
         <Thickness x:Key="TreeViewItemPresenterMargin">0,2,0,2</Thickness>
-        <Style x:Key="CompactMenuFlyoutPresenterStyle" TargetType="MenuFlyoutPresenter">
-            <Setter Property="MaxHeight" Value="420" />
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Visible" />
-            <Setter Property="ScrollViewer.VerticalScrollMode" Value="Auto" />
-        </Style>
+        <Thickness x:Key="TreeViewItemPresenterPadding">0</Thickness>
+        <Thickness x:Key="TreeViewItemMultiSelectSelectedItemBorderMargin">0</Thickness>
+        <x:Double x:Key="TreeViewItemMinHeight">32</x:Double>
+        <x:Double x:Key="TreeViewItemMultiSelectCheckBoxMinHeight">32</x:Double>
+        <x:Double x:Key="TreeViewItemContentHeight">32</x:Double>
     </UserControl.Resources>
 
-    <ScrollViewer x:Name="SidebarScrollViewer" Padding="0,0,12,0" VerticalScrollBarVisibility="Auto">
-        <StackPanel x:Name="RootStackPanel" Margin="0,6,0,8" Spacing="2">
-            <StackPanel x:Name="CompactButtonsPanel" Spacing="2" Visibility="Collapsed" />
+    <Grid RowDefinitions="*,Auto">
+        <ScrollViewer x:Name="SidebarScrollViewer" Padding="0,0,12,0" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="RootStackPanel" Margin="0,4,0,0" Spacing="0">
+                <StackPanel x:Name="CompactButtonsPanel" Spacing="6" Visibility="Collapsed" />
 
-            <Border
-                x:Name="PinnedGroupBorder"
-                Margin="0,2"
-                Padding="0,4"
-                Background="Transparent"
-                CornerRadius="{ThemeResource ListViewItemCornerRadius}"
-                PointerPressed="PinnedGroup_Click">
-                <Grid x:Name="PinnedGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+            <StackPanel x:Name="PinnedSectionPanel" Margin="0,0,0,0" Spacing="2">
+                <Border
+                    x:Name="PinnedGroupBorder"
+                    Margin="0,2"
+                    Padding="0,4"
+                    Background="Transparent"
+                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                    PointerPressed="PinnedGroup_Click">
+                    <Grid x:Name="PinnedGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                        <Border
+                            x:Name="PinnedGroupSelectionIndicator"
+                            Width="3"
+                            Margin="0,2"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                            Visibility="Collapsed" />
+                        <FontIcon
+                            x:Name="PinnedGroupIcon"
+                            Grid.Column="1"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Glyph="&#xE734;" />
+                        <TextBlock
+                            x:Name="PinnedGroupTextBlock"
+                            Grid.Column="2"
+                            Margin="14,0,0,0"
+                            VerticalAlignment="Center"
+                            Text="固定" />
+                        <FontIcon
+                            x:Name="PinnedChevron"
+                            Grid.Column="3"
+                            Width="12"
+                            Height="12"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Glyph="&#xE70E;" />
+                    </Grid>
+                </Border>
+
+                <StackPanel x:Name="PinnedItemsPanel" Spacing="2" Visibility="Visible">
                     <Border
-                        x:Name="PinnedGroupSelectionIndicator"
-                        Width="3"
+                        x:Name="DesktopItemBorder"
+                        Height="32"
                         Margin="0,2"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Stretch"
-                        Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
-                        CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
-                        Visibility="Collapsed" />
-                    <FontIcon
-                        x:Name="PinnedGroupIcon"
-                        Grid.Column="1"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        FontFamily="Segoe Fluent Icons"
-                        FontSize="10"
-                        Glyph="&#xE734;" />
-                    <TextBlock
-                        x:Name="PinnedGroupTextBlock"
-                        Grid.Column="2"
-                        Margin="14,0,0,0"
-                        VerticalAlignment="Center"
-                        Text="固定" />
-                    <FontIcon
-                        x:Name="PinnedChevron"
-                        Grid.Column="3"
-                        Width="12"
-                        Height="12"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Center"
-                        FontFamily="Segoe Fluent Icons"
-                        FontSize="10"
-                        Glyph="&#xE70E;" />
-                </Grid>
-            </Border>
+                        Padding="0,4"
+                        Background="Transparent"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        PointerPressed="PinnedItem_Click"
+                        Tag="Desktop">
+                        <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                            <Border
+                                x:Name="DesktopSelectionIndicator"
+                                Width="3"
+                                Margin="0,2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                                Visibility="Collapsed" />
+                            <FontIcon
+                                Grid.Column="1"
+                                Width="12"
+                                Height="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE80F;" />
+                            <TextBlock
+                                x:Name="DesktopTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="桌面" />
+                        </Grid>
+                    </Border>
 
-            <StackPanel x:Name="PinnedItemsPanel" Visibility="Visible">
-                <Border
-                    x:Name="DesktopItemBorder"
-                    Margin="0,2"
-                    Padding="0,4"
-                    Background="Transparent"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
-                    PointerPressed="PinnedItem_Click"
-                    Tag="Desktop">
-                    <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
-                        <Border
-                            x:Name="DesktopSelectionIndicator"
-                            Width="3"
-                            Margin="0,2"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
-                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
-                            Visibility="Collapsed" />
-                        <FontIcon
-                            Grid.Column="1"
-                            Width="12"
-                            Height="12"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            FontFamily="Segoe Fluent Icons"
-                            FontSize="12"
-                            Glyph="&#xE80F;" />
-                        <TextBlock
-                            x:Name="DesktopTextBlock"
-                            Grid.Column="2"
-                            Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Text="桌面" />
-                    </Grid>
-                </Border>
+                    <Border
+                        x:Name="DocumentsItemBorder"
+                        Height="32"
+                        Margin="0,2"
+                        Padding="0,4"
+                        Background="Transparent"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        PointerPressed="PinnedItem_Click"
+                        Tag="Documents">
+                        <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                            <Border
+                                x:Name="DocumentsSelectionIndicator"
+                                Width="3"
+                                Margin="0,2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                                Visibility="Collapsed" />
+                            <FontIcon
+                                Grid.Column="1"
+                                Width="12"
+                                Height="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE8A5;" />
+                            <TextBlock
+                                x:Name="DocumentsTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="文档" />
+                        </Grid>
+                    </Border>
 
-                <Border
-                    x:Name="DocumentsItemBorder"
-                    Margin="0,2"
-                    Padding="0,4"
-                    Background="Transparent"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
-                    PointerPressed="PinnedItem_Click"
-                    Tag="Documents">
-                    <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
-                        <Border
-                            x:Name="DocumentsSelectionIndicator"
-                            Width="3"
-                            Margin="0,2"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
-                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
-                            Visibility="Collapsed" />
-                        <FontIcon
-                            Grid.Column="1"
-                            Width="12"
-                            Height="12"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            FontFamily="Segoe Fluent Icons"
-                            FontSize="12"
-                            Glyph="&#xE8A5;" />
-                        <TextBlock
-                            x:Name="DocumentsTextBlock"
-                            Grid.Column="2"
-                            Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Text="文档" />
-                    </Grid>
-                </Border>
+                    <Border
+                        x:Name="DownloadsItemBorder"
+                        Height="32"
+                        Margin="0,2"
+                        Padding="0,4"
+                        Background="Transparent"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        PointerPressed="PinnedItem_Click"
+                        Tag="Downloads">
+                        <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                            <Border
+                                x:Name="DownloadsSelectionIndicator"
+                                Width="3"
+                                Margin="0,2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                                Visibility="Collapsed" />
+                            <FontIcon
+                                Grid.Column="1"
+                                Width="12"
+                                Height="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE896;" />
+                            <TextBlock
+                                x:Name="DownloadsTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="下载" />
+                        </Grid>
+                    </Border>
 
-                <Border
-                    x:Name="DownloadsItemBorder"
-                    Margin="0,2"
-                    Padding="0,4"
-                    Background="Transparent"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
-                    PointerPressed="PinnedItem_Click"
-                    Tag="Downloads">
-                    <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
-                        <Border
-                            x:Name="DownloadsSelectionIndicator"
-                            Width="3"
-                            Margin="0,2"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
-                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
-                            Visibility="Collapsed" />
-                        <FontIcon
-                            Grid.Column="1"
-                            Width="12"
-                            Height="12"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            FontFamily="Segoe Fluent Icons"
-                            FontSize="12"
-                            Glyph="&#xE896;" />
-                        <TextBlock
-                            x:Name="DownloadsTextBlock"
-                            Grid.Column="2"
-                            Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Text="下载" />
-                    </Grid>
-                </Border>
-
-                <Border
-                    x:Name="PicturesItemBorder"
-                    Margin="0,2"
-                    Padding="0,4"
-                    Background="Transparent"
-                    CornerRadius="{ThemeResource ListViewItemCornerRadius}"
-                    PointerPressed="PinnedItem_Click"
-                    Tag="Pictures">
-                    <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
-                        <Border
-                            x:Name="PicturesSelectionIndicator"
-                            Width="3"
-                            Margin="0,2"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
-                            CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
-                            Visibility="Collapsed" />
-                        <FontIcon
-                            Grid.Column="1"
-                            Width="12"
-                            Height="12"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            FontFamily="Segoe Fluent Icons"
-                            FontSize="12"
-                            Glyph="&#xE91B;" />
-                        <TextBlock
-                            x:Name="PicturesTextBlock"
-                            Grid.Column="2"
-                            Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Text="图片" />
-                    </Grid>
-                </Border>
+                    <Border
+                        x:Name="PicturesItemBorder"
+                        Height="32"
+                        Margin="0,2"
+                        Padding="0,4"
+                        Background="Transparent"
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        PointerPressed="PinnedItem_Click"
+                        Tag="Pictures">
+                        <Grid ColumnDefinitions="30,12,*" ColumnSpacing="0">
+                            <Border
+                                x:Name="PicturesSelectionIndicator"
+                                Width="3"
+                                Margin="0,2"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Stretch"
+                                Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                                Visibility="Collapsed" />
+                            <FontIcon
+                                Grid.Column="1"
+                                Width="12"
+                                Height="12"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe Fluent Icons"
+                                FontSize="12"
+                                Glyph="&#xE91B;" />
+                            <TextBlock
+                                x:Name="PicturesTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                Text="图片" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
             </StackPanel>
 
             <StackPanel x:Name="TreeSectionPanel" Margin="0,6,0,0" Spacing="2">
@@ -248,7 +256,7 @@
                 </Border>
             </StackPanel>
 
-            <StackPanel x:Name="ExtrasSectionPanel" Margin="0,6,0,0" Spacing="6">
+            <StackPanel x:Name="CloudSectionPanel" Margin="0,6,0,0" Spacing="2">
                 <Border
                     x:Name="CloudGroupBorder"
                     Margin="0,2"
@@ -295,6 +303,7 @@
                 <StackPanel x:Name="CloudItemsPanel" Spacing="2">
                     <Border
                         x:Name="OneDriveItemBorder"
+                        Height="32"
                         Margin="0,2"
                         Padding="0,4"
                         Background="Transparent"
@@ -328,7 +337,9 @@
                         </Grid>
                     </Border>
                 </StackPanel>
+            </StackPanel>
 
+            <StackPanel x:Name="NetworkSectionPanel" Margin="0,6,0,0" Spacing="2">
                 <Border
                     x:Name="NetworkGroupBorder"
                     Margin="0,2"
@@ -373,7 +384,9 @@
                     </Grid>
                 </Border>
                 <StackPanel x:Name="NetworkItemsPanel" Spacing="2" Visibility="Collapsed" />
+            </StackPanel>
 
+            <StackPanel x:Name="TagsSectionPanel" Margin="0,6,0,0" Spacing="2">
                 <Border
                     x:Name="TagsGroupBorder"
                     Margin="0,2"
@@ -420,6 +433,7 @@
                 <StackPanel x:Name="TagsItemsPanel" Spacing="2">
                     <Border
                         x:Name="TagWorkItemBorder"
+                        Height="32"
                         Margin="0,2"
                         Padding="0,4"
                         Background="Transparent"
@@ -455,6 +469,7 @@
 
                     <Border
                         x:Name="TagFocusItemBorder"
+                        Height="32"
                         Margin="0,2"
                         Padding="0,4"
                         Background="Transparent"
@@ -490,6 +505,7 @@
 
                     <Border
                         x:Name="TagArchiveItemBorder"
+                        Height="32"
                         Margin="0,2"
                         Padding="0,4"
                         Background="Transparent"
@@ -524,6 +540,24 @@
                     </Border>
                 </StackPanel>
             </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="1" Height="32">
+            <Button
+                x:Name="SidebarSettingsButton"
+                Width="32"
+                Height="32"
+                Padding="0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Style="{ThemeResource SubtleButtonStyle}"
+                ToolTipService.ToolTip="设置">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE713;" />
+            </Button>
+        </Grid>
+    </Grid>
 </UserControl>

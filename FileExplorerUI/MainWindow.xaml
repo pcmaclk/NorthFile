@@ -14,7 +14,10 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8" Padding="8">
+    <Grid
+        RowDefinitions="Auto,*"
+        RowSpacing="8"
+        Padding="8,8,8,0">
         <Grid
             ColumnDefinitions="Auto,Auto,Auto,Auto,*,280"
             Height="36"
@@ -203,7 +206,7 @@
         </Grid>
 
         <Grid
-            x:Name="ExplorerBodyGrid"
+            x:Name="ExplorerShellGrid"
             Grid.Row="1"
             ColumnSpacing="0">
             <Grid.ColumnDefinitions>
@@ -213,8 +216,7 @@
 
             <Border
                 Grid.Column="0"
-                Background="Transparent"
-                CornerRadius="12">
+                Background="Transparent">
                 <Grid>
                     <local:SidebarView x:Name="StyledSidebarView" />
                     <NavigationView
@@ -232,7 +234,14 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Column="1" Padding="0">
+            <Grid
+                Grid.Column="1"
+                RowDefinitions="*,Auto"
+                Padding="0">
+                <Grid
+                    x:Name="ExplorerBodyGrid"
+                    Grid.Row="0"
+                    Padding="0">
                 <Border
                     Padding="4,8,0,8"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -428,16 +437,6 @@
                     </Grid>
                 </Border>
 
-                <local:ColumnSplitter
-                    x:Name="SidebarSplitter"
-                    Width="8"
-                    Margin="-4,0,0,0"
-                    HorizontalAlignment="Left"
-                    ShowGuide="False"
-                    VerticalAlignment="Stretch"
-                    PointerEntered="ColumnSplitterHover_PointerEntered"
-                    PointerExited="ColumnSplitterHover_PointerExited" />
-
                 <Border
                     x:Name="CommandDockPanel"
                     Width="360"
@@ -498,9 +497,31 @@
                     Click="CommandPeekButton_Click"
                     Content="Commands"
                     Visibility="Collapsed" />
-            </Grid>
-        </Grid>
+                </Grid>
 
-        <TextBlock x:Name="StatusTextBlock" Grid.Row="2" Text="加载中..." TextWrapping="Wrap" />
+                <Grid Grid.Row="1" Height="32">
+                    <TextBlock
+                        x:Name="StatusTextBlock"
+                        Margin="18,0,0,0"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        LineHeight="11"
+                        LineStackingStrategy="BlockLineHeight"
+                        Text="加载中..."
+                        TextWrapping="Wrap" />
+                </Grid>
+            </Grid>
+
+            <local:ColumnSplitter
+                x:Name="SidebarSplitter"
+                Grid.Column="1"
+                Width="8"
+                Margin="-4,0,0,0"
+                HorizontalAlignment="Left"
+                ShowGuide="False"
+                VerticalAlignment="Stretch"
+                PointerEntered="ColumnSplitterHover_PointerEntered"
+                PointerExited="ColumnSplitterHover_PointerExited" />
+        </Grid>
     </Grid>
 </Window>

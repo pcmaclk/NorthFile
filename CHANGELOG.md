@@ -3,7 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-- Week4 in progress.
+
+## [0.1.1] - 2026-03-15
 - WinUI sidebar refactor: pinned/tree/cloud/network/tags groups now use the revised shell styling with collapsible groups.
 - Added "My Computer" home page with drive listing, drive-space columns, root-up navigation, and sidebar/tree selection sync.
 - Refined tree navigation behavior: real expandability detection, separate expand vs navigate handling, and better collapsed-parent selection fallback.
@@ -23,6 +24,12 @@ All notable changes to this project will be documented in this file.
 - Updated "My Computer" icon usage:
   - compact sidebar entry now uses a display icon
   - normal sidebar tree root node now uses a display icon
+- Updated the main window shell layout:
+  - toolbar/address row stays on top
+  - sidebar spans the lower-left column to the bottom
+  - content area and status bar sit on the lower-right side
+  - sidebar bottom row now includes a fixed settings button
+- Added title-bar theme synchronization through `AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode` so Mica-backed title bars follow app light/dark mode correctly.
 - Restored normal-mode pinned header width behavior by returning group headers to stretch alignment outside compact mode.
 - Fixed a regression introduced during the icon refactor:
   - root cause: `SidebarTreeEntry` was temporarily extended to hold a `SolidColorBrush`

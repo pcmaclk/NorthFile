@@ -19,9 +19,9 @@
     <EnableMsixTooling>false</EnableMsixTooling>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.1.0</Version>
-    <InformationalVersion>0.1.0</InformationalVersion>
-    <FileVersion>0.1.0.0</FileVersion>
+    <Version>0.1.1</Version>
+    <InformationalVersion>0.1.1</InformationalVersion>
+    <FileVersion>0.1.1.0</FileVersion>
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
   </PropertyGroup>
 

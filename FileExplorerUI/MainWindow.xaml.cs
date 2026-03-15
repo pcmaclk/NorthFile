@@ -1,4 +1,5 @@
 using FileExplorerUI.Interop;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -52,6 +53,7 @@ namespace FileExplorerUI
         private const double SidebarExpandedMinWidth = 32;
         private const double SidebarCompactWidth = 40;
         private const double SidebarCompactThreshold = SidebarCompactWidth;
+        private const double SidebarCompactExitThreshold = SidebarCompactWidth + 24;
         private const double SidebarSplitterWidth = 0;
         private const double SidebarMinContentWidth = 520;
         private const int SidebarTreeMaxChildren = 5000;
@@ -267,6 +269,10 @@ namespace FileExplorerUI
         public MainWindow()
         {
             InitializeComponent();
+            if (Content is FrameworkElement rootElement)
+            {
+                rootElement.ActualThemeChanged += MainWindowRoot_ActualThemeChanged;
+            }
             PathTextBox.Text = ShellMyComputerPath;
             RegisterColumnSplitterHandlers(HeaderSplitter1);
             RegisterColumnSplitterHandlers(HeaderSplitter2);
@@ -282,12 +288,27 @@ namespace FileExplorerUI
 
             UpdateNavButtonsState();
             this.AppWindow.Title = $"NorthFile | Engine {_engineVersion}";
+            ApplyTitleBarTheme();
             StyledSidebarView.NavigateRequested += StyledSidebarView_NavigateRequested;
             BuildSidebarItems();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
             InstallWindowHook();
             _ = LoadFirstPageAsync();
+        }
+
+        private void MainWindowRoot_ActualThemeChanged(FrameworkElement sender, object args)
+        {
+            ApplyTitleBarTheme();
+        }
+
+        private void ApplyTitleBarTheme()
+        {
+            if (!AppWindowTitleBar.IsCustomizationSupported())
+            {
+                return;
+            }
+            AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
         }
 
         private void RegisterColumnSplitterHandlers(UIElement splitter)
@@ -1160,10 +1181,12 @@ namespace FileExplorerUI
             const string xaml =
                 "<DataTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" " +
                 "xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
-                "<StackPanel Orientation=\"Horizontal\" Spacing=\"6\">" +
-                "<FontIcon FontFamily=\"Segoe Fluent Icons\" FontSize=\"12\" Glyph=\"{Binding Content.IconGlyph}\" />" +
-                "<TextBlock Text=\"{Binding Content.Name}\" TextTrimming=\"CharacterEllipsis\" />" +
+                "<Grid>" +
+                "<StackPanel VerticalAlignment=\"Center\" Orientation=\"Horizontal\" Spacing=\"6\">" +
+                "<FontIcon VerticalAlignment=\"Center\" FontFamily=\"Segoe Fluent Icons\" FontSize=\"12\" Glyph=\"{Binding Content.IconGlyph}\" />" +
+                "<TextBlock VerticalAlignment=\"Center\" Text=\"{Binding Content.Name}\" TextTrimming=\"CharacterEllipsis\" />" +
                 "</StackPanel>" +
+                "</Grid>" +
                 "</DataTemplate>";
 
             return (DataTemplate)XamlReader.Load(xaml);
@@ -1755,12 +1778,12 @@ namespace FileExplorerUI
 
         private void ApplySidebarWidthLayout(double? requestedWidth = null, bool fromUserDrag = false)
         {
-            if (ExplorerBodyGrid is null)
+            if (ExplorerShellGrid is null)
             {
                 return;
             }
 
-            double bodyWidth = ExplorerBodyGrid.ActualWidth;
+            double bodyWidth = ExplorerShellGrid.ActualWidth;
             if (bodyWidth <= 0)
             {
                 SidebarColumnWidth = new GridLength((_sidebarPinnedCompact || _isSidebarCompact) ? SidebarCompactWidth : _sidebarPreferredExpandedWidth);
@@ -1782,7 +1805,9 @@ namespace FileExplorerUI
                 }
             }
 
-            bool forcedCompact = maxSidebarWidth <= SidebarCompactThreshold;
+            bool forcedCompact = _isSidebarCompact
+                ? maxSidebarWidth <= SidebarCompactExitThreshold
+                : maxSidebarWidth <= SidebarCompactThreshold;
             bool compact = forcedCompact || _sidebarPinnedCompact;
             double clampedWidth = Math.Min(_sidebarPreferredExpandedWidth, maxSidebarWidth);
             double finalWidth = compact
@@ -3845,4 +3870,3 @@ namespace FileExplorerUI
     }
 
 }
-

@@ -31,14 +31,14 @@ function Set-Or-CreateNode {
         [string]$Name,
         [string]$Value
     )
-    $node = $Group.$Name
-    if ($null -eq $node) {
+    $existing = $Group.SelectSingleNode($Name)
+    if ($null -eq $existing) {
         $node = $Doc.CreateElement($Name)
         $node.InnerText = $Value
         [void]$Group.AppendChild($node)
     }
     else {
-        $node.InnerText = $Value
+        $existing.InnerText = $Value
     }
 }
 
