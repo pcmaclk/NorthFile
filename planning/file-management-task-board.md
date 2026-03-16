@@ -27,8 +27,18 @@ Deferred:
 - UI code now routes the main Rust/file-system access path through the service layer before FM-01 starts
 - compact sidebar tree menu now uses the same service abstraction as the main window tree
 - 2026-03-15: existing item rename now uses a stabilized name-column overlay editor instead of the old dialog flow, with overlay positioning, custom textbox chrome, Enter/Escape handling, focus recovery tuned for the list surface, in-place left-tree sync for renamed directories, fallback parent-branch refresh only when needed, left-tree-to-right-list rename sync for visible parent folders, a code-created `Canvas + Border + TextBox` rename overlay for regular folder nodes in the left tree, matching editor chrome and sizing between list and tree rename surfaces, text-anchored tree rename positioning, matching context-menu rename support on regular folder nodes in the left tree, and a more stable left-tree overlay sizing/placement pass that waits for the text anchor layout before showing the editor
-- 2026-03-15: FM-01 new file completed with a toolbar entry, context-menu entry, service-backed empty-file creation, local row insertion, and inline rename
-- 2026-03-15: FM-02 new folder completed with shared inline naming flow, service-backed folder creation, local folder row insertion, and tree/list refresh alignment
+- 2026-03-15: FM-01 new file completed with a toolbar entry, context-menu entry, service-backed empty-file creation, local row insertion, and immediate entry into the main list rename overlay
+- 2026-03-15: FM-02 new folder completed with shared overlay naming flow, service-backed folder creation, local folder row insertion, and tree/list refresh alignment
+- 2026-03-16: create-then-rename flow was tightened to avoid a redundant second list scroll before opening the rename overlay
+- 2026-03-16: create flow now uses a temporary local row in the current viewport, enters rename immediately, and only commits to the final sorted slot after the user confirms the name
+- 2026-03-16: list item transitions were disabled for the main list, and temporary create insertion now keys off the current visible viewport instead of the previous selection
+- 2026-03-16: pending create rows now finalize by mutating the existing row model in place instead of swapping the row object, to reduce post-confirm visual jump
+- 2026-03-16: create flow now explicitly reselects the new row both before and after commit so the created item remains selected
+- 2026-03-16: rename overlay startup now skips redundant list reselection when the target item is already selected, so create/rename debugging can isolate overlay positioning and scroll effects from selection churn
+- 2026-03-16: right-side list selection-state debugging continues with the built-in `ListView` selection visuals only; custom row-selection chrome was removed after it duplicated the native indicator
+- 2026-03-16: right-side rename completion now relies on the selected-path restore already performed by the refresh pipeline, instead of applying an extra explicit reselection after refresh
+- 2026-03-16: right-side rename of existing rows now stays local to the visible list row and no longer forces a full current-directory reload at rename completion
+- 2026-03-16: right-side rename completion now explicitly returns focus to the file list so Enter-submit does not bounce focus into the toolbar
 
 ## Execution Order
 
@@ -237,3 +247,15 @@ Reason:
 - smallest surface area
 - reuses current rename flow
 - gives a reusable inline creation pattern for later operations
+
+## Current Notes
+
+- FM-01/FM-02 currently use a real-position pending row plus rename overlay.
+- After create success, list selection should be applied at the end of the UI tick so post-create tree sync does not clear the visible highlight.
+- Existing-item rename should mutate the current row model in place instead of replacing it, otherwise list selection is lost after commit.
+- If rename selection is still unstable, prefer reloading the current directory and reselecting by final path over layering more local selection state.
+- Right-side list selection should converge on a selected-path state so refresh and reorder scenarios recover selection deterministically.
+- New file/new folder should ensure the final insert position is visible before showing rename, not just assume the current viewport already contains it.
+- If the rename overlay cannot position because the new row starts off-screen, retry once after `ScrollIntoView` instead of silently leaving the pending item without edit mode.
+- Current create flow should use a real created item plus follow-up rename, not a pending placeholder row.
+- For off-screen create targets, move the viewport before insertion; for on-screen create targets, clear the old selection before insert so the new row becomes the only highlighted item.

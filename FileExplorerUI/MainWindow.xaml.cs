@@ -189,6 +189,7 @@ namespace FileExplorerUI
         private bool _entriesFlyoutOpen;
         private bool _entriesPointerHooked;
         private string _currentPath = ShellMyComputerPath;
+        private string? _selectedEntryPath;
         private uint _currentPageSize = InitialPageSize;
         private uint _lastFetchMs;
         private uint _totalEntries;
@@ -715,18 +716,28 @@ namespace FileExplorerUI
             }
 
             string initialName = GenerateUniqueNewFileName();
-            string fullPath = Path.Combine(_currentPath, initialName);
+            string targetPath = Path.Combine(_currentPath, initialName);
 
             try
             {
-                await _explorerService.CreateEmptyFileAsync(fullPath);
-                EntryViewModel entry = InsertLocalCreatedEntry(initialName, isDirectory: false);
-                await PromptRenameCreatedEntryAsync(entry);
+                await _explorerService.CreateEmptyFileAsync(targetPath);
+                try
+                {
+                    _explorerService.MarkPathChanged(_currentPath);
+                }
+                catch
+                {
+                    EnsureRefreshFallbackInvalidation(_currentPath, "create-file");
+                }
+
+                EntryViewModel entry = CreateLocalCreatedEntryModel(initialName, isDirectory: false);
+                int insertIndex = FindInsertIndexForEntry(entry);
+                InsertLocalCreatedEntry(entry, insertIndex);
                 UpdateStatus($"Create success: {initialName}");
             }
             catch (Exception ex)
             {
-                UpdateStatus($"New file failed: {ex.Message}");
+                UpdateStatus($"Create failed: {ex.Message}");
             }
         }
 
@@ -745,19 +756,28 @@ namespace FileExplorerUI
             }
 
             string initialName = GenerateUniqueNewFolderName();
-            string fullPath = Path.Combine(_currentPath, initialName);
+            string targetPath = Path.Combine(_currentPath, initialName);
 
             try
             {
-                await _explorerService.CreateDirectoryAsync(fullPath);
-                EntryViewModel entry = InsertLocalCreatedEntry(initialName, isDirectory: true);
-                await PromptRenameCreatedEntryAsync(entry);
-                _ = SelectSidebarTreePathAsync(_currentPath);
+                await _explorerService.CreateDirectoryAsync(targetPath);
+                try
+                {
+                    _explorerService.MarkPathChanged(_currentPath);
+                }
+                catch
+                {
+                    EnsureRefreshFallbackInvalidation(_currentPath, "create-folder");
+                }
+
+                EntryViewModel entry = CreateLocalCreatedEntryModel(initialName, isDirectory: true);
+                int insertIndex = FindInsertIndexForEntry(entry);
+                InsertLocalCreatedEntry(entry, insertIndex);
                 UpdateStatus($"Create success: {initialName}");
             }
             catch (Exception ex)
             {
-                UpdateStatus($"New folder failed: {ex.Message}");
+                UpdateStatus($"Create failed: {ex.Message}");
             }
         }
 
@@ -1037,6 +1057,10 @@ namespace FileExplorerUI
                 _totalEntries = page.TotalEntries;
                 EnsurePlaceholderCount((int)_totalEntries);
                 FillPageRows((int)cursor, page.Rows);
+                if (!append)
+                {
+                    RestoreListSelectionByPath(ensureVisible: false);
+                }
                 RequestMetadataForCurrentViewport();
 
                 _nextCursor = page.NextCursor;
@@ -1644,6 +1668,7 @@ namespace FileExplorerUI
         private void PopulateMyComputerEntries()
         {
             _entries.Clear();
+            _selectedEntryPath = null;
             foreach (DriveInfo drive in _explorerService.GetReadyDrives())
             {
                 string root = drive.RootDirectory.FullName;
@@ -3060,9 +3085,9 @@ namespace FileExplorerUI
             return candidate;
         }
 
-        private EntryViewModel InsertLocalCreatedEntry(string name, bool isDirectory)
+        private EntryViewModel CreateLocalCreatedEntryModel(string name, bool isDirectory)
         {
-            var entry = new EntryViewModel
+            return new EntryViewModel
             {
                 Name = name,
                 PendingName = name,
@@ -3078,15 +3103,166 @@ namespace FileExplorerUI
                 IsLoaded = true,
                 IsMetadataLoaded = true
             };
+        }
 
-            int insertIndex = FindInsertIndexForEntry(entry);
+        private EntryViewModel InsertLocalCreatedEntry(EntryViewModel entry, int insertIndex)
+        {
             _entries.Insert(insertIndex, entry);
             _totalEntries++;
             _hasMore = _nextCursor < _totalEntries;
             this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Items: {_entries.Count}";
-            EntriesListView.SelectedItem = entry;
-            EntriesListView.ScrollIntoView(entry);
             return entry;
+        }
+
+        private void SelectEntryInList(EntryViewModel entry, bool ensureVisible)
+        {
+            _selectedEntryPath = entry.FullPath;
+            EntriesListView.SelectedItem = entry;
+            if (ensureVisible)
+            {
+                EntriesListView.ScrollIntoView(entry);
+            }
+        }
+
+        private void RestoreListSelectionByPath(bool ensureVisible)
+        {
+            if (string.IsNullOrWhiteSpace(_selectedEntryPath))
+            {
+                EntriesListView.SelectedItem = null;
+                return;
+            }
+
+            SelectEntryByPath(_selectedEntryPath, ensureVisible);
+        }
+
+        private void SelectEntryByPath(string targetPath, bool ensureVisible)
+        {
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (string.Equals(_entries[i].FullPath, targetPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    SelectEntryInList(_entries[i], ensureVisible);
+                    return;
+                }
+            }
+        }
+
+        private void EntriesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (EntriesListView.SelectedItem is EntryViewModel entry)
+            {
+                _selectedEntryPath = entry.FullPath;
+            }
+            else if (!_isLoading)
+            {
+                _selectedEntryPath = null;
+            }
+        }
+
+        private int GetCreateInsertIndex()
+        {
+            if (_listScrollViewer is not null && _entries.Count > 0)
+            {
+                int visibleEnd = EstimateViewportBottomIndex(_listScrollViewer);
+                return Math.Min(Math.Max(0, visibleEnd + 1), _entries.Count);
+            }
+
+            int loadedCount = 0;
+            while (loadedCount < _entries.Count && _entries[loadedCount].IsLoaded)
+            {
+                loadedCount++;
+            }
+
+            return loadedCount;
+        }
+
+        private async Task EnsureCreateInsertVisibleAsync(int insertIndex)
+        {
+            if (_entries.Count == 0)
+            {
+                return;
+            }
+
+            _listScrollViewer ??= FindDescendant<ScrollViewer>(EntriesListView);
+            if (_listScrollViewer is null)
+            {
+                int anchorIndex = Math.Clamp(insertIndex <= 0 ? 0 : insertIndex - 1, 0, _entries.Count - 1);
+                EntriesListView.ScrollIntoView(_entries[anchorIndex]);
+                await Task.Delay(16);
+                EntriesListView.UpdateLayout();
+                return;
+            }
+
+            await EnsureDataForIndexAsync(insertIndex);
+            EntriesListView.UpdateLayout();
+
+            int visibleCount = Math.Max(1, (int)Math.Ceiling(_listScrollViewer.ViewportHeight / _estimatedItemHeight));
+            int visibleStart = EstimateViewportIndex(_listScrollViewer);
+            int visibleEnd = Math.Min(_entries.Count - 1, visibleStart + visibleCount - 1);
+
+            if (insertIndex >= visibleStart && insertIndex <= visibleEnd)
+            {
+                return;
+            }
+
+            int desiredTopIndex;
+            if (insertIndex > visibleEnd)
+            {
+                desiredTopIndex = Math.Max(0, insertIndex - visibleCount + 1);
+            }
+            else
+            {
+                desiredTopIndex = insertIndex;
+            }
+
+            double targetOffset = desiredTopIndex * _estimatedItemHeight;
+            _listScrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
+            await Task.Delay(16);
+            EntriesListView.UpdateLayout();
+        }
+
+        private bool IsIndexInCurrentViewport(int index)
+        {
+            if (index < 0 || index >= _entries.Count)
+            {
+                return false;
+            }
+
+            _listScrollViewer ??= FindDescendant<ScrollViewer>(EntriesListView);
+            if (_listScrollViewer is null)
+            {
+                return false;
+            }
+
+            EntriesListView.UpdateLayout();
+            int visibleCount = Math.Max(1, (int)Math.Ceiling(_listScrollViewer.ViewportHeight / _estimatedItemHeight));
+            int visibleStart = EstimateViewportIndex(_listScrollViewer);
+            int visibleEnd = Math.Min(_entries.Count - 1, visibleStart + visibleCount - 1);
+            return index >= visibleStart && index <= visibleEnd;
+        }
+
+        private void ClearListSelection()
+        {
+            _selectedEntryPath = null;
+            EntriesListView.SelectedItem = null;
+        }
+
+        private async Task<bool> StartRenameForCreatedEntryAsync(EntryViewModel entry, int insertIndex)
+        {
+            SelectEntryInList(entry, ensureVisible: false);
+            await Task.Delay(16);
+            EntriesListView.UpdateLayout();
+
+            bool renameStarted = await BeginRenameOverlayAsync(entry, ensureVisible: false, updateSelection: false);
+            if (renameStarted)
+            {
+                return true;
+            }
+
+            EntriesListView.ScrollIntoView(entry);
+            await Task.Delay(16);
+            EntriesListView.UpdateLayout();
+            return await BeginRenameOverlayAsync(entry, ensureVisible: false, updateSelection: false);
         }
 
         private int FindInsertIndexForEntry(EntryViewModel entry)
@@ -3124,11 +3300,18 @@ namespace FileExplorerUI
             return StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
         }
 
-        private async Task BeginRenameOverlayAsync(EntryViewModel entry)
+        private async Task<bool> BeginRenameOverlayAsync(EntryViewModel entry, bool ensureVisible = true, bool updateSelection = true)
         {
             HideRenameOverlay();
-            EntriesListView.SelectedItem = entry;
-            EntriesListView.ScrollIntoView(entry);
+            bool alreadySelected =
+                ReferenceEquals(EntriesListView.SelectedItem, entry) ||
+                string.Equals(_selectedEntryPath, entry.FullPath, StringComparison.OrdinalIgnoreCase);
+
+            if (updateSelection && !alreadySelected)
+            {
+                SelectEntryInList(entry, ensureVisible);
+            }
+            bool scrolledIntoViewForRetry = false;
 
             for (int attempt = 0; attempt < 4; attempt++)
             {
@@ -3136,6 +3319,11 @@ namespace FileExplorerUI
                 EntriesListView.UpdateLayout();
                 if (!TryPositionRenameOverlay(entry))
                 {
+                    if (!scrolledIntoViewForRetry && attempt >= 1)
+                    {
+                        scrolledIntoViewForRetry = true;
+                        EntriesListView.ScrollIntoView(entry);
+                    }
                     continue;
                 }
 
@@ -3144,10 +3332,11 @@ namespace FileExplorerUI
                 RenameOverlayBorder.Visibility = Visibility.Visible;
                 RenameOverlayTextBox.Focus(FocusState.Programmatic);
                 RenameOverlayTextBox.SelectAll();
-                return;
+                return true;
             }
 
             UpdateStatus("Rename failed: could not start inline editor.");
+            return false;
         }
 
         private bool TryPositionRenameOverlay(EntryViewModel entry)
@@ -3204,10 +3393,34 @@ namespace FileExplorerUI
             {
                 EntryViewModel entry = _activeRenameOverlayEntry;
                 string proposedName = RenameOverlayTextBox.Text?.Trim() ?? string.Empty;
+                int index = _entries.IndexOf(entry);
+
+                if (entry.IsPendingCreate)
+                {
+                    if (string.IsNullOrWhiteSpace(proposedName))
+                    {
+                        CancelPendingCreateEntry(index);
+                        HideRenameOverlay();
+                        FocusEntriesList();
+                        return;
+                    }
+
+                    if (!TryValidateCreateOrRenameName(entry, proposedName, out string pendingValidationError))
+                    {
+                        UpdateStatus(pendingValidationError);
+                        RenameOverlayTextBox.Focus(FocusState.Programmatic);
+                        RenameOverlayTextBox.SelectAll();
+                        return;
+                    }
+
+                    await CommitPendingCreateAsync(entry, index, proposedName);
+                    return;
+                }
+
                 if (string.Equals(proposedName, entry.Name, StringComparison.Ordinal))
                 {
                     HideRenameOverlay();
-                    FocusEntriesList();
+                    _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
                     return;
                 }
 
@@ -3219,11 +3432,9 @@ namespace FileExplorerUI
                     return;
                 }
 
-                int index = _entries.IndexOf(entry);
                 if (index < 0)
                 {
                     HideRenameOverlay();
-                    FocusEntriesList();
                     return;
                 }
 
@@ -3233,6 +3444,79 @@ namespace FileExplorerUI
             {
                 _isCommittingRenameOverlay = false;
             }
+        }
+
+        private async Task CommitPendingCreateAsync(EntryViewModel entry, int index, string proposedName)
+        {
+            string targetPath = Path.Combine(_currentPath, proposedName);
+            try
+            {
+                if (entry.PendingCreateIsDirectory)
+                {
+                    await _explorerService.CreateDirectoryAsync(targetPath);
+                }
+                else
+                {
+                    await _explorerService.CreateEmptyFileAsync(targetPath);
+                }
+
+                try
+                {
+                    _explorerService.MarkPathChanged(_currentPath);
+                }
+                catch
+                {
+                    EnsureRefreshFallbackInvalidation(_currentPath, entry.PendingCreateIsDirectory ? "create-folder" : "create-file");
+                }
+
+                HideRenameOverlay();
+
+                if (index < 0 || index >= _entries.Count)
+                {
+                    return;
+                }
+
+                entry.Name = proposedName;
+                entry.PendingName = proposedName;
+                entry.FullPath = targetPath;
+                entry.Type = GetEntryTypeText(proposedName, entry.PendingCreateIsDirectory, isLink: false);
+                entry.IconGlyph = GetEntryIconGlyph(entry.PendingCreateIsDirectory, isLink: false, proposedName);
+                entry.IconForeground = GetEntryIconBrush(entry.PendingCreateIsDirectory, isLink: false, proposedName);
+                entry.SizeText = entry.PendingCreateIsDirectory ? string.Empty : "0 B";
+                entry.ModifiedText = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                entry.IsPendingCreate = false;
+                entry.MftRef = 0;
+                entry.IsLoaded = true;
+                entry.IsMetadataLoaded = true;
+
+                if (entry.PendingCreateIsDirectory && FindSidebarTreeNodeByPath(_currentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
+                {
+                    await PopulateSidebarTreeChildrenAsync(parentNode, _currentPath, CancellationToken.None, expandAfterLoad: true);
+                }
+
+                UpdateStatus($"Create success: {proposedName}");
+                _ = DispatcherQueue.TryEnqueue(() =>
+                {
+                    SelectEntryInList(entry, ensureVisible: true);
+                    FocusEntriesList();
+                });
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Create failed: {ex.Message}");
+                RenameOverlayTextBox.Focus(FocusState.Programmatic);
+                RenameOverlayTextBox.SelectAll();
+            }
+        }
+
+        private void CancelPendingCreateEntry(int index)
+        {
+            if (index < 0 || index >= _entries.Count)
+            {
+                return;
+            }
+
+            _entries.RemoveAt(index);
         }
 
         private void HideRenameOverlay()
@@ -3540,29 +3824,6 @@ namespace FileExplorerUI
             return true;
         }
 
-        private async Task PromptRenameCreatedEntryAsync(EntryViewModel entry)
-        {
-            string? proposedName = await PromptRenameAsync(entry.Name);
-            if (string.IsNullOrWhiteSpace(proposedName) || string.Equals(proposedName, entry.Name, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            if (!TryValidateCreateOrRenameName(entry, proposedName, out string validationError))
-            {
-                UpdateStatus(validationError);
-                return;
-            }
-
-            int index = _entries.IndexOf(entry);
-            if (index < 0)
-            {
-                return;
-            }
-
-            await RenameEntryAsync(entry, index, proposedName);
-        }
-
         private void ApplyLocalRename(int index, string newName)
         {
             if (index < 0 || index >= _entries.Count)
@@ -3571,25 +3832,13 @@ namespace FileExplorerUI
             }
 
             EntryViewModel current = _entries[index];
-            _entries[index] = new EntryViewModel
-            {
-                Name = newName,
-                PendingName = newName,
-                FullPath = Path.Combine(_currentPath, newName),
-                Type = current.Type,
-                IconGlyph = current.IconGlyph,
-                IconForeground = current.IconForeground,
-                MftRef = current.MftRef,
-                SizeText = string.Empty,
-                ModifiedText = string.Empty,
-                IsDirectory = current.IsDirectory,
-                IsLink = current.IsLink,
-                IsLoaded = true,
-                IsMetadataLoaded = false
-            };
-            HideRenameOverlay();
-            EntriesListView.SelectedItem = _entries[index];
-            EntriesListView.ScrollIntoView(_entries[index]);
+            current.Name = newName;
+            current.PendingName = newName;
+            current.FullPath = Path.Combine(_currentPath, newName);
+            current.SizeText = string.Empty;
+            current.ModifiedText = string.Empty;
+            current.IsLoaded = true;
+            current.IsMetadataLoaded = false;
             RequestMetadataForCurrentViewport();
         }
 
@@ -3618,27 +3867,13 @@ namespace FileExplorerUI
 
             EntryViewModel current = _entries[index];
             bool wasSelected = ReferenceEquals(EntriesListView.SelectedItem, current);
-            _entries[index] = new EntryViewModel
-            {
-                Name = newName,
-                PendingName = newName,
-                FullPath = Path.Combine(_currentPath, newName),
-                Type = current.Type,
-                IconGlyph = current.IconGlyph,
-                IconForeground = current.IconForeground,
-                MftRef = current.MftRef,
-                SizeText = current.SizeText,
-                ModifiedText = current.ModifiedText,
-                IsDirectory = current.IsDirectory,
-                IsLink = current.IsLink,
-                IsLoaded = current.IsLoaded,
-                IsMetadataLoaded = current.IsMetadataLoaded
-            };
+            current.Name = newName;
+            current.PendingName = newName;
+            current.FullPath = Path.Combine(_currentPath, newName);
 
             if (wasSelected)
             {
-                EntriesListView.SelectedItem = _entries[index];
-                EntriesListView.ScrollIntoView(_entries[index]);
+                _ = DispatcherQueue.TryEnqueue(() => SelectEntryInList(current, ensureVisible: true));
             }
         }
 
@@ -3647,6 +3882,12 @@ namespace FileExplorerUI
             if (index < 0 || index >= _entries.Count)
             {
                 return;
+            }
+
+            if (ReferenceEquals(EntriesListView.SelectedItem, _entries[index]))
+            {
+                _selectedEntryPath = null;
+                EntriesListView.SelectedItem = null;
             }
 
             _entries.RemoveAt(index);
@@ -3700,8 +3941,7 @@ namespace FileExplorerUI
             if (item?.DataContext is EntryViewModel tappedEntry)
             {
                 row = tappedEntry;
-                EntriesListView.SelectedItem = tappedEntry;
-                item.IsSelected = true;
+                SelectEntryInList(tappedEntry, ensureVisible: false);
             }
             else
             {
@@ -3752,8 +3992,7 @@ namespace FileExplorerUI
 
             if (item?.DataContext is EntryViewModel entry)
             {
-                EntriesListView.SelectedItem = entry;
-                item.IsSelected = true;
+                SelectEntryInList(entry, ensureVisible: false);
             }
         }
 
@@ -3764,12 +4003,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            EntriesListView.SelectedItem = entry;
-
-            if (FindAncestor<ListViewItem>(row) is ListViewItem item)
-            {
-                item.IsSelected = true;
-            }
+            SelectEntryInList(entry, ensureVisible: false);
         }
 
         private void EntriesListView_PointerPressedPreview(object sender, PointerRoutedEventArgs e)
@@ -3789,8 +4023,7 @@ namespace FileExplorerUI
                                  ?? FindAncestor<ListViewItem>(e.OriginalSource as DependencyObject);
             if (item?.DataContext is EntryViewModel entry)
             {
-                EntriesListView.SelectedItem = entry;
-                item.IsSelected = true;
+                SelectEntryInList(entry, ensureVisible: false);
             }
 
             EntriesContextFlyout.Hide();
@@ -4213,13 +4446,14 @@ namespace FileExplorerUI
         {
             string src = Path.Combine(_currentPath, entry.Name);
             string dst = Path.Combine(_currentPath, newName);
+            string oldName = entry.Name;
             TreeViewNode? renamedTreeNode = entry.IsDirectory ? FindSidebarTreeNodeByPath(src) : null;
             try
             {
                 await _explorerService.RenamePathAsync(src, dst);
                 RenameTextBox.Text = string.Empty;
                 HideRenameOverlay();
-                ApplyLocalRename(selectedIndex, newName);
+                _selectedEntryPath = dst;
                 try
                 {
                     _explorerService.MarkPathChanged(_currentPath);
@@ -4239,8 +4473,9 @@ namespace FileExplorerUI
                         await PopulateSidebarTreeChildrenAsync(parentNode, _currentPath, CancellationToken.None, expandAfterLoad: true);
                     }
                 }
-                UpdateStatus($"Rename success: {entry.Name} -> {newName}");
+                ApplyLocalRename(selectedIndex, newName);
                 _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                UpdateStatus($"Rename success: {oldName} -> {newName}");
             }
             catch (Exception ex)
             {
@@ -4582,6 +4817,9 @@ namespace FileExplorerUI
         private bool _isLink;
         private bool _isLoaded;
         private bool _isMetadataLoaded;
+        private bool _isPendingCreate;
+        private bool _pendingCreateIsDirectory;
+        private bool _isExplicitlySelected;
         private string _pendingName = string.Empty;
         private bool _isNameEditing;
 
@@ -4755,6 +4993,50 @@ namespace FileExplorerUI
             }
         }
 
+        public bool IsPendingCreate
+        {
+            get => _isPendingCreate;
+            set
+            {
+                if (_isPendingCreate == value)
+                {
+                    return;
+                }
+                _isPendingCreate = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsPendingCreate)));
+            }
+        }
+
+        public bool PendingCreateIsDirectory
+        {
+            get => _pendingCreateIsDirectory;
+            set
+            {
+                if (_pendingCreateIsDirectory == value)
+                {
+                    return;
+                }
+                _pendingCreateIsDirectory = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PendingCreateIsDirectory)));
+            }
+        }
+
+        public bool IsExplicitlySelected
+        {
+            get => _isExplicitlySelected;
+            set
+            {
+                if (_isExplicitlySelected == value)
+                {
+                    return;
+                }
+                _isExplicitlySelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExplicitlySelected)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowBackground)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowSelectionIndicatorVisibility)));
+            }
+        }
+
         public string PendingName
         {
             get => _pendingName;
@@ -4799,6 +5081,12 @@ namespace FileExplorerUI
         public Visibility NameDisplayVisibility => _isNameEditing ? Visibility.Collapsed : Visibility.Visible;
 
         public Visibility NameEditorVisibility => _isNameEditing ? Visibility.Visible : Visibility.Collapsed;
+
+        public Brush RowBackground => _isExplicitlySelected
+            ? new SolidColorBrush(ColorHelper.FromArgb(0x14, 0x80, 0x80, 0x80))
+            : new SolidColorBrush(Colors.Transparent);
+
+        public Visibility RowSelectionIndicatorVisibility => _isExplicitlySelected ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public sealed class BreadcrumbItemViewModel : INotifyPropertyChanged

@@ -375,6 +375,7 @@
                             Background="Transparent"
                             DoubleTapped="EntriesListView_DoubleTapped"
                             ContextRequested="EntriesListView_ContextRequested"
+                            ItemContainerTransitions="{x:Null}"
                             IsItemClickEnabled="False"
                             Loaded="EntriesListView_Loaded"
                             Padding="0"
@@ -382,6 +383,7 @@
                             ScrollViewer.HorizontalScrollMode="Enabled"
                             ScrollViewer.VerticalScrollBarVisibility="Visible"
                             ScrollViewer.VerticalScrollMode="Enabled"
+                            SelectionChanged="EntriesListView_SelectionChanged"
                             SelectionMode="Single">
                             <ListView.ItemContainerStyle>
                                 <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">

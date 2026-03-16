@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Right-side rename now returns focus to the file list after successful or no-op completion, preventing Enter-submit from bouncing focus to the toolbar back button.
+- Right-side rename of existing items now updates the visible row in place instead of reloading the entire current page, avoiding the double-jump behavior seen at rename completion.
+- Removed the extra post-refresh reselection step after right-side rename; the list now relies on the selected-path restore already performed inside the refresh path, reducing duplicate jump behavior when rename ends.
+- Right-side list selection continues to use the built-in `ListView` selection visuals; custom row-selection chrome was dropped to avoid duplicate indicators while selection-state debugging continues.
+- Recorded native Windows shell context-menu integration as a deferred explorer-experience item; the current release continues to use the app's custom list context menu while rename/create work remains the priority.
+- Right-side rename overlay startup no longer reapplies list selection when the target row is already selected, reducing extra selection churn during context-menu rename and create-then-rename experiments.
 - Fixed a WinUI XAML compile regression in the rename overlay editor by simplifying the overlay host back to a minimal safe shape.
 - Added a shared `ExplorerService` layer so the main window now calls a dedicated service for directory reads, search reads, tree loading, breadcrumb directory lookup, rename/delete, and USN/cache operations instead of calling Rust/file-system APIs inline.
 - Moved compact sidebar tree flyout directory enumeration onto the same `ExplorerService` abstraction so sidebar navigation and the main explorer surface now share one backend access path.
@@ -21,6 +27,13 @@ All notable changes to this project will be documented in this file.
   - left-tree rename no longer uses a modal dialog and now edits through a code-created `Canvas + Border + TextBox` overlay anchored to the tree item text
   - left-tree rename overlay now uses the same white-box, thin-border editor chrome as the main list rename overlay
   - left-tree rename editor dimensions and positioning now follow the tree item's text block instead of the whole node container
+  - new file and new folder now enter the same list rename overlay immediately after creation instead of going through the old rename dialog
+  - creating a folder now also refreshes the expanded current branch in the left tree before entering rename
+  - create-then-rename now avoids a second forced list scroll before showing the overlay, reducing the visible list jump
+  - new file and new folder now start from a temporary row inserted directly at the final sorted position, enter rename there immediately, and convert that row in place after the user confirms the name
+  - the main list now disables item-container transitions during file operations so temporary and committed create rows do not animate in
+  - pending create rows now finalize in place by updating the existing view-model instead of replacing the row object, reducing the small jump after Enter
+  - new rows are now explicitly reselected after insertion and after pending-create commit so the created item stays selected through the whole flow
   - left-tree rename overlay now waits briefly for tree-item layout, reuses the same lightweight textbox template as the list rename overlay, and clamps editor width to the visible sidebar surface so the inline editor opens reliably
 - Added FM-01 new-file support with:
   - a top toolbar entry and list context-menu entry
@@ -34,6 +47,17 @@ All notable changes to this project will be documented in this file.
   - reuse of the same immediate rename prompt introduced for new files
   - local folder row insertion with selection retention
   - sidebar tree refresh alignment after folder create/rename
+
+## [Unreleased]
+- File-management create flow now reapplies list selection on the final UI tick after create success so tree sync and status updates do not clear the new-item highlight.
+- List rename now updates the existing row model in place and reapplies selection after commit so the renamed item stays selected.
+- Right-side rename now refreshes the current directory and reselects the renamed path after reload so selection follows the final list state.
+- Right-side list selection is now being normalized toward a selected-path model so refresh, rename, and create flows can restore selection from path instead of row instance identity.
+- Create flows now scroll the final insert position into view before opening the rename overlay when the new row would otherwise land outside the current viewport.
+- Inline rename overlay now does one fallback `ScrollIntoView` retry when the target row is initially outside the viewport, so create-then-rename still starts for off-screen insert positions.
+- New file/new folder now create the real filesystem item first, then open rename on that created item instead of using a pending placeholder state.
+- Create flows now retry inline rename once after an explicit `ScrollIntoView` if the first overlay start fails, and right-side rename no longer forces focus back to the list after commit.
+- Create flows now scroll the final insert region into view before inserting off-screen items, and clear the old list selection before insert to avoid transient highlight jumps.
 
 ## [0.1.1] - 2026-03-15
 - WinUI sidebar refactor: pinned/tree/cloud/network/tags groups now use the revised shell styling with collapsible groups.

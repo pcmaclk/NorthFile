@@ -55,6 +55,7 @@ Build NorthFile into a stable Windows desktop file manager with:
 - User-defined pinned items
 - Functional cloud / network / tags sections
 - Richer context menu and shortcuts
+- Optional native Windows shell context-menu integration for file, folder, and background surfaces
 - Settings page for theme, startup page, behavior, and performance options
 
 ## P2 Engineering and Release
