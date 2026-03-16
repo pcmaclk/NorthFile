@@ -28,7 +28,8 @@ namespace FileExplorerUI
         {
             None,
             NewFile,
-            NewFolder
+            NewFolder,
+            Paste
         }
 
         private GridLength _nameColumnWidth = new(220);
@@ -58,6 +59,9 @@ namespace FileExplorerUI
         private bool _suppressSidebarNavSelection;
         private EntryViewModel? _pendingContextRenameEntry;
         private PendingEntriesContextAction _pendingEntriesContextAction = PendingEntriesContextAction.None;
+        private EntryViewModel? _entriesContextEntry;
+        private bool _entriesContextTargetIsItem;
+        private EntryViewModel? _lastEntriesContextItem;
         private MenuFlyout? _sidebarTreeContextFlyout;
         private SidebarTreeEntry? _pendingSidebarTreeContextEntry;
         private Canvas? _sidebarTreeRenameOverlayCanvas;
@@ -209,6 +213,7 @@ namespace FileExplorerUI
         private readonly Stack<string> _forwardStack = new();
         private string _currentQuery = string.Empty;
         private readonly ExplorerService _explorerService = new();
+        private readonly FileManagementCoordinator _fileManagementCoordinator;
         private readonly HashSet<string> _suppressedWatcherRefreshPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly string _engineVersion;
         private EntryViewModel? _activeRenameOverlayEntry;
@@ -298,6 +303,7 @@ namespace FileExplorerUI
         public MainWindow()
         {
             InitializeComponent();
+            _fileManagementCoordinator = new FileManagementCoordinator(_explorerService);
             if (Content is FrameworkElement rootElement)
             {
                 rootElement.ActualThemeChanged += MainWindowRoot_ActualThemeChanged;
@@ -660,28 +666,200 @@ namespace FileExplorerUI
 
         private void RenameButton_Click(object sender, RoutedEventArgs e)
         {
-            if (EntriesListView.SelectedItem is not EntryViewModel entry || !entry.IsLoaded)
-            {
-                UpdateStatus("Rename failed: select a loaded entry first.");
-                return;
-            }
-            int selectedIndex = EntriesListView.SelectedIndex;
-            if (selectedIndex < 0 || selectedIndex >= _entries.Count)
-            {
-                UpdateStatus("Rename failed: invalid selected index.");
-                return;
-            }
-
-            _ = BeginRenameOverlayAsync(entry);
+            _ = ExecuteRenameSelectedAsync();
         }
 
         private async void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
-            if (EntriesListView.SelectedItem is not EntryViewModel entry || !entry.IsLoaded)
+            await ExecuteDeleteSelectedAsync();
+        }
+
+        private async void NewFileButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ExecuteNewFileAsync();
+        }
+
+        private async void NewFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ExecuteNewFolderAsync();
+        }
+
+        private void CopyButton_Click(object sender, RoutedEventArgs e)
+        {
+            ExecuteCopy();
+        }
+
+        private void CutButton_Click(object sender, RoutedEventArgs e)
+        {
+            ExecuteCut();
+        }
+
+        private async void PasteButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ExecutePasteAsync();
+        }
+
+        private bool TryGetSelectedLoadedEntry(out EntryViewModel entry)
+        {
+            if (EntriesListView.SelectedItem is EntryViewModel selected && selected.IsLoaded)
+            {
+                entry = selected;
+                return true;
+            }
+
+            entry = null!;
+            return false;
+        }
+
+        private bool CanPasteIntoCurrentDirectory()
+        {
+            return !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase)
+                   && _explorerService.DirectoryExists(_currentPath);
+        }
+
+        private bool CanCreateInCurrentDirectory()
+        {
+            return CanPasteIntoCurrentDirectory();
+        }
+
+        private bool CanCopySelectedEntry()
+        {
+            return TryGetSelectedLoadedEntry(out _);
+        }
+
+        private bool CanCutSelectedEntry()
+        {
+            return TryGetSelectedLoadedEntry(out _);
+        }
+
+        private bool CanRenameSelectedEntry()
+        {
+            if (!TryGetSelectedLoadedEntry(out _))
+            {
+                return false;
+            }
+
+            int selectedIndex = EntriesListView.SelectedIndex;
+            return selectedIndex >= 0 && selectedIndex < _entries.Count;
+        }
+
+        private bool CanDeleteSelectedEntry()
+        {
+            if (!TryGetSelectedLoadedEntry(out _))
+            {
+                return false;
+            }
+
+            int selectedIndex = EntriesListView.SelectedIndex;
+            return selectedIndex >= 0 && selectedIndex < _entries.Count;
+        }
+
+        private void UpdateFileCommandStates()
+        {
+            bool canCreate = CanCreateInCurrentDirectory();
+            bool canRename = CanRenameSelectedEntry();
+            bool canDelete = CanDeleteSelectedEntry();
+            bool canCopy = CanCopySelectedEntry();
+            bool canCut = CanCutSelectedEntry();
+            bool canPaste = CanPasteIntoCurrentDirectory() && _fileManagementCoordinator.HasClipboardItems;
+
+            if (NewFileButton is not null)
+            {
+                NewFileButton.IsEnabled = canCreate;
+            }
+
+            if (NewFolderButton is not null)
+            {
+                NewFolderButton.IsEnabled = canCreate;
+            }
+
+            if (RenameButton is not null)
+            {
+                RenameButton.IsEnabled = canRename;
+            }
+
+            if (DeleteButton is not null)
+            {
+                DeleteButton.IsEnabled = canDelete;
+            }
+
+            if (CopyButton is not null)
+            {
+                CopyButton.IsEnabled = canCopy;
+            }
+
+            if (CutButton is not null)
+            {
+                CutButton.IsEnabled = canCut;
+            }
+
+            if (PasteButton is not null)
+            {
+                PasteButton.IsEnabled = canPaste;
+            }
+        }
+
+        private Task ExecuteNewFileAsync()
+        {
+            return ExecuteNewEntryAsync(isDirectory: false);
+        }
+
+        private Task ExecuteNewFolderAsync()
+        {
+            return ExecuteNewEntryAsync(isDirectory: true);
+        }
+
+        private async Task ExecuteNewEntryAsync(bool isDirectory)
+        {
+            if (!CanCreateInCurrentDirectory())
+            {
+                string createKind = isDirectory ? "folder" : "file";
+                if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    UpdateStatus($"New {createKind} failed: open a folder first.");
+                }
+                else
+                {
+                    UpdateStatus($"New {createKind} failed: current folder is not available.");
+                }
+                return;
+            }
+
+            await CreateNewEntryAsync(isDirectory);
+        }
+
+        private Task ExecuteRenameSelectedAsync()
+        {
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
+            {
+                UpdateStatus("Rename failed: select a loaded entry first.");
+                return Task.CompletedTask;
+            }
+
+            int selectedIndex = EntriesListView.SelectedIndex;
+            if (selectedIndex < 0 || selectedIndex >= _entries.Count)
+            {
+                UpdateStatus("Rename failed: invalid selected index.");
+                return Task.CompletedTask;
+            }
+
+            if (_entriesFlyoutOpen)
+            {
+                _pendingContextRenameEntry = entry;
+                return Task.CompletedTask;
+            }
+
+            return BeginRenameOverlayAsync(entry);
+        }
+
+        private async Task ExecuteDeleteSelectedAsync()
+        {
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
             {
                 UpdateStatus("Delete failed: select a loaded entry first.");
                 return;
             }
+
             int selectedIndex = EntriesListView.SelectedIndex;
             if (selectedIndex < 0 || selectedIndex >= _entries.Count)
             {
@@ -689,7 +867,6 @@ namespace FileExplorerUI
                 return;
             }
 
-            string target = Path.Combine(_currentPath, entry.Name);
             bool recursive = RecursiveDeleteCheckBox.IsChecked == true;
             bool confirmed = await ConfirmDeleteAsync(entry.Name, recursive);
             if (!confirmed)
@@ -698,101 +875,201 @@ namespace FileExplorerUI
                 return;
             }
 
+            string target = Path.Combine(_currentPath, entry.Name);
             await DeleteEntryAsync(entry, selectedIndex, target, recursive);
         }
 
-        private async void NewFileButton_Click(object sender, RoutedEventArgs e)
+        private void ExecuteCopy()
         {
-            await CreateNewFileAsync();
+            if (!CanCopySelectedEntry())
+            {
+                UpdateStatus("Copy failed: select a loaded entry first.");
+                return;
+            }
+
+            CopySelectedEntry();
         }
 
-        private async void NewFolderButton_Click(object sender, RoutedEventArgs e)
+        private void ExecuteCut()
         {
-            await CreateNewFolderAsync();
+            if (!CanCutSelectedEntry())
+            {
+                UpdateStatus("Cut failed: select a loaded entry first.");
+                return;
+            }
+
+            CutSelectedEntry();
         }
 
-        private async Task CreateNewFileAsync()
+        private Task ExecutePasteAsync()
         {
-            TraceFocusState("CreateNewFileAsync:begin");
+            return PasteIntoCurrentDirectoryAsync();
+        }
+
+        private void CopySelectedEntry()
+        {
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
+            {
+                UpdateStatus("Copy failed: select a loaded entry first.");
+                return;
+            }
+
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                UpdateStatus("New file failed: open a folder first.");
+                UpdateStatus("Copy failed: drive roots are not supported yet.");
                 return;
             }
 
-            if (!_explorerService.DirectoryExists(_currentPath))
+            _fileManagementCoordinator.SetClipboard(new[] { entry.FullPath }, FileTransferMode.Copy);
+            UpdateFileCommandStates();
+            UpdateStatus($"Copy ready: {entry.Name}");
+        }
+
+        private void CutSelectedEntry()
+        {
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
             {
-                UpdateStatus("New file failed: current folder is not available.");
+                UpdateStatus("Cut failed: select a loaded entry first.");
                 return;
             }
 
-            string initialName = GenerateUniqueNewFileName();
-            string targetPath = Path.Combine(_currentPath, initialName);
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateStatus("Cut failed: drive roots are not supported yet.");
+                return;
+            }
+
+            _fileManagementCoordinator.SetClipboard(new[] { entry.FullPath }, FileTransferMode.Cut);
+            UpdateFileCommandStates();
+            UpdateStatus($"Cut ready: {entry.Name}");
+        }
+
+        private async Task PasteIntoCurrentDirectoryAsync()
+        {
+            if (!CanPasteIntoCurrentDirectory())
+            {
+                UpdateStatus("Paste failed: open a folder first.");
+                return;
+            }
+
+            if (!_fileManagementCoordinator.HasClipboardItems)
+            {
+                UpdateStatus("Paste failed: clipboard is empty.");
+                return;
+            }
 
             try
             {
-                SuppressNextWatcherRefresh(_currentPath);
-                await _explorerService.CreateEmptyFileAsync(targetPath);
-                try
+                FilePasteResult result = await _fileManagementCoordinator.PasteAsync(_currentPath);
+                int appliedCount = 0;
+                int conflictCount = 0;
+                int samePathCount = 0;
+                int failureCount = 0;
+                string? firstAppliedPath = null;
+                bool appliedDirectory = false;
+
+                foreach (FilePasteItemResult item in result.Items)
                 {
-                    _explorerService.MarkPathChanged(_currentPath);
-                }
-                catch
-                {
-                    EnsureRefreshFallbackInvalidation(_currentPath, "create-file");
+                    if (item.Applied)
+                    {
+                        appliedCount++;
+                        firstAppliedPath ??= item.TargetPath;
+                        appliedDirectory |= item.IsDirectory;
+                        continue;
+                    }
+
+                    if (item.Conflict)
+                    {
+                        conflictCount++;
+                        continue;
+                    }
+
+                    if (item.SamePath)
+                    {
+                        samePathCount++;
+                        continue;
+                    }
+
+                    failureCount++;
                 }
 
-                EntryViewModel entry = CreateLocalCreatedEntryModel(initialName, isDirectory: false);
-                int insertIndex = FindInsertIndexForEntry(entry);
-                if (!IsIndexInCurrentViewport(insertIndex))
+                if (appliedCount == 0)
                 {
-                    await EnsureCreateInsertVisibleAsync(insertIndex);
+                    if (conflictCount > 0)
+                    {
+                        UpdateStatus($"Paste skipped: {conflictCount} target item(s) already exist.");
+                    }
+                    else if (samePathCount > 0)
+                    {
+                        UpdateStatus("Paste skipped: source and target are the same.");
+                    }
+                    else if (failureCount > 0 && result.Items.Count > 0)
+                    {
+                        string? message = result.Items[0].ErrorMessage;
+                        UpdateStatus($"Paste failed: {message}");
+                    }
+                    else
+                    {
+                        UpdateStatus("Paste skipped: nothing was applied.");
+                    }
+                    return;
                 }
 
-                InsertLocalCreatedEntry(entry, insertIndex);
-                TraceFocusState("CreateNewFileAsync:after-insert", $"insertIndex={insertIndex}");
-                _pendingCreatedEntrySelection = entry;
-                UpdateStatus($"Create success: {initialName}");
-                await StartRenameForCreatedEntryAsync(entry, insertIndex);
+                if (!result.TargetChanged)
+                {
+                    EnsureRefreshFallbackInvalidation(_currentPath, result.Mode == FileTransferMode.Cut ? "cut-paste" : "copy-paste");
+                }
+
+                if (appliedCount == 1 && !string.IsNullOrWhiteSpace(firstAppliedPath))
+                {
+                    _selectedEntryPath = firstAppliedPath;
+                }
+
+                await LoadFirstPageAsync();
+
+                if (appliedDirectory && FindSidebarTreeNodeByPath(_currentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
+                {
+                    await PopulateSidebarTreeChildrenAsync(parentNode, _currentPath, CancellationToken.None, expandAfterLoad: true);
+                }
+
+                _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+
+                UpdateFileCommandStates();
+                string modeText = result.Mode == FileTransferMode.Cut ? "Move" : "Paste";
+                UpdateStatus($"{modeText} success: {appliedCount} item(s), conflicts {conflictCount}, same-path {samePathCount}, failures {failureCount}.");
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Create failed: {ex.Message}");
+                UpdateStatus($"Paste failed: {ex.Message}");
             }
         }
 
-        private async Task CreateNewFolderAsync()
+        private async Task CreateNewEntryAsync(bool isDirectory)
         {
-            TraceFocusState("CreateNewFolderAsync:begin");
+            string createKind = isDirectory ? "folder" : "file";
+            TraceFocusState($"CreateNewEntryAsync:{createKind}:begin");
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                UpdateStatus("New folder failed: open a folder first.");
+                UpdateStatus($"New {createKind} failed: open a folder first.");
                 return;
             }
 
             if (!_explorerService.DirectoryExists(_currentPath))
             {
-                UpdateStatus("New folder failed: current folder is not available.");
+                UpdateStatus($"New {createKind} failed: current folder is not available.");
                 return;
             }
-
-            string initialName = GenerateUniqueNewFolderName();
-            string targetPath = Path.Combine(_currentPath, initialName);
 
             try
             {
                 SuppressNextWatcherRefresh(_currentPath);
-                await _explorerService.CreateDirectoryAsync(targetPath);
-                try
+                CreatedEntryInfo created = await _fileManagementCoordinator.CreateEntryAsync(_currentPath, isDirectory);
+                if (!created.ChangeNotified)
                 {
-                    _explorerService.MarkPathChanged(_currentPath);
-                }
-                catch
-                {
-                    EnsureRefreshFallbackInvalidation(_currentPath, "create-folder");
+                    EnsureRefreshFallbackInvalidation(_currentPath, isDirectory ? "create-folder" : "create-file");
                 }
 
-                EntryViewModel entry = CreateLocalCreatedEntryModel(initialName, isDirectory: true);
+                EntryViewModel entry = CreateLocalCreatedEntryModel(created.Name, created.IsDirectory);
                 int insertIndex = FindInsertIndexForEntry(entry);
                 if (!IsIndexInCurrentViewport(insertIndex))
                 {
@@ -800,9 +1077,9 @@ namespace FileExplorerUI
                 }
 
                 InsertLocalCreatedEntry(entry, insertIndex);
-                TraceFocusState("CreateNewFolderAsync:after-insert", $"insertIndex={insertIndex}");
+                TraceFocusState($"CreateNewEntryAsync:{createKind}:after-insert", $"insertIndex={insertIndex}");
                 _pendingCreatedEntrySelection = entry;
-                UpdateStatus($"Create success: {initialName}");
+                UpdateStatus($"Create success: {created.Name}");
                 await StartRenameForCreatedEntryAsync(entry, insertIndex);
             }
             catch (Exception ex)
@@ -918,6 +1195,7 @@ namespace FileExplorerUI
                 _usnCapability = default;
                 ConfigureDirectoryWatcher(string.Empty);
                 PopulateMyComputerEntries();
+                UpdateFileCommandStates();
                 return;
             }
 
@@ -1091,6 +1369,7 @@ namespace FileExplorerUI
                 {
                     RestoreListSelectionByPath(ensureVisible: false);
                 }
+                UpdateFileCommandStates();
                 RequestMetadataForCurrentViewport();
 
                 _nextCursor = page.NextCursor;
@@ -1128,6 +1407,7 @@ namespace FileExplorerUI
                 NextButton.IsEnabled = _hasMore;
                 SidebarNavView.IsEnabled = true;
                 StyledSidebarView.IsEnabled = true;
+                UpdateFileCommandStates();
             }
         }
 
@@ -1729,6 +2009,7 @@ namespace FileExplorerUI
             _nextCursor = 0;
             _hasMore = false;
             EntriesListView.SelectedItem = null;
+            UpdateFileCommandStates();
             this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Drives: {_entries.Count}";
             UpdateStatus($"我的电脑下 {_entries.Count} 个驱动器");
         }
@@ -3089,37 +3370,6 @@ namespace FileExplorerUI
             PathTextBox.BorderBrush = _pathDefaultBorderBrush;
         }
 
-        private string GenerateUniqueNewFileName()
-        {
-            const string baseName = "New File";
-            const string extension = ".txt";
-            string candidate = baseName + extension;
-            int suffix = 2;
-
-            while (_explorerService.PathExists(Path.Combine(_currentPath, candidate)))
-            {
-                candidate = $"{baseName} ({suffix}){extension}";
-                suffix++;
-            }
-
-            return candidate;
-        }
-
-        private string GenerateUniqueNewFolderName()
-        {
-            const string baseName = "New Folder";
-            string candidate = baseName;
-            int suffix = 2;
-
-            while (_explorerService.PathExists(Path.Combine(_currentPath, candidate)))
-            {
-                candidate = $"{baseName} ({suffix})";
-                suffix++;
-            }
-
-            return candidate;
-        }
-
         private EntryViewModel CreateLocalCreatedEntryModel(string name, bool isDirectory)
         {
             return new EntryViewModel
@@ -3230,6 +3480,8 @@ namespace FileExplorerUI
                 _selectedEntryPath = null;
                 TraceListSelection("SelectionChanged:cleared");
             }
+
+            UpdateFileCommandStates();
         }
 
         private int GetCreateInsertIndex()
@@ -3491,7 +3743,7 @@ namespace FileExplorerUI
                         return;
                     }
 
-                    if (!TryValidateCreateOrRenameName(entry, proposedName, out string pendingValidationError))
+                    if (!_fileManagementCoordinator.TryValidateName(_currentPath, entry.Name, proposedName, out string pendingValidationError))
                     {
                         UpdateStatus(pendingValidationError);
                         RenameOverlayTextBox.Focus(FocusState.Programmatic);
@@ -3518,7 +3770,7 @@ namespace FileExplorerUI
                     return;
                 }
 
-                if (!TryValidateCreateOrRenameName(entry, proposedName, out string validationError))
+                if (!_fileManagementCoordinator.TryValidateName(_currentPath, entry.Name, proposedName, out string validationError))
                 {
                     UpdateStatus(validationError);
                     RenameOverlayTextBox.Focus(FocusState.Programmatic);
@@ -3928,37 +4180,6 @@ namespace FileExplorerUI
             _ = DispatcherQueue.TryEnqueue(FocusSidebarSurface);
         }
 
-        private bool TryValidateCreateOrRenameName(EntryViewModel entry, string name, out string error)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                error = "Name failed: name is empty.";
-                return false;
-            }
-
-            if (name is "." or "..")
-            {
-                error = $"Name failed: '{name}' is reserved.";
-                return false;
-            }
-
-            if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-            {
-                error = $"Name failed: '{name}' contains invalid characters.";
-                return false;
-            }
-
-            string targetPath = Path.Combine(_currentPath, name);
-            if (!string.Equals(name, entry.Name, StringComparison.OrdinalIgnoreCase) && _explorerService.PathExists(targetPath))
-            {
-                error = $"Name failed: '{name}' already exists.";
-                return false;
-            }
-
-            error = string.Empty;
-            return true;
-        }
-
         private void ApplyLocalRename(int index, string newName)
         {
             if (index < 0 || index >= _entries.Count)
@@ -4035,6 +4256,7 @@ namespace FileExplorerUI
                 _entries.RemoveAt(_entries.Count - 1);
             }
             _hasMore = _nextCursor < _totalEntries;
+            UpdateFileCommandStates();
         }
 
         private async Task RefreshCurrentDirectoryInBackgroundAsync()
@@ -4127,11 +4349,18 @@ namespace FileExplorerUI
 
             if (item?.DataContext is EntryViewModel entry)
             {
+                _entriesContextEntry = entry;
+                _entriesContextTargetIsItem = true;
+                _lastEntriesContextItem = entry;
                 if (!IsEntryAlreadySelected(entry))
                 {
                     SelectEntryInList(entry, ensureVisible: false);
                 }
+                return;
             }
+
+            _entriesContextEntry = null;
+            _entriesContextTargetIsItem = false;
         }
 
         private bool IsEntryAlreadySelected(EntryViewModel entry)
@@ -4162,6 +4391,9 @@ namespace FileExplorerUI
             if (point.Properties.IsRightButtonPressed)
             {
                 e.Handled = true;
+                _entriesContextEntry = entry;
+                _entriesContextTargetIsItem = true;
+                _lastEntriesContextItem = entry;
                 EntriesContextFlyout.ShowAt(row, new FlyoutShowOptions
                 {
                     Position = point.Position
@@ -4175,6 +4407,10 @@ namespace FileExplorerUI
             {
                 return;
             }
+
+            _entriesContextEntry = entry;
+            _entriesContextTargetIsItem = true;
+            _lastEntriesContextItem = entry;
 
             if (IsEntryAlreadySelected(entry))
             {
@@ -4214,12 +4450,60 @@ namespace FileExplorerUI
         private void EntriesContextFlyout_Opening(object sender, object e)
         {
             _entriesFlyoutOpen = true;
+
+            EntryViewModel? contextEntry = _entriesContextTargetIsItem
+                ? (_entriesContextEntry is { IsLoaded: true } ? _entriesContextEntry : _lastEntriesContextItem)
+                : null;
+            bool hasItemTarget = contextEntry is { IsLoaded: true };
+            bool canPaste = CanPasteIntoCurrentDirectory() && _fileManagementCoordinator.HasClipboardItems;
+            Visibility clipboardVisibility = hasItemTarget ? Visibility.Visible : Visibility.Collapsed;
+
+            if (ContextCopyMenuItem is not null)
+            {
+                ContextCopyMenuItem.IsEnabled = hasItemTarget && CanCopySelectedEntry();
+                ContextCopyMenuItem.Visibility = clipboardVisibility;
+            }
+
+            if (ContextCutMenuItem is not null)
+            {
+                ContextCutMenuItem.IsEnabled = hasItemTarget && CanCutSelectedEntry();
+                ContextCutMenuItem.Visibility = clipboardVisibility;
+            }
+
+            if (ContextPasteMenuItem is not null)
+            {
+                ContextPasteMenuItem.IsEnabled = canPaste;
+                ContextPasteMenuItem.Visibility = clipboardVisibility;
+            }
+
+            if (ContextCreateSeparator is not null)
+            {
+                ContextCreateSeparator.Visibility = Visibility.Visible;
+            }
+
+            if (ContextClipboardSeparator is not null)
+            {
+                ContextClipboardSeparator.Visibility = clipboardVisibility;
+            }
+
+            if (ContextRenameMenuItem is not null)
+            {
+                ContextRenameMenuItem.IsEnabled = hasItemTarget && CanRenameSelectedEntry();
+            }
+
+            if (ContextDeleteMenuItem is not null)
+            {
+                ContextDeleteMenuItem.IsEnabled = hasItemTarget && CanDeleteSelectedEntry();
+            }
         }
 
         private void EntriesContextFlyout_Closed(object sender, object e)
         {
             _entriesFlyoutOpen = false;
             TraceFocusState("EntriesContextFlyout_Closed:begin", $"pendingAction={_pendingEntriesContextAction}; pendingRename={_pendingContextRenameEntry?.Name ?? "<null>"}");
+            _entriesContextEntry = null;
+            _entriesContextTargetIsItem = false;
+            _lastEntriesContextItem = null;
             if (_pendingContextRenameEntry is not null)
             {
                 EntriesListView.Focus(FocusState.Programmatic);
@@ -4236,11 +4520,14 @@ namespace FileExplorerUI
             {
                 case PendingEntriesContextAction.NewFile:
                     TraceFocusState("EntriesContextFlyout_Closed:dispatch-new-file");
-                    _ = CreateNewFileAsync();
+                    _ = ExecuteNewFileAsync();
                     break;
                 case PendingEntriesContextAction.NewFolder:
                     TraceFocusState("EntriesContextFlyout_Closed:dispatch-new-folder");
-                    _ = CreateNewFolderAsync();
+                    _ = ExecuteNewFolderAsync();
+                    break;
+                case PendingEntriesContextAction.Paste:
+                    _ = ExecutePasteAsync();
                     break;
             }
         }
@@ -4488,26 +4775,28 @@ namespace FileExplorerUI
 
         private void ContextRename_Click(object sender, RoutedEventArgs e)
         {
-            if (EntriesListView.SelectedItem is not EntryViewModel entry || !entry.IsLoaded)
-            {
-                UpdateStatus("Rename failed: select a loaded entry first.");
-                return;
-            }
+            _ = ExecuteRenameSelectedAsync();
+        }
 
-            int selectedIndex = EntriesListView.SelectedIndex;
-            if (selectedIndex < 0 || selectedIndex >= _entries.Count)
-            {
-                UpdateStatus("Rename failed: invalid selected index.");
-                return;
-            }
+        private void ContextCopy_Click(object sender, RoutedEventArgs e)
+        {
+            ExecuteCopy();
+        }
 
+        private void ContextCut_Click(object sender, RoutedEventArgs e)
+        {
+            ExecuteCut();
+        }
+
+        private async void ContextPaste_Click(object sender, RoutedEventArgs e)
+        {
             if (_entriesFlyoutOpen)
             {
-                _pendingContextRenameEntry = entry;
+                _pendingEntriesContextAction = PendingEntriesContextAction.Paste;
                 return;
             }
 
-            _ = BeginRenameOverlayAsync(entry);
+            await ExecutePasteAsync();
         }
 
         private async void ContextNewFile_Click(object sender, RoutedEventArgs e)
@@ -4519,7 +4808,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            await CreateNewFileAsync();
+            await ExecuteNewFileAsync();
         }
 
         private async void ContextNewFolder_Click(object sender, RoutedEventArgs e)
@@ -4531,33 +4820,12 @@ namespace FileExplorerUI
                 return;
             }
 
-            await CreateNewFolderAsync();
+            await ExecuteNewFolderAsync();
         }
 
         private async void ContextDelete_Click(object sender, RoutedEventArgs e)
         {
-            if (EntriesListView.SelectedItem is not EntryViewModel entry || !entry.IsLoaded)
-            {
-                UpdateStatus("Delete failed: select a loaded entry first.");
-                return;
-            }
-
-            int selectedIndex = EntriesListView.SelectedIndex;
-            if (selectedIndex < 0 || selectedIndex >= _entries.Count)
-            {
-                UpdateStatus("Delete failed: invalid selected index.");
-                return;
-            }
-
-            bool recursive = RecursiveDeleteCheckBox.IsChecked == true;
-            bool confirmed = await ConfirmDeleteAsync(entry.Name, recursive);
-            if (!confirmed)
-            {
-                return;
-            }
-
-            string target = Path.Combine(_currentPath, entry.Name);
-            await DeleteEntryAsync(entry, selectedIndex, target, recursive);
+            await ExecuteDeleteSelectedAsync();
         }
 
         private async void ContextRefresh_Click(object sender, RoutedEventArgs e)
@@ -4658,21 +4926,16 @@ namespace FileExplorerUI
         private async Task RenameEntryAsync(EntryViewModel entry, int selectedIndex, string newName)
         {
             string src = Path.Combine(_currentPath, entry.Name);
-            string dst = Path.Combine(_currentPath, newName);
             string oldName = entry.Name;
             TreeViewNode? renamedTreeNode = entry.IsDirectory ? FindSidebarTreeNodeByPath(src) : null;
             TraceListSelection("RenameEntryAsync:begin", entry, $"selectedIndex={selectedIndex}; oldName={oldName}; newName={newName}");
             try
             {
-                await _explorerService.RenamePathAsync(src, dst);
+                RenamedEntryInfo renamed = await _fileManagementCoordinator.RenameEntryAsync(_currentPath, entry.Name, newName);
                 RenameTextBox.Text = string.Empty;
                 HideRenameOverlay();
-                _selectedEntryPath = dst;
-                try
-                {
-                    _explorerService.MarkPathChanged(_currentPath);
-                }
-                catch
+                _selectedEntryPath = renamed.TargetPath;
+                if (!renamed.ChangeNotified)
                 {
                     EnsureRefreshFallbackInvalidation(_currentPath, "rename");
                 }
@@ -4680,7 +4943,7 @@ namespace FileExplorerUI
                 {
                     if (renamedTreeNode is not null)
                     {
-                        UpdateSidebarTreeNodePath(renamedTreeNode, src, dst, newName);
+                        UpdateSidebarTreeNodePath(renamedTreeNode, renamed.SourcePath, renamed.TargetPath, newName);
                     }
                     else if (FindSidebarTreeNodeByPath(_currentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
                     {
@@ -4688,7 +4951,7 @@ namespace FileExplorerUI
                     }
                 }
                 ApplyLocalRename(selectedIndex, newName);
-                TraceListSelection("RenameEntryAsync:success-before-focus", entry, $"selectedIndex={selectedIndex}; dst={dst}");
+                TraceListSelection("RenameEntryAsync:success-before-focus", entry, $"selectedIndex={selectedIndex}; dst={renamed.TargetPath}");
                 if (ReferenceEquals(_pendingCreatedEntrySelection, entry))
                 {
                     CompleteCreatedEntrySelectionIfPending(entry, ensureVisible: false);
@@ -4714,7 +4977,12 @@ namespace FileExplorerUI
         {
             try
             {
-                await _explorerService.DeletePathAsync(targetPath, recursive);
+                bool changeNotified = await _fileManagementCoordinator.DeleteEntryAsync(targetPath, recursive);
+                if (!changeNotified)
+                {
+                    string parentPath = Path.GetDirectoryName(targetPath) ?? _currentPath;
+                    EnsureRefreshFallbackInvalidation(parentPath, "delete");
+                }
                 ApplyLocalDelete(selectedIndex);
                 _ = RefreshCurrentDirectoryInBackgroundAsync();
                 UpdateStatus($"Delete success: {entry.Name} (recursive: {recursive})");

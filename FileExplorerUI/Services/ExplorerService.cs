@@ -9,6 +9,37 @@ namespace FileExplorerUI.Services;
 
 public sealed class ExplorerService
 {
+    public string GenerateUniqueNewFileName(string directoryPath)
+    {
+        const string baseName = "New File";
+        const string extension = ".txt";
+        string candidate = baseName + extension;
+        int suffix = 2;
+
+        while (PathExists(Path.Combine(directoryPath, candidate)))
+        {
+            candidate = $"{baseName} ({suffix}){extension}";
+            suffix++;
+        }
+
+        return candidate;
+    }
+
+    public string GenerateUniqueNewFolderName(string directoryPath)
+    {
+        const string baseName = "New Folder";
+        string candidate = baseName;
+        int suffix = 2;
+
+        while (PathExists(Path.Combine(directoryPath, candidate)))
+        {
+            candidate = $"{baseName} ({suffix})";
+            suffix++;
+        }
+
+        return candidate;
+    }
+
     public string GetEngineVersion()
     {
         return RustBatchInterop.GetEngineVersion();
@@ -155,6 +186,46 @@ public sealed class ExplorerService
         return Task.Run(() => RustBatchInterop.DeletePath(path, recursive));
     }
 
+    public Task CopyPathAsync(string sourcePath, string targetPath)
+    {
+        return Task.Run(() =>
+        {
+            if (Directory.Exists(sourcePath))
+            {
+                CopyDirectory(sourcePath, targetPath);
+                return;
+            }
+
+            string? targetDirectory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            File.Copy(sourcePath, targetPath, overwrite: false);
+        });
+    }
+
+    public Task MovePathAsync(string sourcePath, string targetPath)
+    {
+        return Task.Run(() =>
+        {
+            if (Directory.Exists(sourcePath))
+            {
+                MoveDirectory(sourcePath, targetPath);
+                return;
+            }
+
+            string? targetDirectory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            File.Move(sourcePath, targetPath);
+        });
+    }
+
     public Task CreateEmptyFileAsync(string path)
     {
         return Task.Run(
@@ -168,5 +239,47 @@ public sealed class ExplorerService
     public Task CreateDirectoryAsync(string path)
     {
         return Task.Run(() => Directory.CreateDirectory(path));
+    }
+
+    public Task CreatePathAsync(string path, bool isDirectory)
+    {
+        return isDirectory ? CreateDirectoryAsync(path) : CreateEmptyFileAsync(path);
+    }
+
+    private static void CopyDirectory(string sourcePath, string targetPath)
+    {
+        Directory.CreateDirectory(targetPath);
+
+        foreach (string directory in Directory.EnumerateDirectories(sourcePath, "*", SearchOption.AllDirectories))
+        {
+            string relativePath = Path.GetRelativePath(sourcePath, directory);
+            Directory.CreateDirectory(Path.Combine(targetPath, relativePath));
+        }
+
+        foreach (string file in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
+        {
+            string relativePath = Path.GetRelativePath(sourcePath, file);
+            string destinationPath = Path.Combine(targetPath, relativePath);
+            string? destinationDirectory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            File.Copy(file, destinationPath, overwrite: false);
+        }
+    }
+
+    private static void MoveDirectory(string sourcePath, string targetPath)
+    {
+        try
+        {
+            Directory.Move(sourcePath, targetPath);
+        }
+        catch (IOException)
+        {
+            CopyDirectory(sourcePath, targetPath);
+            Directory.Delete(sourcePath, recursive: true);
+        }
     }
 }

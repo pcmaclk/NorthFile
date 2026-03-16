@@ -19,7 +19,7 @@
         RowSpacing="8"
         Padding="8,8,8,0">
         <Grid
-            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,280"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,280"
             Height="36"
             ColumnSpacing="8">
             <Button
@@ -111,7 +111,52 @@
                     Glyph="&#xE8B7;" />
             </Button>
 
-            <Grid Grid.Column="6">
+            <Button
+                x:Name="CopyButton"
+                Grid.Column="6"
+                Width="32"
+                Height="32"
+                Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
+                Click="CopyButton_Click"
+                ToolTipService.ToolTip="Copy">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE8C8;" />
+            </Button>
+
+            <Button
+                x:Name="CutButton"
+                Grid.Column="7"
+                Width="32"
+                Height="32"
+                Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
+                Click="CutButton_Click"
+                ToolTipService.ToolTip="Cut">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE8C6;" />
+            </Button>
+
+            <Button
+                x:Name="PasteButton"
+                Grid.Column="8"
+                Width="32"
+                Height="32"
+                Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
+                Click="PasteButton_Click"
+                ToolTipService.ToolTip="Paste">
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE77F;" />
+            </Button>
+
+            <Grid Grid.Column="9">
                 <Border
                     x:Name="AddressBreadcrumbBorder"
                     Height="32"
@@ -229,7 +274,7 @@
 
             <TextBox
                 x:Name="SearchTextBox"
-                Grid.Column="7"
+                Grid.Column="10"
                 Height="32"
                 PlaceholderText="Search in current folder"
                 KeyDown="SearchTextBox_KeyDown" />
@@ -406,9 +451,13 @@
                                     Closed="EntriesContextFlyout_Closed">
                                     <MenuFlyoutItem Click="ContextNewFile_Click" Text="New File" />
                                     <MenuFlyoutItem Click="ContextNewFolder_Click" Text="New Folder" />
-                                    <MenuFlyoutSeparator />
-                                    <MenuFlyoutItem Click="ContextRename_Click" Text="Rename" />
-                                    <MenuFlyoutItem Click="ContextDelete_Click" Text="Delete" />
+                                    <MenuFlyoutSeparator x:Name="ContextCreateSeparator" />
+                                    <MenuFlyoutItem x:Name="ContextCopyMenuItem" Click="ContextCopy_Click" Text="Copy" />
+                                    <MenuFlyoutItem x:Name="ContextCutMenuItem" Click="ContextCut_Click" Text="Cut" />
+                                    <MenuFlyoutItem x:Name="ContextPasteMenuItem" Click="ContextPaste_Click" Text="Paste" />
+                                    <MenuFlyoutSeparator x:Name="ContextClipboardSeparator" />
+                                    <MenuFlyoutItem x:Name="ContextRenameMenuItem" Click="ContextRename_Click" Text="Rename" />
+                                    <MenuFlyoutItem x:Name="ContextDeleteMenuItem" Click="ContextDelete_Click" Text="Delete" />
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Click="ContextRefresh_Click" Text="Refresh" />
                                 </MenuFlyout>

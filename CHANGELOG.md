@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Added the first shared `CanCreate / CanRename / CanDelete / CanCopy / CanCut / CanPaste` checks in `MainWindow.xaml.cs` and started using them to drive toolbar and context-menu state from one place.
+- Began the command-layer refactor in `MainWindow.xaml.cs`: existing new / rename / delete / copy / cut / paste toolbar and context-menu entry points now route through shared `Execute...` command functions instead of each entry point owning its own validation and dispatch path.
+- Added a dedicated file-management command architecture document to keep future toolbar, context-menu, and shortcut work on one shared command path instead of duplicating file-operation logic per entry point.
+- Wired single-item `Copy / Cut / Paste` into the main toolbar and list context menu. Paste now goes through `FileManagementCoordinator`, reloads the current directory, and refreshes the expanded current tree branch when directories are pasted into the open folder.
+- Expanded `FileManagementCoordinator` into a clipboard-aware coordination layer for FM-03 work: it now owns copy/cut clipboard state, paste execution, and per-item paste result reporting beneath the first round of toolbar/context-menu wiring.
+- Added `FileManagementCoordinator` as the next file-ops coordination layer. Create, rename, delete, and name validation now route through it so future copy/cut/paste can reuse one backend-facing workflow.
+- File-management create flow was refactored again: file/folder creation now shares one `CreateNewEntryAsync(bool isDirectory)` path in the window layer, while default-name generation and physical create dispatch moved into `ExplorerService`.
 - File rename now selects only the base-name portion by default in the inline editor; folder rename still selects the full name.
 - Off-screen create reveal now scrolls the target row a little higher, keeping about `12px` of bottom breathing room before rename starts.
 - New file/new folder no longer switch `ListView.SelectedItem` before opening the rename overlay; the created row is only selected after the create-rename flow completes, reducing the visible jump seen at create start.

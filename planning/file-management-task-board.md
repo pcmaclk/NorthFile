@@ -23,6 +23,13 @@ Deferred:
 
 ## Current Progress
 
+- 2026-03-16: added the first shared `Can...` capability checks and started using them to drive toolbar and context-menu state, so file-management actions no longer decide enablement separately per entry point
+- 2026-03-16: started the shared command-layer refactor in `MainWindow.xaml.cs`; current new / rename / delete / copy / cut / paste entry points now converge on shared `Execute...` flows instead of duplicating UI-side validation and dispatch logic
+- 2026-03-16: added a dedicated file-management command-architecture document so future create / rename / delete / copy / cut / paste / shortcut work follows the same operation-layer, command-layer, and UI-entry-layer split
+- 2026-03-16: wired FM-03 single-item copy/cut/paste into the toolbar and list context menu; paste now routes through the coordinator, reloads the current directory, and refreshes the expanded current tree branch when pasted folders land in the open folder
+- 2026-03-16: expanded `FileManagementCoordinator` into a real clipboard/paste coordination layer with copy/cut clipboard state, same-path/conflict reporting, and paste execution results; UI commands are not wired yet
+- 2026-03-16: added `FileManagementCoordinator`; create, rename, delete, and name validation now go through a shared file-ops coordination layer for future copy/cut/paste work
+- 2026-03-16: create-file and create-folder window logic now share one `CreateNewEntryAsync(bool isDirectory)` path, and default naming/physical create dispatch were moved further into `ExplorerService`
 - 2026-03-16: file rename now preselects only the base-name part in the inline editor, while folders still select the full name
 - 2026-03-16: off-screen create reveal now scrolls slightly further so the created row lands with a small bottom margin instead of sticking to the viewport edge
 - 2026-03-16: create-then-rename no longer preselects the newly created row before showing the rename overlay; selection is now applied only after the create rename flow finishes, reducing create-start jump
@@ -147,6 +154,12 @@ Support standard clipboard-style file operations inside NorthFile.
 
 - Stable file and folder identity in the list
 - Clear current directory target
+
+Current implementation note:
+
+- `FileManagementCoordinator` now already owns clipboard state and paste execution/reporting
+- FM-03 now has single-item toolbar/context-menu wiring
+- FM-03 still needs keyboard shortcuts, multi-select clipboard behavior, and richer conflict handling
 
 ### Definition of done
 
