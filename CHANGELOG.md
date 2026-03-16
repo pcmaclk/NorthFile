@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- File rename now selects only the base-name portion by default in the inline editor; folder rename still selects the full name.
+- Off-screen create reveal now scrolls the target row a little higher, keeping about `12px` of bottom breathing room before rename starts.
+- New file/new folder no longer switch `ListView.SelectedItem` before opening the rename overlay; the created row is only selected after the create-rename flow completes, reducing the visible jump seen at create start.
+- Paged list refresh now mutates existing `EntryViewModel` instances inside `FillPageRows(...)` instead of replacing row objects, so scrolling and append loads preserve `ListView.SelectedItem` identity more reliably.
+- Context-menu `New File` and `New Folder` now defer execution until the entries flyout fully closes, keeping create insertion and rename startup off the flyout-dismiss path and reducing the extra jump seen only from right-click creation.
+- New file/new folder now suppress the next same-directory watcher refresh caused by their own filesystem create, preventing the create-rename flow from being interrupted by an immediate background reload.
+- Added focused DEBUG tracing for list selection and create-then-rename startup/completion so the current "new item selection jumps" investigation can be followed from Visual Studio output without changing runtime behavior.
+- Create flow now updates the new row as the current list item immediately after insertion, then starts the existing rename overlay from that current item; create rename completion no longer carries any extra create-specific reselection logic.
+- Create-then-rename has been reconnected to a single startup path again: new rows now scroll into the target viewport first when needed, then insert at the final sorted slot, and finally enter the existing rename overlay.
+- List-row mouse preselection now short-circuits when the target item is already selected, so both left-click and right-click avoid re-running the list selection path before rename/create work continues.
 - Right-side rename now returns focus to the file list after successful or no-op completion, preventing Enter-submit from bouncing focus to the toolbar back button.
 - Right-side rename of existing items now updates the visible row in place instead of reloading the entire current page, avoiding the double-jump behavior seen at rename completion.
 - Removed the extra post-refresh reselection step after right-side rename; the list now relies on the selected-path restore already performed inside the refresh path, reducing duplicate jump behavior when rename ends.

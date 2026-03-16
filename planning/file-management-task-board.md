@@ -23,6 +23,16 @@ Deferred:
 
 ## Current Progress
 
+- 2026-03-16: file rename now preselects only the base-name part in the inline editor, while folders still select the full name
+- 2026-03-16: off-screen create reveal now scrolls slightly further so the created row lands with a small bottom margin instead of sticking to the viewport edge
+- 2026-03-16: create-then-rename no longer preselects the newly created row before showing the rename overlay; selection is now applied only after the create rename flow finishes, reducing create-start jump
+- 2026-03-16: paged row fills now mutate existing `EntryViewModel` instances instead of replacing them, so selection can survive append loads and scroll-triggered paging more reliably
+- 2026-03-16: context-menu create actions now defer until the list flyout fully closes, separating right-click flyout dismissal from list insertion and rename startup
+- 2026-03-16: self-created files and folders now suppress the next same-directory watcher refresh so create-then-rename is not interrupted by an immediate background reload
+- 2026-03-16: added focused DEBUG tracing around list selection and create-rename startup/completion so the remaining new-item jump can be diagnosed from VS output before changing behavior again
+- 2026-03-16: create flow now promotes the inserted row to the current list item immediately after insertion, then starts rename from that current item and leaves completion to the normal rename path
+- 2026-03-16: create-then-rename now uses a single startup path again; off-screen targets scroll into the destination region first, then insert at the final sorted slot, then enter the existing rename overlay
+- 2026-03-16: list-row pointer handling now short-circuits when the clicked row is already selected, so left-click and right-click no longer re-run the preselection path before file-management actions
 - 2026-03-15: extracted a shared `ExplorerService` layer for `MainWindow` and `SidebarView`
 - UI code now routes the main Rust/file-system access path through the service layer before FM-01 starts
 - compact sidebar tree menu now uses the same service abstraction as the main window tree

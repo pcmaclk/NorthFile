@@ -419,6 +419,7 @@
                                         Height="30"
                                         Padding="8,0,8,0"
                                         HorizontalAlignment="Stretch"
+                                        PointerPressed="EntryRow_PointerPressed"
                                         RightTapped="EntryRow_RightTapped">
                                         <Grid HorizontalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
