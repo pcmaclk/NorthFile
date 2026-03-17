@@ -1,3 +1,4 @@
+using FileExplorerUI.Commands;
 using FileExplorerUI.Interop;
 using FileExplorerUI.Services;
 using Microsoft.UI.Windowing;
@@ -32,6 +33,12 @@ namespace FileExplorerUI
             Paste
         }
 
+        private sealed record EntriesContextRequest(
+            UIElement Anchor,
+            Point Position,
+            EntryViewModel? Entry,
+            bool IsItemTarget);
+
         private GridLength _nameColumnWidth = new(220);
         private GridLength _typeColumnWidth = new(150);
         private GridLength _sizeColumnWidth = new(120);
@@ -59,9 +66,10 @@ namespace FileExplorerUI
         private bool _suppressSidebarNavSelection;
         private EntryViewModel? _pendingContextRenameEntry;
         private PendingEntriesContextAction _pendingEntriesContextAction = PendingEntriesContextAction.None;
-        private EntryViewModel? _entriesContextEntry;
-        private bool _entriesContextTargetIsItem;
+        private EntriesContextRequest? _entriesContextRequest;
         private EntryViewModel? _lastEntriesContextItem;
+        private EntriesContextRequest? _pendingEntriesContextRequest;
+        private readonly FileCommandCatalog _fileCommandCatalog = new();
         private MenuFlyout? _sidebarTreeContextFlyout;
         private SidebarTreeEntry? _pendingSidebarTreeContextEntry;
         private Canvas? _sidebarTreeRenameOverlayCanvas;
@@ -207,6 +215,8 @@ namespace FileExplorerUI
         private uint _totalEntries;
         private DirectorySortMode _currentSortMode = DirectorySortMode.FolderFirstNameAsc;
         private ScrollViewer? _listScrollViewer;
+        private double _lastListHorizontalOffset = double.NaN;
+        private double _lastListVerticalOffset = double.NaN;
         private double _estimatedItemHeight = 32.0;
         private Brush? _pathDefaultBorderBrush;
         private readonly Stack<string> _backStack = new();
@@ -251,6 +261,7 @@ namespace FileExplorerUI
         private const int WM_NCLBUTTONDOWN = 0x00A1;
         private const int WM_NCRBUTTONDOWN = 0x00A4;
         private const int WM_SETCURSOR = 0x0020;
+        private const int IDC_ARROW = 32512;
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -307,6 +318,8 @@ namespace FileExplorerUI
             if (Content is FrameworkElement rootElement)
             {
                 rootElement.ActualThemeChanged += MainWindowRoot_ActualThemeChanged;
+                rootElement.PointerEntered += RootElement_PointerEnteredOrMoved;
+                rootElement.PointerMoved += RootElement_PointerEnteredOrMoved;
             }
             PathTextBox.Text = ShellMyComputerPath;
             RegisterColumnSplitterHandlers(HeaderSplitter1);
@@ -318,6 +331,7 @@ namespace FileExplorerUI
             EntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
             EntriesListView.SizeChanged += EntriesListView_SizeChanged;
             this.SizeChanged += MainWindow_SizeChanged;
+            this.Activated += MainWindow_Activated;
             _pathDefaultBorderBrush = PathTextBox.BorderBrush;
             _engineVersion = _explorerService.GetEngineVersion();
 
@@ -328,13 +342,25 @@ namespace FileExplorerUI
             BuildSidebarItems();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
-            InstallWindowHook();
             _ = LoadFirstPageAsync();
         }
 
         private void MainWindowRoot_ActualThemeChanged(FrameworkElement sender, object args)
         {
             ApplyTitleBarTheme();
+        }
+
+        private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
+        {
+            TryResetSystemCursorToArrow();
+        }
+
+        private void RootElement_PointerEnteredOrMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (_activeColumnSplitter is null)
+            {
+                TryResetSystemCursorToArrow();
+            }
         }
 
         private void ApplyTitleBarTheme()
@@ -390,13 +416,6 @@ namespace FileExplorerUI
             {
                 _ = DispatcherQueue.TryEnqueue(CloseActiveBreadcrumbFlyout);
             }
-            else if (msg == WM_SETCURSOR && (_splitterHoverCount > 0 || _activeColumnSplitter is not null))
-            {
-                if (ColumnSplitter.TryApplyResizeCursor())
-                {
-                    return new IntPtr(1);
-                }
-            }
 
             return NativeMethods.CallWindowProc(_originalWndProc, hWnd, msg, wParam, lParam);
         }
@@ -421,7 +440,6 @@ namespace FileExplorerUI
                 return;
             }
 
-            ColumnSplitter.TryApplyResizeCursor();
             _activeColumnSplitter = splitter;
             _activeSplitterTag = tag;
             _dragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
@@ -452,11 +470,6 @@ namespace FileExplorerUI
 
         private void ColumnSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is UIElement)
-            {
-                ColumnSplitter.TryApplyResizeCursor();
-            }
-
             if (sender is not UIElement splitter || !ReferenceEquals(splitter, _activeColumnSplitter))
             {
                 return;
@@ -713,13 +726,30 @@ namespace FileExplorerUI
 
         private bool CanPasteIntoCurrentDirectory()
         {
-            return !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase)
-                   && _explorerService.DirectoryExists(_currentPath);
+            return !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase);
         }
 
         private bool CanCreateInCurrentDirectory()
         {
             return CanPasteIntoCurrentDirectory();
+        }
+
+        private bool TryEnsureCurrentDirectoryAvailable(out string errorMessage)
+        {
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                errorMessage = "open a folder first.";
+                return false;
+            }
+
+            if (!_explorerService.DirectoryExists(_currentPath))
+            {
+                errorMessage = "current folder is not available.";
+                return false;
+            }
+
+            errorMessage = string.Empty;
+            return true;
         }
 
         private bool CanCopySelectedEntry()
@@ -814,14 +844,14 @@ namespace FileExplorerUI
             if (!CanCreateInCurrentDirectory())
             {
                 string createKind = isDirectory ? "folder" : "file";
-                if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    UpdateStatus($"New {createKind} failed: open a folder first.");
-                }
-                else
-                {
-                    UpdateStatus($"New {createKind} failed: current folder is not available.");
-                }
+                UpdateStatus($"New {createKind} failed: open a folder first.");
+                return;
+            }
+
+            if (!TryEnsureCurrentDirectoryAvailable(out string createError))
+            {
+                string createKind = isDirectory ? "folder" : "file";
+                UpdateStatus($"New {createKind} failed: {createError}");
                 return;
             }
 
@@ -952,6 +982,12 @@ namespace FileExplorerUI
                 return;
             }
 
+            if (!TryEnsureCurrentDirectoryAvailable(out string pasteError))
+            {
+                UpdateStatus($"Paste failed: {pasteError}");
+                return;
+            }
+
             if (!_fileManagementCoordinator.HasClipboardItems)
             {
                 UpdateStatus("Paste failed: clipboard is empty.");
@@ -1047,7 +1083,6 @@ namespace FileExplorerUI
         private async Task CreateNewEntryAsync(bool isDirectory)
         {
             string createKind = isDirectory ? "folder" : "file";
-            TraceFocusState($"CreateNewEntryAsync:{createKind}:begin");
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 UpdateStatus($"New {createKind} failed: open a folder first.");
@@ -1077,7 +1112,6 @@ namespace FileExplorerUI
                 }
 
                 InsertLocalCreatedEntry(entry, insertIndex);
-                TraceFocusState($"CreateNewEntryAsync:{createKind}:after-insert", $"insertIndex={insertIndex}");
                 _pendingCreatedEntrySelection = entry;
                 UpdateStatus($"Create success: {created.Name}");
                 await StartRenameForCreatedEntryAsync(entry, insertIndex);
@@ -1095,6 +1129,8 @@ namespace FileExplorerUI
             {
                 _listScrollViewer.ViewChanged -= ListScrollViewer_ViewChanged;
                 _listScrollViewer.ViewChanged += ListScrollViewer_ViewChanged;
+                _lastListHorizontalOffset = _listScrollViewer.HorizontalOffset;
+                _lastListVerticalOffset = _listScrollViewer.VerticalOffset;
             }
             if (!_entriesPointerHooked)
             {
@@ -1143,6 +1179,20 @@ namespace FileExplorerUI
                 return;
             }
 
+            bool scrolled =
+                double.IsNaN(_lastListHorizontalOffset) ||
+                double.IsNaN(_lastListVerticalOffset) ||
+                Math.Abs(viewer.HorizontalOffset - _lastListHorizontalOffset) > 0.1 ||
+                Math.Abs(viewer.VerticalOffset - _lastListVerticalOffset) > 0.1;
+
+            _lastListHorizontalOffset = viewer.HorizontalOffset;
+            _lastListVerticalOffset = viewer.VerticalOffset;
+
+            if (scrolled && _entriesFlyoutOpen && EntriesContextFlyout.IsOpen)
+            {
+                EntriesContextFlyout.Hide();
+            }
+
             if (DetailsHeaderTranslateTransform is not null)
             {
                 DetailsHeaderTranslateTransform.X = -viewer.HorizontalOffset;
@@ -1172,6 +1222,16 @@ namespace FileExplorerUI
             RequestViewportWork();
             UpdateVisibleBreadcrumbs();
             UpdateRenameOverlayPosition();
+            TryResetSystemCursorToArrow();
+        }
+
+        private static void TryResetSystemCursorToArrow()
+        {
+            IntPtr cursor = NativeMethods.LoadCursor(IntPtr.Zero, IDC_ARROW);
+            if (cursor != IntPtr.Zero)
+            {
+                NativeMethods.SetCursor(cursor);
+            }
         }
 
         private async Task LoadFirstPageAsync()
@@ -2311,7 +2371,6 @@ namespace FileExplorerUI
                 return;
             }
 
-            ColumnSplitter.TryApplyResizeCursor();
             _activeColumnSplitter = splitter;
             _activeSplitterTag = 100;
             _dragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
@@ -2322,11 +2381,6 @@ namespace FileExplorerUI
 
         private void SidebarSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is UIElement)
-            {
-                ColumnSplitter.TryApplyResizeCursor();
-            }
-
             if (sender is not UIElement splitter || !ReferenceEquals(splitter, _activeColumnSplitter) || _activeSplitterTag != 100)
             {
                 return;
@@ -3399,26 +3453,6 @@ namespace FileExplorerUI
             return entry;
         }
 
-        [Conditional("DEBUG")]
-        private void TraceListSelection(string stage, EntryViewModel? entry = null, string? extra = null)
-        {
-            string selectedName = (EntriesListView.SelectedItem as EntryViewModel)?.Name ?? "<null>";
-            string selectedPath = _selectedEntryPath ?? "<null>";
-            string entryName = entry?.Name ?? "<null>";
-            string entryPath = entry?.FullPath ?? "<null>";
-            Debug.WriteLine(
-                $"[ListSelection] {DateTime.Now:HH:mm:ss.fff} stage={stage} entry={entryName} entryPath={entryPath} selectedItem={selectedName} selectedPath={selectedPath} extra={extra ?? "<none>"}");
-        }
-
-        private void TraceFocusState(string stage, string? extra = null)
-        {
-            FrameworkElement? focusedElement = FocusManager.GetFocusedElement(Content.XamlRoot) as FrameworkElement;
-            string focusedName = focusedElement?.Name ?? "<unnamed>";
-            string focusedType = focusedElement?.GetType().Name ?? "<null>";
-            Debug.WriteLine(
-                $"[FocusTrace] {DateTime.Now:HH:mm:ss.fff} stage={stage} focusedType={focusedType} focusedName={focusedName} extra={extra ?? "<none>"}");
-        }
-
         private void SuppressNextWatcherRefresh(string path)
         {
             if (!string.IsNullOrWhiteSpace(path))
@@ -3434,15 +3468,12 @@ namespace FileExplorerUI
 
         private void SelectEntryInList(EntryViewModel entry, bool ensureVisible)
         {
-            TraceListSelection("SelectEntryInList:before", entry, $"ensureVisible={ensureVisible}");
             _selectedEntryPath = entry.FullPath;
             EntriesListView.SelectedItem = entry;
             if (ensureVisible)
             {
                 EntriesListView.ScrollIntoView(entry);
             }
-
-            TraceListSelection("SelectEntryInList:after", entry, $"ensureVisible={ensureVisible}");
         }
 
         private void RestoreListSelectionByPath(bool ensureVisible)
@@ -3473,12 +3504,10 @@ namespace FileExplorerUI
             if (EntriesListView.SelectedItem is EntryViewModel entry)
             {
                 _selectedEntryPath = entry.FullPath;
-                TraceListSelection("SelectionChanged:selected", entry);
             }
             else if (!_isLoading)
             {
                 _selectedEntryPath = null;
-                TraceListSelection("SelectionChanged:cleared");
             }
 
             UpdateFileCommandStates();
@@ -3576,23 +3605,19 @@ namespace FileExplorerUI
 
         private async Task<bool> StartRenameForCreatedEntryAsync(EntryViewModel entry, int insertIndex)
         {
-            TraceListSelection("StartRenameForCreatedEntryAsync:begin", entry, $"insertIndex={insertIndex}");
             await Task.Delay(16);
             EntriesListView.UpdateLayout();
 
             bool renameStarted = await BeginRenameOverlayAsync(entry, ensureVisible: false, updateSelection: false);
             if (renameStarted)
             {
-                TraceListSelection("StartRenameForCreatedEntryAsync:first-started", entry, $"insertIndex={insertIndex}");
                 return true;
             }
 
             EntriesListView.ScrollIntoView(entry);
-            TraceListSelection("StartRenameForCreatedEntryAsync:scrolled-retry", entry, $"insertIndex={insertIndex}");
             await Task.Delay(16);
             EntriesListView.UpdateLayout();
             bool retryStarted = await BeginRenameOverlayAsync(entry, ensureVisible: false, updateSelection: false);
-            TraceListSelection("StartRenameForCreatedEntryAsync:retry-result", entry, $"started={retryStarted}");
             return retryStarted;
         }
 
@@ -3637,10 +3662,6 @@ namespace FileExplorerUI
             bool alreadySelected =
                 ReferenceEquals(EntriesListView.SelectedItem, entry) ||
                 string.Equals(_selectedEntryPath, entry.FullPath, StringComparison.OrdinalIgnoreCase);
-            TraceListSelection(
-                "BeginRenameOverlayAsync:begin",
-                entry,
-                $"ensureVisible={ensureVisible}; updateSelection={updateSelection}; alreadySelected={alreadySelected}");
 
             if (updateSelection && !alreadySelected)
             {
@@ -3667,11 +3688,9 @@ namespace FileExplorerUI
                 RenameOverlayBorder.Visibility = Visibility.Visible;
                 RenameOverlayTextBox.Focus(FocusState.Programmatic);
                 SelectRenameTargetText(RenameOverlayTextBox, entry);
-                TraceListSelection("BeginRenameOverlayAsync:shown", entry, $"attempt={attempt}");
                 return true;
             }
 
-            TraceListSelection("BeginRenameOverlayAsync:failed", entry);
             UpdateStatus("Rename failed: could not start inline editor.");
             return false;
         }
@@ -3731,7 +3750,6 @@ namespace FileExplorerUI
                 EntryViewModel entry = _activeRenameOverlayEntry;
                 string proposedName = RenameOverlayTextBox.Text?.Trim() ?? string.Empty;
                 int index = _entries.IndexOf(entry);
-                TraceListSelection("CommitRenameOverlayAsync:begin", entry, $"proposedName={proposedName}; index={index}");
 
                 if (entry.IsPendingCreate)
                 {
@@ -3758,7 +3776,6 @@ namespace FileExplorerUI
                 if (string.Equals(proposedName, entry.Name, StringComparison.Ordinal))
                 {
                     HideRenameOverlay();
-                    TraceListSelection("CommitRenameOverlayAsync:no-change", entry);
                     if (ReferenceEquals(_pendingCreatedEntrySelection, entry))
                     {
                         CompleteCreatedEntrySelectionIfPending(entry, ensureVisible: false);
@@ -3781,7 +3798,6 @@ namespace FileExplorerUI
                 if (index < 0)
                 {
                     HideRenameOverlay();
-                    TraceListSelection("CommitRenameOverlayAsync:index-missing", entry);
                     return;
                 }
 
@@ -4334,35 +4350,6 @@ namespace FileExplorerUI
             }
         }
 
-        private void EntriesListView_ContextRequested(UIElement sender, ContextRequestedEventArgs e)
-        {
-            ListViewItem? item = null;
-            if (e.OriginalSource is DependencyObject source)
-            {
-                item = FindAncestor<ListViewItem>(source);
-            }
-
-            if (item is null && e.TryGetPosition(EntriesListView, out Point pos))
-            {
-                item = FindListViewItemAt(pos);
-            }
-
-            if (item?.DataContext is EntryViewModel entry)
-            {
-                _entriesContextEntry = entry;
-                _entriesContextTargetIsItem = true;
-                _lastEntriesContextItem = entry;
-                if (!IsEntryAlreadySelected(entry))
-                {
-                    SelectEntryInList(entry, ensureVisible: false);
-                }
-                return;
-            }
-
-            _entriesContextEntry = null;
-            _entriesContextTargetIsItem = false;
-        }
-
         private bool IsEntryAlreadySelected(EntryViewModel entry)
         {
             return ReferenceEquals(EntriesListView.SelectedItem, entry) ||
@@ -4388,37 +4375,98 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (point.Properties.IsRightButtonPressed)
-            {
-                e.Handled = true;
-                _entriesContextEntry = entry;
-                _entriesContextTargetIsItem = true;
-                _lastEntriesContextItem = entry;
-                EntriesContextFlyout.ShowAt(row, new FlyoutShowOptions
-                {
-                    Position = point.Position
-                });
-            }
         }
 
-        private void EntryRow_RightTapped(object sender, RightTappedRoutedEventArgs e)
+        private void EntriesListView_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
         {
-            if (sender is not FrameworkElement row || row.DataContext is not EntryViewModel entry)
+            if (args.ItemContainer is not ListViewItem item)
             {
                 return;
             }
 
-            _entriesContextEntry = entry;
-            _entriesContextTargetIsItem = true;
+            item.RightTapped -= EntryContainer_RightTapped;
+            item.RightTapped += EntryContainer_RightTapped;
+        }
+
+        private void EntryContainer_RightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            if (sender is not ListViewItem item || item.Content is not EntryViewModel entry)
+            {
+                return;
+            }
+
             _lastEntriesContextItem = entry;
 
-            if (IsEntryAlreadySelected(entry))
+            if (!IsEntryAlreadySelected(entry))
+            {
+                SelectEntryInList(entry, ensureVisible: false);
+            }
+
+            ShowEntriesContextFlyout(new EntriesContextRequest(
+                item,
+                e.GetPosition(item),
+                entry,
+                IsItemTarget: true));
+            e.Handled = true;
+        }
+
+        private void EntriesListView_RightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            Point position = e.GetPosition(EntriesListView);
+            if (e.OriginalSource is DependencyObject source &&
+                FindAncestor<ListViewItem>(source) is not null)
             {
                 e.Handled = true;
                 return;
             }
 
-            SelectEntryInList(entry, ensureVisible: false);
+            if (TryFindListViewItemBoundsAt(position, out ListViewItem? hitItem, out _) &&
+                hitItem is not null)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            _lastEntriesContextItem = null;
+            ShowEntriesContextFlyout(new EntriesContextRequest(
+                EntriesListView,
+                position,
+                Entry: null,
+                IsItemTarget: false));
+            e.Handled = true;
+        }
+
+        private void ShowEntriesContextFlyout(EntriesContextRequest request)
+        {
+            // `MenuFlyout.IsOpen` can be false during transition while `Opening` has
+            // already marked `_entriesFlyoutOpen = true`. Treat either as "open-ish"
+            // and route through pending-reopen path to avoid losing context.
+            bool flyoutActive = _entriesFlyoutOpen || EntriesContextFlyout.IsOpen;
+            if (flyoutActive)
+            {
+                // During one right-click chain, multiple handlers can race to switch the flyout.
+                // Keep the item-target request if it is already pending; do not let a later
+                // background request override it.
+                if (_pendingEntriesContextRequest is { IsItemTarget: true } &&
+                    !request.IsItemTarget)
+                {
+                    return;
+                }
+
+                _pendingEntriesContextRequest = request;
+                if (EntriesContextFlyout.IsOpen)
+                {
+                    EntriesContextFlyout.Hide();
+                }
+                return;
+            }
+
+            _entriesContextRequest = request;
+            _lastEntriesContextItem = request.Entry ?? _lastEntriesContextItem;
+            EntriesContextFlyout.ShowAt(request.Anchor, new FlyoutShowOptions
+            {
+                Position = request.Position
+            });
         }
 
         private void EntriesListView_PointerPressedPreview(object sender, PointerRoutedEventArgs e)
@@ -4450,64 +4498,236 @@ namespace FileExplorerUI
         private void EntriesContextFlyout_Opening(object sender, object e)
         {
             _entriesFlyoutOpen = true;
+            ResetColumnSplitterCursorState();
 
-            EntryViewModel? contextEntry = _entriesContextTargetIsItem
-                ? (_entriesContextEntry is { IsLoaded: true } ? _entriesContextEntry : _lastEntriesContextItem)
+            EntryViewModel? contextEntry = _entriesContextRequest is { IsItemTarget: true } currentRequest
+                ? (currentRequest.Entry is { IsLoaded: true } ? currentRequest.Entry : _lastEntriesContextItem)
                 : null;
-            bool hasItemTarget = contextEntry is { IsLoaded: true };
-            bool canPaste = CanPasteIntoCurrentDirectory() && _fileManagementCoordinator.HasClipboardItems;
-            Visibility clipboardVisibility = hasItemTarget ? Visibility.Visible : Visibility.Collapsed;
-
-            if (ContextCopyMenuItem is not null)
+            FileCommandTarget target = ResolveEntriesContextTarget(contextEntry);
+            var commandIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (FileCommandDescriptor command in _fileCommandCatalog.BuildCommands(target))
             {
-                ContextCopyMenuItem.IsEnabled = hasItemTarget && CanCopySelectedEntry();
-                ContextCopyMenuItem.Visibility = clipboardVisibility;
+                commandIds.Add(command.Id);
+            }
+
+            bool isFileTarget = target.Kind == FileCommandTargetKind.FileEntry;
+            bool isFolderTarget = target.Kind is FileCommandTargetKind.DirectoryEntry or FileCommandTargetKind.DriveRoot;
+            bool isBackgroundTarget = target.Kind is FileCommandTargetKind.ListBackground or FileCommandTargetKind.CurrentDirectory;
+            bool hasItemTarget = contextEntry is { IsLoaded: true };
+            bool canCreate = CanCreateInCurrentDirectory();
+            bool canPaste = CanPasteIntoCurrentDirectory() && _fileManagementCoordinator.HasClipboardItems;
+
+            bool showOpen = commandIds.Contains(FileCommandIds.Open);
+            bool showOpenWith = isFileTarget && commandIds.Contains(FileCommandIds.OpenWith);
+            bool showShare = isFileTarget && commandIds.Contains(FileCommandIds.Share);
+            bool showCompress = (isFileTarget || isFolderTarget) && commandIds.Contains(FileCommandIds.Compress);
+            bool showCreateShortcut = isFileTarget && commandIds.Contains(FileCommandIds.CreateShortcut);
+            bool showCopyPath = (isFileTarget || isFolderTarget) && commandIds.Contains(FileCommandIds.CopyPath);
+            bool showSetTag = (isFileTarget || isFolderTarget) && commandIds.Contains(FileCommandIds.SetTag);
+            bool showOpenInNewWindow = isFolderTarget && commandIds.Contains(FileCommandIds.OpenInNewWindow);
+            bool showPinSidebar = isFolderTarget && (commandIds.Contains(FileCommandIds.PinToSidebar) || commandIds.Contains(FileCommandIds.UnpinFromSidebar));
+            bool showOpenInTerminal = (isFolderTarget || isBackgroundTarget) && commandIds.Contains(FileCommandIds.OpenInTerminal);
+            bool showView = isBackgroundTarget && commandIds.Contains(FileCommandIds.View);
+            bool showSortBy = isBackgroundTarget && commandIds.Contains(FileCommandIds.SortBy);
+            bool showGroupBy = isBackgroundTarget && commandIds.Contains(FileCommandIds.GroupBy);
+            bool showNewFile = isBackgroundTarget && commandIds.Contains(FileCommandIds.NewFile);
+            bool showNewFolder = isBackgroundTarget && commandIds.Contains(FileCommandIds.NewFolder);
+            bool showNewSubMenu = showNewFile || showNewFolder;
+            bool showCut = commandIds.Contains(FileCommandIds.Cut);
+            bool showCopy = commandIds.Contains(FileCommandIds.Copy);
+            bool showPaste = commandIds.Contains(FileCommandIds.Paste) && (isBackgroundTarget || isFolderTarget);
+            bool showRename = commandIds.Contains(FileCommandIds.Rename);
+            bool showDelete = commandIds.Contains(FileCommandIds.Delete);
+            bool showRefresh = isBackgroundTarget && commandIds.Contains(FileCommandIds.Refresh);
+            bool showProperties = commandIds.Contains(FileCommandIds.Properties);
+
+            if (ContextOpenMenuItem is not null)
+            {
+                ContextOpenMenuItem.Visibility = showOpen ? Visibility.Visible : Visibility.Collapsed;
+                ContextOpenMenuItem.IsEnabled = false;
+            }
+
+            if (ContextOpenWithMenuItem is not null)
+            {
+                ContextOpenWithMenuItem.Visibility = showOpenWith ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextShareMenuItem is not null)
+            {
+                ContextShareMenuItem.Visibility = showShare ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextCompressSubMenu is not null)
+            {
+                ContextCompressSubMenu.Visibility = showCompress ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextCreateShortcutMenuItem is not null)
+            {
+                ContextCreateShortcutMenuItem.Visibility = showCreateShortcut ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextCopyPathMenuItem is not null)
+            {
+                ContextCopyPathMenuItem.Visibility = showCopyPath ? Visibility.Visible : Visibility.Collapsed;
+                ContextCopyPathMenuItem.Text = isFileTarget ? "Copy file path" : "Copy folder path";
+            }
+
+            if (ContextSetTagMenuItem is not null)
+            {
+                ContextSetTagMenuItem.Visibility = showSetTag ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextOpenInNewWindowMenuItem is not null)
+            {
+                ContextOpenInNewWindowMenuItem.Visibility = showOpenInNewWindow ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextPinSidebarMenuItem is not null)
+            {
+                ContextPinSidebarMenuItem.Visibility = showPinSidebar ? Visibility.Visible : Visibility.Collapsed;
+                ContextPinSidebarMenuItem.Text = "Pin to sidebar";
+            }
+
+            if (ContextOpenInTerminalMenuItem is not null)
+            {
+                ContextOpenInTerminalMenuItem.Visibility = showOpenInTerminal ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextViewSubMenu is not null)
+            {
+                ContextViewSubMenu.Visibility = showView ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextSortBySubMenu is not null)
+            {
+                ContextSortBySubMenu.Visibility = showSortBy ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextGroupBySubMenu is not null)
+            {
+                ContextGroupBySubMenu.Visibility = showGroupBy ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextNewSubMenu is not null)
+            {
+                ContextNewSubMenu.Visibility = showNewSubMenu ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextNewFileMenuItem is not null)
+            {
+                ContextNewFileMenuItem.Visibility = showNewFile ? Visibility.Visible : Visibility.Collapsed;
+                ContextNewFileMenuItem.IsEnabled = showNewFile && canCreate;
+            }
+
+            if (ContextNewFolderMenuItem is not null)
+            {
+                ContextNewFolderMenuItem.Visibility = showNewFolder ? Visibility.Visible : Visibility.Collapsed;
+                ContextNewFolderMenuItem.IsEnabled = showNewFolder && canCreate;
             }
 
             if (ContextCutMenuItem is not null)
             {
+                ContextCutMenuItem.Visibility = showCut ? Visibility.Visible : Visibility.Collapsed;
                 ContextCutMenuItem.IsEnabled = hasItemTarget && CanCutSelectedEntry();
-                ContextCutMenuItem.Visibility = clipboardVisibility;
+            }
+
+            if (ContextCopyMenuItem is not null)
+            {
+                ContextCopyMenuItem.Visibility = showCopy ? Visibility.Visible : Visibility.Collapsed;
+                ContextCopyMenuItem.IsEnabled = hasItemTarget && CanCopySelectedEntry();
             }
 
             if (ContextPasteMenuItem is not null)
             {
-                ContextPasteMenuItem.IsEnabled = canPaste;
-                ContextPasteMenuItem.Visibility = clipboardVisibility;
-            }
-
-            if (ContextCreateSeparator is not null)
-            {
-                ContextCreateSeparator.Visibility = Visibility.Visible;
-            }
-
-            if (ContextClipboardSeparator is not null)
-            {
-                ContextClipboardSeparator.Visibility = clipboardVisibility;
+                ContextPasteMenuItem.Visibility = showPaste ? Visibility.Visible : Visibility.Collapsed;
+                ContextPasteMenuItem.IsEnabled = isBackgroundTarget && canPaste;
             }
 
             if (ContextRenameMenuItem is not null)
             {
+                ContextRenameMenuItem.Visibility = showRename ? Visibility.Visible : Visibility.Collapsed;
                 ContextRenameMenuItem.IsEnabled = hasItemTarget && CanRenameSelectedEntry();
             }
 
             if (ContextDeleteMenuItem is not null)
             {
+                ContextDeleteMenuItem.Visibility = showDelete ? Visibility.Visible : Visibility.Collapsed;
                 ContextDeleteMenuItem.IsEnabled = hasItemTarget && CanDeleteSelectedEntry();
+            }
+
+            if (ContextRefreshMenuItem is not null)
+            {
+                ContextRefreshMenuItem.Visibility = showRefresh ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (ContextPropertiesMenuItem is not null)
+            {
+                ContextPropertiesMenuItem.Visibility = showProperties ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            bool showPrimaryGroup = showOpen ||
+                showOpenWith ||
+                showShare ||
+                showCompress ||
+                showCreateShortcut ||
+                showCopyPath ||
+                showSetTag ||
+                showOpenInNewWindow ||
+                showPinSidebar ||
+                showOpenInTerminal ||
+                showView ||
+                showSortBy ||
+                showGroupBy ||
+                showNewSubMenu;
+            bool showEditGroup = showCut || showCopy || showPaste;
+            bool showManageGroup = showRename || showDelete || showRefresh;
+
+            if (ContextPrimarySeparator is not null)
+            {
+                ContextPrimarySeparator.Visibility = showPrimaryGroup && (showEditGroup || showManageGroup || showProperties)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            if (ContextEditSeparator is not null)
+            {
+                ContextEditSeparator.Visibility = showEditGroup && (showManageGroup || showProperties)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            if (ContextTailSeparator is not null)
+            {
+                ContextTailSeparator.Visibility = (showManageGroup || showEditGroup || showPrimaryGroup) && showProperties
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             }
         }
 
         private void EntriesContextFlyout_Closed(object sender, object e)
         {
             _entriesFlyoutOpen = false;
-            TraceFocusState("EntriesContextFlyout_Closed:begin", $"pendingAction={_pendingEntriesContextAction}; pendingRename={_pendingContextRenameEntry?.Name ?? "<null>"}");
-            _entriesContextEntry = null;
-            _entriesContextTargetIsItem = false;
+
+            if (_pendingEntriesContextRequest is not null)
+            {
+                EntriesContextRequest pendingRequest = _pendingEntriesContextRequest;
+                _pendingEntriesContextRequest = null;
+
+                _entriesContextRequest = pendingRequest;
+                _lastEntriesContextItem = pendingRequest.Entry ?? _lastEntriesContextItem;
+                EntriesContextFlyout.ShowAt(pendingRequest.Anchor, new FlyoutShowOptions
+                {
+                    Position = pendingRequest.Position
+                });
+                return;
+            }
+
+            _entriesContextRequest = null;
             _lastEntriesContextItem = null;
             if (_pendingContextRenameEntry is not null)
             {
                 EntriesListView.Focus(FocusState.Programmatic);
-                TraceFocusState("EntriesContextFlyout_Closed:after-focus-list-for-rename");
                 EntryViewModel entry = _pendingContextRenameEntry;
                 _pendingContextRenameEntry = null;
                 _ = BeginRenameOverlayAsync(entry);
@@ -4519,17 +4739,21 @@ namespace FileExplorerUI
             switch (pendingAction)
             {
                 case PendingEntriesContextAction.NewFile:
-                    TraceFocusState("EntriesContextFlyout_Closed:dispatch-new-file");
                     _ = ExecuteNewFileAsync();
                     break;
                 case PendingEntriesContextAction.NewFolder:
-                    TraceFocusState("EntriesContextFlyout_Closed:dispatch-new-folder");
                     _ = ExecuteNewFolderAsync();
                     break;
                 case PendingEntriesContextAction.Paste:
                     _ = ExecutePasteAsync();
                     break;
             }
+        }
+
+        private void ResetColumnSplitterCursorState()
+        {
+            _splitterHoverCount = 0;
+            _activeColumnSplitter = null;
         }
 
         private ListViewItem? FindListViewItemAt(Point position)
@@ -4551,7 +4775,117 @@ namespace FileExplorerUI
                 }
             }
 
+            if (position.X > 0)
+            {
+                Point leftAlignedPosition = new(1, position.Y);
+                foreach (UIElement hit in VisualTreeHelper.FindElementsInHostCoordinates(leftAlignedPosition, EntriesListView, includeAllElements: true))
+                {
+                    if (hit is ListViewItem direct)
+                    {
+                        return direct;
+                    }
+
+                    if (hit is DependencyObject dep)
+                    {
+                        ListViewItem? ancestor = FindAncestor<ListViewItem>(dep);
+                        if (ancestor is not null)
+                        {
+                            return ancestor;
+                        }
+                    }
+                }
+            }
+
+            ListViewItem? verticalMatch = FindListViewItemByVerticalPosition(position.Y);
+            if (verticalMatch is not null)
+            {
+                return verticalMatch;
+            }
+
             return null;
+        }
+
+        private bool TryFindListViewItemBoundsAt(Point position, out ListViewItem? item, out Rect bounds)
+        {
+            item = null;
+            bounds = default;
+
+            foreach (UIElement hit in VisualTreeHelper.FindElementsInHostCoordinates(position, EntriesListView, includeAllElements: true))
+            {
+                if (hit is ListViewItem direct)
+                {
+                    Rect directBounds = GetListViewItemBounds(direct);
+                    if (directBounds.Contains(position))
+                    {
+                        item = direct;
+                        bounds = directBounds;
+                        return true;
+                    }
+                }
+
+                if (hit is DependencyObject dep)
+                {
+                    ListViewItem? ancestor = FindAncestor<ListViewItem>(dep);
+                    if (ancestor is not null)
+                    {
+                        Rect ancestorBounds = GetListViewItemBounds(ancestor);
+                        if (ancestorBounds.Contains(position))
+                        {
+                            item = ancestor;
+                            bounds = ancestorBounds;
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private Rect GetListViewItemBounds(ListViewItem item)
+        {
+            GeneralTransform transform = item.TransformToVisual(EntriesListView);
+            return transform.TransformBounds(new Rect(0, 0, item.ActualWidth, item.ActualHeight));
+        }
+
+        private ListViewItem? FindListViewItemByVerticalPosition(double y)
+        {
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (EntriesListView.ContainerFromIndex(i) is not ListViewItem item)
+                {
+                    continue;
+                }
+
+                GeneralTransform? transform = item.TransformToVisual(EntriesListView);
+                Rect bounds = transform.TransformBounds(new Rect(0, 0, item.ActualWidth, item.ActualHeight));
+                if (y >= bounds.Top && y <= bounds.Bottom)
+                {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+
+        private FileCommandTarget ResolveEntriesContextTarget(EntryViewModel? contextEntry)
+        {
+            if (contextEntry is { IsLoaded: true })
+            {
+                if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) && contextEntry.IsDirectory)
+                {
+                    return FileCommandTargetResolver.ResolveDriveRoot(contextEntry.FullPath);
+                }
+
+                return FileCommandTargetResolver.ResolveEntry(contextEntry.FullPath, contextEntry.IsDirectory);
+            }
+
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return FileCommandTargetResolver.ResolveVirtualNode(ShellMyComputerPath, "My Computer");
+            }
+
+            return FileCommandTargetResolver.ResolveListBackground(_currentPath);
         }
 
         private async void UpButton_Click(object sender, RoutedEventArgs e)
@@ -4801,7 +5135,6 @@ namespace FileExplorerUI
 
         private async void ContextNewFile_Click(object sender, RoutedEventArgs e)
         {
-            TraceFocusState("ContextNewFile_Click");
             if (_entriesFlyoutOpen)
             {
                 _pendingEntriesContextAction = PendingEntriesContextAction.NewFile;
@@ -4813,7 +5146,6 @@ namespace FileExplorerUI
 
         private async void ContextNewFolder_Click(object sender, RoutedEventArgs e)
         {
-            TraceFocusState("ContextNewFolder_Click");
             if (_entriesFlyoutOpen)
             {
                 _pendingEntriesContextAction = PendingEntriesContextAction.NewFolder;
@@ -4928,7 +5260,6 @@ namespace FileExplorerUI
             string src = Path.Combine(_currentPath, entry.Name);
             string oldName = entry.Name;
             TreeViewNode? renamedTreeNode = entry.IsDirectory ? FindSidebarTreeNodeByPath(src) : null;
-            TraceListSelection("RenameEntryAsync:begin", entry, $"selectedIndex={selectedIndex}; oldName={oldName}; newName={newName}");
             try
             {
                 RenamedEntryInfo renamed = await _fileManagementCoordinator.RenameEntryAsync(_currentPath, entry.Name, newName);
@@ -4951,7 +5282,6 @@ namespace FileExplorerUI
                     }
                 }
                 ApplyLocalRename(selectedIndex, newName);
-                TraceListSelection("RenameEntryAsync:success-before-focus", entry, $"selectedIndex={selectedIndex}; dst={renamed.TargetPath}");
                 if (ReferenceEquals(_pendingCreatedEntrySelection, entry))
                 {
                     CompleteCreatedEntrySelectionIfPending(entry, ensureVisible: false);
@@ -4968,7 +5298,6 @@ namespace FileExplorerUI
                 {
                     CompleteCreatedEntrySelectionIfPending(entry, ensureVisible: false);
                 }
-                TraceListSelection("RenameEntryAsync:failed", entry, ex.Message);
                 UpdateStatus($"Rename failed: {ex.Message}");
             }
         }
@@ -5698,6 +6027,12 @@ namespace FileExplorerUI
 
     internal static partial class NativeMethods
     {
+        [LibraryImport("user32.dll", EntryPoint = "LoadCursorW", SetLastError = true)]
+        internal static partial IntPtr LoadCursor(IntPtr hInstance, int lpCursorName);
+
+        [LibraryImport("user32.dll", EntryPoint = "SetCursor", SetLastError = true)]
+        internal static partial IntPtr SetCursor(IntPtr hCursor);
+
         [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
         internal static partial IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 

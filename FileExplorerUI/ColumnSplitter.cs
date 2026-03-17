@@ -2,24 +2,13 @@ using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using System;
-using System.Runtime.InteropServices;
 
 namespace FileExplorerUI;
 
 public sealed class ColumnSplitter : Grid
 {
     private static readonly InputCursor ResizeCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeWestEast);
-    private const int IdcSizeWe = 32644;
     private readonly Border _guide;
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr LoadCursor(IntPtr hInstance, int lpCursorName);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr SetCursor(IntPtr hCursor);
-
-    private static readonly IntPtr SizeWeCursorHandle = LoadCursor(IntPtr.Zero, IdcSizeWe);
 
     public ColumnSplitter()
     {
@@ -35,6 +24,7 @@ public sealed class ColumnSplitter : Grid
         };
         Children.Add(_guide);
 
+        // Keep cursor behavior local to splitter surface; do not force global SetCursor.
         PointerEntered += (_, _) => ProtectedCursor = ResizeCursor;
         PointerMoved += (_, _) => ProtectedCursor = ResizeCursor;
         PointerExited += (_, _) => ProtectedCursor = null;
@@ -45,16 +35,5 @@ public sealed class ColumnSplitter : Grid
     {
         get => _guide.Visibility == Visibility.Visible;
         set => _guide.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    public static bool TryApplyResizeCursor()
-    {
-        if (SizeWeCursorHandle == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        SetCursor(SizeWeCursorHandle);
-        return true;
     }
 }

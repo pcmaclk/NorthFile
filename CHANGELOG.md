@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Added the placeholder file/folder/background context-menu matrix to the planning docs, including the decision that compression should later support both ZIP and 7z, and that background `New` should become a submenu.
+- Started using the standalone file-command model for list context-menu visibility decisions, so file-item vs background menu differences now begin to flow from the shared target/trait/catalog layer.
+- Added a standalone file-command model layer under `FileExplorerUI/Commands` with target kinds, file traits, capability flags, a target resolver, and provider-based command catalog primitives so future file-type-specific commands can grow outside `MainWindow`.
 - Added the first shared `CanCreate / CanRename / CanDelete / CanCopy / CanCut / CanPaste` checks in `MainWindow.xaml.cs` and started using them to drive toolbar and context-menu state from one place.
 - Began the command-layer refactor in `MainWindow.xaml.cs`: existing new / rename / delete / copy / cut / paste toolbar and context-menu entry points now route through shared `Execute...` command functions instead of each entry point owning its own validation and dispatch path.
 - Added a dedicated file-management command architecture document to keep future toolbar, context-menu, and shortcut work on one shared command path instead of duplicating file-operation logic per entry point.
@@ -116,3 +119,22 @@ All notable changes to this project will be documented in this file.
 - Week1: browsing/navigation/paging/rename/delete stability and cache invalidation.
 - Week2: real NTFS probe + boot sector params + minimal MFT/index integration.
 - Week3: layered search path (prefix + ASCII fast path + UTF-16 fallback), search UI and perf metrics.
+- 2026-03-17: expanded the list context menu into distinct file / folder / background display groups, moved background creation under a `New` submenu, and left future commands as disabled placeholders while preserving the existing working actions
+- 2026-03-17: updated the file-management command-architecture documentation so first-pass compression is ZIP-first and 7z remains a later follow-up
+- 2026-03-17: fixed repeated right-click on an item so the list context target no longer falls back to the background menu when the item target was already established by the row event chain
+- 2026-03-17: tightened the list context-target pipeline with an explicit row-primed flag so repeated right-click on the same item keeps the item menu even when the later list-level `ContextRequested` pass does not resolve a container again
+- 2026-03-17: split list item and list background right-click handling into separate `RightTapped` paths so mouse right-click no longer depends on the shared list-level `ContextRequested` chain to decide item-vs-background menus
+- 2026-03-17: removed the manual `ShowAt(...)` call from list-row `RightTapped` so item context menus no longer open twice through both the custom row path and the default attached flyout path
+- 2026-03-17: added a strict hit-test fallback in the list-level right-click handler so item context can still be resolved from the actual pointer position when the row-level event does not fire, while preserving background menus for true blank-space clicks
+- 2026-03-17: queued repeated context-menu reopen requests so re-right-clicking while the flyout is already open no longer loses the item target when the first flyout closes before reopening at the new pointer location
+- 2026-03-17: moved list-item right-click handling onto the `ListViewItem` container instead of the name-row template surface so repeated right-click can use the full item container hit area instead of depending on the narrower content template region
+- Fixed repeated entry/background context-menu reopen behavior by suppressing the extra `ListView.RightTapped` pass that followed preview-driven flyout switching.
+- Refined entries context-menu suppression to a short preview-switch window so repeated item right-clicks are not blocked by stale one-shot suppression flags.
+- Guarded `ShowEntriesContextFlyout` pending-target updates so an item-target reopen request cannot be overwritten by a later background request in the same right-click event chain.
+- Added context-menu event-chain diagnostics (`gid`, flyout state, preview/right-tap stages, show/queue-reopen stages) to pinpoint duplicate background-open paths during repeated right-click interactions.
+- Simplified entries context-menu routing to match event source ownership: item-right-click is handled only by `ListViewItem` container handler, while list container right-click only opens background menu; removed preview right-click takeover and list-side item fallback routing.
+- Cleaned up temporary diagnostics and stale context-menu code paths: removed `ContextMenu/Focus/ListSelection` tracing hooks and deleted unused legacy handlers to keep the right-click pipeline maintainable.
+- Refactored entries context-flyout state into a single request model (`EntriesContextRequest`) and removed unused `primedFromRow` / split pending-state fields to reduce right-click pipeline complexity.
+- Moved current-directory existence checks out of menu-open/UI-state evaluation and into action execution (`New`/`Paste`) to avoid sync `Directory.Exists(...)` during context-flyout opening.
+- Stabilized cursor behavior by removing global cursor-forcing paths and keeping splitter cursor feedback local to `ColumnSplitter` (`ProtectedCursor` only), avoiding stuck busy/resize cursor states.
+- Context menu now dismisses automatically when the entries list is actually scrolled (offset delta check in `ListScrollViewer.ViewChanged`).
