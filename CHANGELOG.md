@@ -138,3 +138,4 @@ All notable changes to this project will be documented in this file.
 - Moved current-directory existence checks out of menu-open/UI-state evaluation and into action execution (`New`/`Paste`) to avoid sync `Directory.Exists(...)` during context-flyout opening.
 - Stabilized cursor behavior by removing global cursor-forcing paths and keeping splitter cursor feedback local to `ColumnSplitter` (`ProtectedCursor` only), avoiding stuck busy/resize cursor states.
 - Context menu now dismisses automatically when the entries list is actually scrolled (offset delta check in `ListScrollViewer.ViewChanged`).
+- Completed first-pass context-menu category display for file/folder/background targets via a provider-driven command catalog, including grouped visibility and `New` submenu wiring in the list flyout UI.

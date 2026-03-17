@@ -115,6 +115,10 @@ Tasks:
 - overwrite / duplicate / skip decisions
 - progress and failure messaging
 
+Current architecture support:
+- command-target and file-trait resolution now live outside `MainWindow`
+- provider-based command catalog is in place for later file-type-specific menu expansion
+
 Definition of done:
 - basic file copy and move flows are complete
 - long operations remain responsive

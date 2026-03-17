@@ -418,8 +418,9 @@
                             Margin="0,8,0,0"
                             HorizontalAlignment="Stretch"
                             Background="Transparent"
+                            ContainerContentChanging="EntriesListView_ContainerContentChanging"
                             DoubleTapped="EntriesListView_DoubleTapped"
-                            ContextRequested="EntriesListView_ContextRequested"
+                            RightTapped="EntriesListView_RightTapped"
                             ItemContainerTransitions="{x:Null}"
                             IsItemClickEnabled="False"
                             Loaded="EntriesListView_Loaded"
@@ -444,24 +445,55 @@
                                     <Setter Property="VerticalContentAlignment" Value="Stretch" />
                                 </Style>
                             </ListView.ItemContainerStyle>
-                            <ListView.ContextFlyout>
+                            <ListView.Resources>
                                 <MenuFlyout
                                     x:Name="EntriesContextFlyout"
                                     Opening="EntriesContextFlyout_Opening"
                                     Closed="EntriesContextFlyout_Closed">
-                                    <MenuFlyoutItem Click="ContextNewFile_Click" Text="New File" />
-                                    <MenuFlyoutItem Click="ContextNewFolder_Click" Text="New Folder" />
-                                    <MenuFlyoutSeparator x:Name="ContextCreateSeparator" />
-                                    <MenuFlyoutItem x:Name="ContextCopyMenuItem" Click="ContextCopy_Click" Text="Copy" />
+                                    <MenuFlyoutItem x:Name="ContextOpenMenuItem" IsEnabled="False" Text="Open" />
+                                    <MenuFlyoutItem x:Name="ContextOpenWithMenuItem" IsEnabled="False" Text="Open with" />
+                                    <MenuFlyoutItem x:Name="ContextShareMenuItem" IsEnabled="False" Text="Share" />
+                                    <MenuFlyoutSubItem x:Name="ContextCompressSubMenu" Text="Compress">
+                                        <MenuFlyoutItem x:Name="ContextCompressZipMenuItem" IsEnabled="False" Text="Compress to ZIP" />
+                                        <MenuFlyoutItem x:Name="ContextCompress7zMenuItem" IsEnabled="False" Text="Compress to 7z" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutItem x:Name="ContextCreateShortcutMenuItem" IsEnabled="False" Text="Create shortcut" />
+                                    <MenuFlyoutItem x:Name="ContextCopyPathMenuItem" IsEnabled="False" Text="Copy path" />
+                                    <MenuFlyoutItem x:Name="ContextSetTagMenuItem" IsEnabled="False" Text="Set tag" />
+                                    <MenuFlyoutItem x:Name="ContextOpenInNewWindowMenuItem" IsEnabled="False" Text="Open in new window" />
+                                    <MenuFlyoutItem x:Name="ContextPinSidebarMenuItem" IsEnabled="False" Text="Pin to sidebar" />
+                                    <MenuFlyoutItem x:Name="ContextOpenInTerminalMenuItem" IsEnabled="False" Text="Open in terminal" />
+                                    <MenuFlyoutSubItem x:Name="ContextViewSubMenu" Text="View">
+                                        <MenuFlyoutItem IsEnabled="False" Text="Details" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="List" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem x:Name="ContextSortBySubMenu" Text="Sort by">
+                                        <MenuFlyoutItem IsEnabled="False" Text="Name" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="Type" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="Size" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="Modified date" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem x:Name="ContextGroupBySubMenu" Text="Group by">
+                                        <MenuFlyoutItem IsEnabled="False" Text="None" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="Type" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="Modified date" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem x:Name="ContextNewSubMenu" Text="New">
+                                        <MenuFlyoutItem x:Name="ContextNewFileMenuItem" Click="ContextNewFile_Click" Text="New File" />
+                                        <MenuFlyoutItem x:Name="ContextNewFolderMenuItem" Click="ContextNewFolder_Click" Text="New Folder" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSeparator x:Name="ContextPrimarySeparator" />
                                     <MenuFlyoutItem x:Name="ContextCutMenuItem" Click="ContextCut_Click" Text="Cut" />
+                                    <MenuFlyoutItem x:Name="ContextCopyMenuItem" Click="ContextCopy_Click" Text="Copy" />
                                     <MenuFlyoutItem x:Name="ContextPasteMenuItem" Click="ContextPaste_Click" Text="Paste" />
-                                    <MenuFlyoutSeparator x:Name="ContextClipboardSeparator" />
+                                    <MenuFlyoutSeparator x:Name="ContextEditSeparator" />
                                     <MenuFlyoutItem x:Name="ContextRenameMenuItem" Click="ContextRename_Click" Text="Rename" />
                                     <MenuFlyoutItem x:Name="ContextDeleteMenuItem" Click="ContextDelete_Click" Text="Delete" />
-                                    <MenuFlyoutSeparator />
-                                    <MenuFlyoutItem Click="ContextRefresh_Click" Text="Refresh" />
+                                    <MenuFlyoutItem x:Name="ContextRefreshMenuItem" Click="ContextRefresh_Click" Text="Refresh" />
+                                    <MenuFlyoutSeparator x:Name="ContextTailSeparator" />
+                                    <MenuFlyoutItem x:Name="ContextPropertiesMenuItem" IsEnabled="False" Text="Properties" />
                                 </MenuFlyout>
-                            </ListView.ContextFlyout>
+                            </ListView.Resources>
                             <ListView.ItemTemplate>
                                 <DataTemplate>
                                     <Border
@@ -469,7 +501,7 @@
                                         Padding="8,0,8,0"
                                         HorizontalAlignment="Stretch"
                                         PointerPressed="EntryRow_PointerPressed"
-                                        RightTapped="EntryRow_RightTapped">
+                                        >
                                         <Grid HorizontalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />

@@ -147,19 +147,125 @@ This avoids each entry point inventing its own rules.
 
 The command layer should work from a small set of explicit targets.
 
-Current target types:
+Implemented structure:
 
-- selected list item
-- list background/current directory
-- selected tree node
+- [D:\Develop\Workspace\Rust\FileExplorer\FileExplorerUI\Commands\FileCommandModels.cs](D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI/Commands/FileCommandModels.cs)
+- [D:\Develop\Workspace\Rust\FileExplorer\FileExplorerUI\Commands\FileCommandTargetResolver.cs](D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI/Commands/FileCommandTargetResolver.cs)
+- [D:\Develop\Workspace\Rust\FileExplorer\FileExplorerUI\Commands\FileCommandCatalog.cs](D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI/Commands/FileCommandCatalog.cs)
+- [D:\Develop\Workspace\Rust\FileExplorer\FileExplorerUI\Commands\FileCommandProviders.cs](D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI/Commands/FileCommandProviders.cs)
 
-Recommended future model:
+Current target kinds:
 
-- `FileCommandTargetKind.Entry`
-- `FileCommandTargetKind.DirectoryBackground`
-- `FileCommandTargetKind.TreeNode`
+- `ListBackground`
+- `CurrentDirectory`
+- `FileEntry`
+- `DirectoryEntry`
+- `DriveRoot`
+- `TreeDirectoryNode`
+- `VirtualNode`
 
 This keeps command logic clear when the same menu surface can mean different things.
+
+## File Traits
+
+Do not explode the target-kind model for every file extension.
+
+Instead:
+
+- target kind answers "what did the user click"
+- traits answer "what sort of file is this"
+
+Current traits model:
+
+- `Shortcut`
+- `Executable`
+- `Archive`
+- `Image`
+- `Video`
+- `Audio`
+- `Text`
+- `Script`
+
+This lets command availability evolve without rewriting the whole target model.
+
+## Command Catalog
+
+Command definitions should be composed through providers, not large `if/else` blocks inside the window layer.
+
+Current structure:
+
+- `BaseFileCommandProvider`
+- `ShortcutFileCommandProvider`
+- `ExecutableFileCommandProvider`
+- `ArchiveFileCommandProvider`
+- `PreviewFileCommandProvider`
+
+Current catalog responsibilities:
+
+- merge command contributions
+- deduplicate by command id
+- keep file-type-specific command growth outside `MainWindow`
+
+## Placeholder Context Menu Matrix
+
+This matrix is the current target design only.
+
+It is a placeholder for gradual implementation, not a commitment to ship all commands at once.
+
+### File
+
+- Open
+- Open with
+- Share
+- Compress
+  - first implementation should target ZIP
+  - 7z can be added later as an extension
+- Create shortcut
+- Copy file path
+- Set tag
+- Cut
+- Copy
+- Rename
+- Delete
+- Properties
+
+### Folder
+
+- Open
+- Open in new window
+- Pin to sidebar / Unpin from sidebar
+- Compress
+  - first implementation should target ZIP
+  - 7z can be added later as an extension
+- Copy folder path
+- Set tag
+- Open in terminal
+- Cut
+- Copy
+- Paste
+- Rename
+- Delete
+- Properties
+
+### Background
+
+- View
+- Sort by
+- Group by
+- New
+  - should be a submenu so more create options can be added later
+- Open in terminal
+- Paste
+- Refresh
+- Properties
+
+### Notes
+
+- `Open with` is file-only; folders and background do not need a separate command for it.
+- `New` in the background menu should be implemented as a submenu so more create actions can be added later.
+- ZIP should be the first compression format that becomes functional; 7z should remain a later follow-up.
+- This matrix should be implemented incrementally.
+- Each command should be added through the shared target/trait/catalog model first, then wired to UI entry points later.
 
 ## Refresh and Selection Rules
 
@@ -187,6 +293,7 @@ When adding a new file-management feature:
 
 This architecture should be used next for:
 
+- list context-menu visibility decisions driven by `FileCommandTargetResolver` + `FileCommandCatalog`
 - FM-03 keyboard shortcut wiring for copy / cut / paste
 - FM-03 conflict presentation cleanup
 - FM-04 multi-select and batch actions
