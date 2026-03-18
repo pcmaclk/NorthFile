@@ -39,15 +39,12 @@ namespace FileExplorerUI
         private GridLength _sidebarColumnWidth = new(220);
         private double _detailsContentWidth = 694;
         private double _detailsRowWidth = 714;
-        private UIElement? _activeColumnSplitter;
-        private int _activeSplitterTag;
-        private double _dragStartX;
-        private double _dragStartName;
-        private double _dragStartType;
-        private double _dragStartSize;
-        private double _dragStartModified;
-        private double _dragStartContent;
-        private double _sidebarDragStartWidth;
+        private UIElement? _activeSplitterElement;
+        private SplitterDragMode _activeSplitterDragMode;
+        private ColumnSplitterKind? _activeColumnSplitterKind;
+        private ColumnResizeState? _activeColumnResizeState;
+        private double _splitterDragStartX;
+        private double? _sidebarDragStartWidth;
         private int _splitterHoverCount;
         private double _sidebarPreferredExpandedWidth = 220;
         private bool _isSidebarCompact;
@@ -250,6 +247,28 @@ namespace FileExplorerUI
             Bottom
         }
 
+        private enum SplitterDragMode
+        {
+            None,
+            Column,
+            Sidebar
+        }
+
+        private enum ColumnSplitterKind
+        {
+            Name = 1,
+            Type = 2,
+            Size = 3,
+            Modified = 4
+        }
+
+        private readonly record struct ColumnResizeState(
+            double Name,
+            double Type,
+            double Size,
+            double Modified,
+            double ContentWidth);
+
         private const int GWL_WNDPROC = -4;
         private const int WM_NCLBUTTONDOWN = 0x00A1;
         private const int WM_NCRBUTTONDOWN = 0x00A4;
@@ -352,7 +371,7 @@ namespace FileExplorerUI
 
         private void RootElement_PointerEnteredOrMoved(object sender, PointerRoutedEventArgs e)
         {
-            if (_activeColumnSplitter is null)
+            if (_activeSplitterElement is null)
             {
                 TryResetSystemCursorToArrow();
             }
@@ -430,23 +449,22 @@ namespace FileExplorerUI
 
         private void ColumnSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is not FrameworkElement splitter || splitter.Tag is not string tagText || !int.TryParse(tagText, out int tag))
+            if (sender is not UIElement splitter || !TryGetColumnSplitterKind(splitter, out ColumnSplitterKind kind))
             {
                 return;
             }
 
-            _activeColumnSplitter = splitter;
-            _activeSplitterTag = tag;
-            _dragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
-            _dragStartName = NameColumnWidth.Value;
-            _dragStartType = TypeColumnWidth.Value;
-            _dragStartSize = SizeColumnWidth.Value;
-            _dragStartModified = ModifiedColumnWidth.Value;
-            _dragStartContent = DetailsContentWidth;
-            if (splitter is UIElement uiElement)
-            {
-                uiElement.CapturePointer(e.Pointer);
-            }
+            _activeSplitterElement = splitter;
+            _activeSplitterDragMode = SplitterDragMode.Column;
+            _activeColumnSplitterKind = kind;
+            _activeColumnResizeState = new ColumnResizeState(
+                NameColumnWidth.Value,
+                TypeColumnWidth.Value,
+                SizeColumnWidth.Value,
+                ModifiedColumnWidth.Value,
+                DetailsContentWidth);
+            _splitterDragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            splitter.CapturePointer(e.Pointer);
             e.Handled = true;
         }
 
@@ -465,7 +483,11 @@ namespace FileExplorerUI
 
         private void ColumnSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is not UIElement splitter || !ReferenceEquals(splitter, _activeColumnSplitter))
+            if (sender is not UIElement splitter
+                || !ReferenceEquals(splitter, _activeSplitterElement)
+                || _activeSplitterDragMode != SplitterDragMode.Column
+                || _activeColumnSplitterKind is not ColumnSplitterKind kind
+                || _activeColumnResizeState is not ColumnResizeState state)
             {
                 return;
             }
@@ -476,7 +498,7 @@ namespace FileExplorerUI
             }
 
             double x = e.GetCurrentPoint(this.Content as UIElement).Position.X;
-            double delta = x - _dragStartX;
+            double delta = x - _splitterDragStartX;
             if (Math.Abs(delta) < 0.5)
             {
                 return;
@@ -487,35 +509,35 @@ namespace FileExplorerUI
             const double minName = 120;
             const double minModified = 120;
 
-            double name = _dragStartName;
-            double type = _dragStartType;
-            double size = _dragStartSize;
-            double modified = _dragStartModified;
-            double content = _dragStartContent;
+            double name = state.Name;
+            double type = state.Type;
+            double size = state.Size;
+            double modified = state.Modified;
+            double content = state.ContentWidth;
 
-            switch (_activeSplitterTag)
+            switch (kind)
             {
-                case 1:
+                case ColumnSplitterKind.Name:
                     {
-                        name = Math.Max(minName, _dragStartName + delta);
+                        name = Math.Max(minName, state.Name + delta);
                         content = name + 24 + type + size + modified;
                     }
                     break;
-                case 2:
+                case ColumnSplitterKind.Type:
                     {
-                        type = Math.Max(minType, _dragStartType + delta);
+                        type = Math.Max(minType, state.Type + delta);
                         content = name + 24 + type + size + modified;
                     }
                     break;
-                case 3:
+                case ColumnSplitterKind.Size:
                     {
-                        size = Math.Max(minSize, _dragStartSize + delta);
+                        size = Math.Max(minSize, state.Size + delta);
                         content = name + 24 + type + size + modified;
                     }
                     break;
-                case 4:
+                case ColumnSplitterKind.Modified:
                     {
-                        modified = Math.Max(minModified, _dragStartModified + delta);
+                        modified = Math.Max(minModified, state.Modified + delta);
                         content = name + 24 + type + size + modified;
                     }
                     break;
@@ -531,15 +553,34 @@ namespace FileExplorerUI
 
         private void ColumnSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is UIElement splitter)
+            EndActiveSplitterDrag(sender as UIElement);
+            e.Handled = true;
+        }
+
+        private static bool TryGetColumnSplitterKind(UIElement splitter, out ColumnSplitterKind kind)
+        {
+            kind = default;
+            if (splitter is not FrameworkElement element
+                || element.Tag is not string tagText
+                || !int.TryParse(tagText, out int tagValue)
+                || !Enum.IsDefined(typeof(ColumnSplitterKind), tagValue))
             {
-                splitter.ReleasePointerCaptures();
+                return false;
             }
 
-            _activeColumnSplitter = null;
-            _activeSplitterTag = 0;
-            _dragStartX = 0;
-            e.Handled = true;
+            kind = (ColumnSplitterKind)tagValue;
+            return true;
+        }
+
+        private void EndActiveSplitterDrag(UIElement? splitter)
+        {
+            splitter?.ReleasePointerCaptures();
+            _activeSplitterElement = null;
+            _activeSplitterDragMode = SplitterDragMode.None;
+            _activeColumnSplitterKind = null;
+            _activeColumnResizeState = null;
+            _sidebarDragStartWidth = null;
+            _splitterDragStartX = 0;
         }
 
 
@@ -2366,9 +2407,9 @@ namespace FileExplorerUI
                 return;
             }
 
-            _activeColumnSplitter = splitter;
-            _activeSplitterTag = 100;
-            _dragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            _activeSplitterElement = splitter;
+            _activeSplitterDragMode = SplitterDragMode.Sidebar;
+            _splitterDragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
             _sidebarDragStartWidth = SidebarColumnWidth.Value;
             splitter.CapturePointer(e.Pointer);
             e.Handled = true;
@@ -2376,7 +2417,10 @@ namespace FileExplorerUI
 
         private void SidebarSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is not UIElement splitter || !ReferenceEquals(splitter, _activeColumnSplitter) || _activeSplitterTag != 100)
+            if (sender is not UIElement splitter
+                || !ReferenceEquals(splitter, _activeSplitterElement)
+                || _activeSplitterDragMode != SplitterDragMode.Sidebar
+                || _sidebarDragStartWidth is not double startWidth)
             {
                 return;
             }
@@ -2387,27 +2431,20 @@ namespace FileExplorerUI
             }
 
             double x = e.GetCurrentPoint(this.Content as UIElement).Position.X;
-            double delta = x - _dragStartX;
-            double requestedWidth = _sidebarDragStartWidth + delta;
+            double delta = x - _splitterDragStartX;
+            double requestedWidth = startWidth + delta;
             ApplySidebarWidthLayout(requestedWidth, fromUserDrag: true);
             e.Handled = true;
         }
 
         private void SidebarSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
-            if (_activeSplitterTag != 100)
+            if (_activeSplitterDragMode != SplitterDragMode.Sidebar)
             {
                 return;
             }
 
-            if (sender is UIElement splitter)
-            {
-                splitter.ReleasePointerCaptures();
-            }
-
-            _activeColumnSplitter = null;
-            _activeSplitterTag = 0;
-            _dragStartX = 0;
+            EndActiveSplitterDrag(sender as UIElement);
             e.Handled = true;
         }
 
@@ -4612,7 +4649,11 @@ namespace FileExplorerUI
         private void ResetColumnSplitterCursorState()
         {
             _splitterHoverCount = 0;
-            _activeColumnSplitter = null;
+            _activeSplitterElement = null;
+            _activeSplitterDragMode = SplitterDragMode.None;
+            _activeColumnSplitterKind = null;
+            _activeColumnResizeState = null;
+            _sidebarDragStartWidth = null;
         }
 
         private ListViewItem? FindListViewItemAt(Point position)

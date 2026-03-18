@@ -11,13 +11,17 @@ namespace FileExplorerUI
 {
     public sealed partial class SidebarView : UserControl
     {
-        private const int CompactTreeProbeLimit = 1;
         private const int CompactTreeChildLimit = 200;
         private readonly ExplorerService _explorerService = new();
         private readonly Dictionary<string, string> _pinnedPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<SidebarVisualItem> _visualItems = new();
         private readonly List<TextBlock> _labelBlocks = new();
         private readonly List<TextBlock> _headerBlocks = new();
+        private readonly List<FrameworkElement> _compactGroupHeaders = new();
+        private readonly List<Panel> _fullGroupPanels = new();
+        private readonly List<FrameworkElement> _fullOnlySections = new();
+        private readonly List<FontIcon> _groupChevrons = new();
+        private readonly List<GroupHeaderLayoutParts> _groupHeaderLayouts = new();
         private bool _isPinnedExpanded = true;
         private bool _isCloudExpanded = true;
         private bool _isNetworkExpanded = true;
@@ -39,6 +43,18 @@ namespace FileExplorerUI
             _headerBlocks.Add(CloudHeaderTextBlock);
             _headerBlocks.Add(NetworkHeaderTextBlock);
             _headerBlocks.Add(TagsHeaderTextBlock);
+            _compactGroupHeaders.AddRange(new FrameworkElement[] { PinnedGroupBorder, TreeCompactBorder, CloudGroupBorder, NetworkGroupBorder, TagsGroupBorder });
+            _fullGroupPanels.AddRange(new Panel[] { PinnedSectionPanel, TreeSectionPanel, CloudSectionPanel, NetworkSectionPanel, TagsSectionPanel });
+            _fullOnlySections.AddRange(new FrameworkElement[] { PinnedSectionPanel, TreeSectionPanel, CloudSectionPanel, NetworkSectionPanel, TagsSectionPanel, TreeHostBorder });
+            _groupChevrons.AddRange(new[] { PinnedChevron, CloudChevron, NetworkChevron, TagsChevron });
+            _groupHeaderLayouts.AddRange(new[]
+            {
+                new GroupHeaderLayoutParts(PinnedGroupBorder, PinnedGroupGrid, PinnedGroupSelectionIndicator, PinnedGroupIcon),
+                new GroupHeaderLayoutParts(TreeCompactBorder, TreeCompactGrid, TreeCompactSelectionIndicator, TreeCompactIcon),
+                new GroupHeaderLayoutParts(CloudGroupBorder, CloudGroupGrid, CloudGroupSelectionIndicator, CloudGroupIcon),
+                new GroupHeaderLayoutParts(NetworkGroupBorder, NetworkGroupGrid, NetworkGroupSelectionIndicator, NetworkGroupIcon),
+                new GroupHeaderLayoutParts(TagsGroupBorder, TagsGroupGrid, TagsGroupSelectionIndicator, TagsGroupIcon)
+            });
 
             RegisterStaticItem("Desktop", DesktopItemBorder, DesktopSelectionIndicator, DesktopTextBlock, SidebarSection.Pinned);
             RegisterStaticItem("Documents", DocumentsItemBorder, DocumentsSelectionIndicator, DocumentsTextBlock, SidebarSection.Pinned);
@@ -104,6 +120,15 @@ namespace FileExplorerUI
                 _compactMenuController.Hide();
             }
 
+            UpdateCompactButtonPlacement(compact);
+            ApplyCompactVisibility(compact);
+            ApplyHeaderLayout(compact);
+            UpdateExpandedSectionVisibility(compact);
+            SetSelectedPath(_selectedPath);
+        }
+
+        private void UpdateCompactButtonPlacement(bool compact)
+        {
             if (compact)
             {
                 AttachCompactButtons();
@@ -112,44 +137,6 @@ namespace FileExplorerUI
             {
                 DetachCompactButtons();
             }
-
-            SidebarScrollViewer.Padding = compact ? new Thickness(0, 0, 0, 0) : new Thickness(0, 0, 12, 0);
-            CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
-            PinnedSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            TreeSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            CloudSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            NetworkSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            TagsSectionPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
-            TreeHostBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            foreach (TextBlock block in _labelBlocks)
-            {
-                block.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            }
-
-            foreach (TextBlock block in _headerBlocks)
-            {
-                block.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            }
-
-            PinnedChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            CloudChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            NetworkChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-            TagsChevron.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-
-            ApplyGroupHeaderLayout(PinnedGroupBorder, PinnedGroupGrid, PinnedGroupSelectionIndicator, PinnedGroupIcon, compact);
-            ApplyGroupHeaderLayout(TreeCompactBorder, TreeCompactGrid, TreeCompactSelectionIndicator, TreeCompactIcon, compact);
-            ApplyGroupHeaderLayout(CloudGroupBorder, CloudGroupGrid, CloudGroupSelectionIndicator, CloudGroupIcon, compact);
-            ApplyGroupHeaderLayout(NetworkGroupBorder, NetworkGroupGrid, NetworkGroupSelectionIndicator, NetworkGroupIcon, compact);
-            ApplyGroupHeaderLayout(TagsGroupBorder, TagsGroupGrid, TagsGroupSelectionIndicator, TagsGroupIcon, compact);
-
-            PinnedItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isPinnedExpanded ? Visibility.Visible : Visibility.Collapsed);
-            CloudItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isCloudExpanded ? Visibility.Visible : Visibility.Collapsed);
-            NetworkItemsPanel.Visibility = compact
-                ? Visibility.Collapsed
-                : (_isNetworkExpanded && NetworkItemsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed);
-            TagsItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isTagsExpanded ? Visibility.Visible : Visibility.Collapsed);
-            SetSelectedPath(_selectedPath);
         }
 
         private void AttachCompactButtons()
@@ -159,18 +146,13 @@ namespace FileExplorerUI
                 return;
             }
 
-            RemoveFromParent(PinnedGroupBorder);
-            RemoveFromParent(TreeCompactBorder);
-            RemoveFromParent(CloudGroupBorder);
-            RemoveFromParent(NetworkGroupBorder);
-            RemoveFromParent(TagsGroupBorder);
-
+            RemoveCompactHeadersFromParents();
             CompactButtonsPanel.Children.Clear();
-            CompactButtonsPanel.Children.Add(PinnedGroupBorder);
-            CompactButtonsPanel.Children.Add(TreeCompactBorder);
-            CompactButtonsPanel.Children.Add(CloudGroupBorder);
-            CompactButtonsPanel.Children.Add(NetworkGroupBorder);
-            CompactButtonsPanel.Children.Add(TagsGroupBorder);
+            foreach (FrameworkElement header in _compactGroupHeaders)
+            {
+                CompactButtonsPanel.Children.Add(header);
+            }
+
             _compactButtonsAttached = true;
         }
 
@@ -181,18 +163,67 @@ namespace FileExplorerUI
                 return;
             }
 
-            RemoveFromParent(PinnedGroupBorder);
-            RemoveFromParent(TreeCompactBorder);
-            RemoveFromParent(CloudGroupBorder);
-            RemoveFromParent(NetworkGroupBorder);
-            RemoveFromParent(TagsGroupBorder);
+            RemoveCompactHeadersFromParents();
+            for (int i = 0; i < _compactGroupHeaders.Count; i++)
+            {
+                _fullGroupPanels[i].Children.Insert(0, _compactGroupHeaders[i]);
+            }
 
-            PinnedSectionPanel.Children.Insert(0, PinnedGroupBorder);
-            TreeSectionPanel.Children.Insert(0, TreeCompactBorder);
-            CloudSectionPanel.Children.Insert(0, CloudGroupBorder);
-            NetworkSectionPanel.Children.Insert(0, NetworkGroupBorder);
-            TagsSectionPanel.Children.Insert(0, TagsGroupBorder);
             _compactButtonsAttached = false;
+        }
+
+        private void RemoveCompactHeadersFromParents()
+        {
+            foreach (FrameworkElement header in _compactGroupHeaders)
+            {
+                RemoveFromParent(header);
+            }
+        }
+
+        private void ApplyCompactVisibility(bool compact)
+        {
+            SidebarScrollViewer.Padding = compact ? new Thickness(0) : new Thickness(0, 0, 12, 0);
+            CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            SetVisibility(_fullOnlySections, compact ? Visibility.Collapsed : Visibility.Visible);
+            TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            SetTextVisibility(_labelBlocks, compact);
+            SetTextVisibility(_headerBlocks, compact);
+            SetVisibility(_groupChevrons, compact ? Visibility.Collapsed : Visibility.Visible);
+        }
+
+        private void ApplyHeaderLayout(bool compact)
+        {
+            foreach (GroupHeaderLayoutParts layout in _groupHeaderLayouts)
+            {
+                ApplyGroupHeaderLayout(layout.Border, layout.Grid, layout.Indicator, layout.Icon, compact);
+            }
+        }
+
+        private void UpdateExpandedSectionVisibility(bool compact)
+        {
+            PinnedItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isPinnedExpanded ? Visibility.Visible : Visibility.Collapsed);
+            CloudItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isCloudExpanded ? Visibility.Visible : Visibility.Collapsed);
+            NetworkItemsPanel.Visibility = compact
+                ? Visibility.Collapsed
+                : (_isNetworkExpanded && NetworkItemsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed);
+            TagsItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isTagsExpanded ? Visibility.Visible : Visibility.Collapsed);
+        }
+
+        private static void SetTextVisibility(IEnumerable<TextBlock> blocks, bool compact)
+        {
+            Visibility visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            foreach (TextBlock block in blocks)
+            {
+                block.Visibility = visibility;
+            }
+        }
+
+        private static void SetVisibility<T>(IEnumerable<T> elements, Visibility visibility) where T : UIElement
+        {
+            foreach (T element in elements)
+            {
+                element.Visibility = visibility;
+            }
         }
 
         private static void RemoveFromParent(FrameworkElement element)
@@ -768,6 +799,7 @@ namespace FileExplorerUI
 
         private sealed record SidebarVisualItem(string Key, string? Path, Border Border, Border Indicator, TextBlock Label, SidebarSection Section, bool Selectable);
         private sealed record CompactFlyoutItem(string Label, string Glyph, string? Path, bool Selectable);
+        private sealed record GroupHeaderLayoutParts(Border Border, Grid Grid, Border Indicator, FontIcon Icon);
 
         private enum SidebarSection
         {

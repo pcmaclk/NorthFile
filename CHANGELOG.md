@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Cleaned up the context-menu resource structure by inlining `CommandMenuFlyoutPresenterStyle` into `App.xaml`, removing the old single-style `Themes/Generic.xaml`, and pruning the earlier prototype-only context-menu code.
+- Refactored the list-column splitter and sidebar splitter state in `MainWindow.xaml.cs` so they no longer share magic tags and ad hoc drag fields, and reorganized `SidebarView.xaml.cs` compact-mode layout switching into smaller focused helper methods without changing behavior.
 - Reworked the list context menu into a `CommandMenuFlyout`-based top-level presenter with a native `MenuFlyout` item tree, three separate file/folder/background menu definitions, a direction-aware bottom command bar, dynamic folder/background paste visibility, and a compact-sidebar flyout fix that went back to one-level child probing instead of blocking the UI thread with `GetAwaiter().GetResult()`.
 - Added the placeholder file/folder/background context-menu matrix to the planning docs, including the decision that compression should later support both ZIP and 7z, and that background `New` should become a submenu.
 - Started using the standalone file-command model for list context-menu visibility decisions, so file-item vs background menu differences now begin to flow from the shared target/trait/catalog layer.
