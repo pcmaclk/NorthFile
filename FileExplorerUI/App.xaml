@@ -8,17 +8,116 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
-                <ResourceDictionary Source="ms-appx:///Themes/Generic.xaml" />
                 <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
             <Style x:Key="BreadcrumbMenuFlyoutPresenterStyle" TargetType="MenuFlyoutPresenter">
                 <Setter Property="MaxHeight" Value="360" />
             </Style>
-            <Style
-                x:Key="ContextPrototypeFlyoutPresenterStyle"
-                TargetType="FlyoutPresenter"
-                BasedOn="{StaticResource DefaultFlyoutPresenterStyle}">
-                <Setter Property="Padding" Value="4" />
+
+            <Style x:Key="CommandMenuFlyoutPresenterStyle" TargetType="MenuFlyoutPresenter" BasedOn="{StaticResource DefaultMenuFlyoutPresenterStyle}">
+                <Setter Property="MinWidth" Value="280" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="MenuFlyoutPresenter">
+                            <Border
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                BackgroundSizing="InnerBorderEdge">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <ScrollViewer
+                                        x:Name="MenuFlyoutPresenterScrollViewer"
+                                        Grid.Row="0"
+                                        Margin="{TemplateBinding Padding}"
+                                        MinWidth="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=TemplateSettings.FlyoutContentMinWidth}"
+                                        AutomationProperties.AccessibilityView="Raw"
+                                        HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                        HorizontalScrollMode="{TemplateBinding ScrollViewer.HorizontalScrollMode}"
+                                        IsHorizontalRailEnabled="{TemplateBinding ScrollViewer.IsHorizontalRailEnabled}"
+                                        IsVerticalRailEnabled="{TemplateBinding ScrollViewer.IsVerticalRailEnabled}"
+                                        VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
+                                        VerticalScrollMode="{TemplateBinding ScrollViewer.VerticalScrollMode}"
+                                        ZoomMode="{TemplateBinding ScrollViewer.ZoomMode}">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+
+                                    <Border
+                                        x:Name="PART_CommandSeparator"
+                                        Grid.Row="1"
+                                        Height="1"
+                                        Margin="4,4,4,0"
+                                        Background="{ThemeResource MenuFlyoutSeparatorBackground}"
+                                        Visibility="Collapsed" />
+
+                                    <ItemsControl
+                                        x:Name="PART_CommandBar"
+                                        Grid.Row="2"
+                                        Margin="4,4,4,4"
+                                        HorizontalAlignment="Left"
+                                        Visibility="Collapsed">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel HorizontalAlignment="Left" Orientation="Horizontal" Spacing="0" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid ColumnDefinitions="Auto,Auto">
+                                                    <Button
+                                                        Width="58"
+                                                        Height="52"
+                                                        MinWidth="58"
+                                                        MinHeight="52"
+                                                        Padding="2,2"
+                                                        HorizontalAlignment="Stretch"
+                                                        VerticalAlignment="Stretch"
+                                                        Command="{Binding Command}"
+                                                        CommandParameter="{Binding CommandParameter}"
+                                                        IsEnabled="{Binding IsEnabled}"
+                                                        Style="{StaticResource SubtleButtonStyle}">
+                                                        <StackPanel
+                                                            HorizontalAlignment="Center"
+                                                            Orientation="Vertical"
+                                                            Spacing="8">
+                                                            <FontIcon
+                                                                HorizontalAlignment="Center"
+                                                                FontFamily="{Binding IconFontFamily}"
+                                                                FontSize="16"
+                                                                Glyph="{Binding IconGlyph}" />
+                                                            <TextBlock
+                                                                HorizontalAlignment="Center"
+                                                                FontSize="13"
+                                                                LineHeight="13"
+                                                                LineStackingStrategy="BlockLineHeight"
+                                                                Text="{Binding Label}"
+                                                                TextAlignment="Center"
+                                                                TextWrapping="NoWrap" />
+                                                        </StackPanel>
+                                                    </Button>
+
+                                                    <Border
+                                                        Grid.Column="1"
+                                                        Width="1"
+                                                        Height="34"
+                                                        Margin="4,0"
+                                                        VerticalAlignment="Center"
+                                                        Background="{ThemeResource MenuFlyoutSeparatorBackground}"
+                                                        Visibility="{Binding SeparatorVisibility}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <Style x:Key="ContextMenuFlyoutPresenterStyle" TargetType="MenuFlyoutPresenter" BasedOn="{StaticResource DefaultMenuFlyoutPresenterStyle}" />

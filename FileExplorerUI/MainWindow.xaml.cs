@@ -26,14 +26,6 @@ namespace FileExplorerUI
 {
     public sealed partial class MainWindow : Window, INotifyPropertyChanged
     {
-        private enum PendingEntriesContextAction
-        {
-            None,
-            NewFile,
-            NewFolder,
-            Paste
-        }
-
         private sealed record EntriesContextRequest(
             UIElement Anchor,
             Point Position,
@@ -66,7 +58,6 @@ namespace FileExplorerUI
         private readonly Dictionary<string, string> _sidebarTreeSelectionMemory = new(StringComparer.OrdinalIgnoreCase);
         private bool _suppressSidebarNavSelection;
         private EntryViewModel? _pendingContextRenameEntry;
-        private PendingEntriesContextAction _pendingEntriesContextAction = PendingEntriesContextAction.None;
         private EntriesContextRequest? _entriesContextRequest;
         private EntryViewModel? _lastEntriesContextItem;
         private EntriesContextRequest? _pendingEntriesContextRequest;
@@ -4973,96 +4964,6 @@ namespace FileExplorerUI
 
             await NavigateToPathAsync(target, pushHistory: true);
             ExitAddressEditMode(commit: true);
-        }
-
-        private void ContextRename_Click(object sender, RoutedEventArgs e)
-        {
-            _ = ExecuteRenameSelectedAsync();
-            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
-            {
-                HideActiveEntriesContextFlyout();
-            }
-        }
-
-        private void ContextCopy_Click(object sender, RoutedEventArgs e)
-        {
-            ExecuteCopy();
-            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
-            {
-                HideActiveEntriesContextFlyout();
-            }
-        }
-
-        private void ContextCut_Click(object sender, RoutedEventArgs e)
-        {
-            ExecuteCut();
-            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
-            {
-                HideActiveEntriesContextFlyout();
-            }
-        }
-
-        private async void ContextPaste_Click(object sender, RoutedEventArgs e)
-        {
-            if (_entriesFlyoutOpen)
-            {
-                _pendingEntriesContextAction = PendingEntriesContextAction.Paste;
-                if ((_activeEntriesContextFlyout?.IsOpen ?? false))
-                {
-                    HideActiveEntriesContextFlyout();
-                }
-                return;
-            }
-
-            await ExecutePasteAsync();
-        }
-
-        private async void ContextNewFile_Click(object sender, RoutedEventArgs e)
-        {
-            if (_entriesFlyoutOpen)
-            {
-                _pendingEntriesContextAction = PendingEntriesContextAction.NewFile;
-                if ((_activeEntriesContextFlyout?.IsOpen ?? false))
-                {
-                    HideActiveEntriesContextFlyout();
-                }
-                return;
-            }
-
-            await ExecuteNewFileAsync();
-        }
-
-        private async void ContextNewFolder_Click(object sender, RoutedEventArgs e)
-        {
-            if (_entriesFlyoutOpen)
-            {
-                _pendingEntriesContextAction = PendingEntriesContextAction.NewFolder;
-                if ((_activeEntriesContextFlyout?.IsOpen ?? false))
-                {
-                    HideActiveEntriesContextFlyout();
-                }
-                return;
-            }
-
-            await ExecuteNewFolderAsync();
-        }
-
-        private async void ContextDelete_Click(object sender, RoutedEventArgs e)
-        {
-            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
-            {
-                HideActiveEntriesContextFlyout();
-            }
-            await ExecuteDeleteSelectedAsync();
-        }
-
-        private async void ContextRefresh_Click(object sender, RoutedEventArgs e)
-        {
-            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
-            {
-                HideActiveEntriesContextFlyout();
-            }
-            await LoadFirstPageAsync();
         }
 
         private bool TryValidateTreeRename(SidebarTreeEntry entry, string newName, out string error)
