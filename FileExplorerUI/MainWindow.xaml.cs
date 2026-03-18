@@ -1,4 +1,5 @@
 using FileExplorerUI.Commands;
+using FileExplorerUI.Controls;
 using FileExplorerUI.Interop;
 using FileExplorerUI.Services;
 using Microsoft.UI.Windowing;
@@ -207,6 +208,7 @@ namespace FileExplorerUI
         private bool _hasMore;
         private bool _isLoading;
         private bool _entriesFlyoutOpen;
+        private CommandMenuFlyout? _activeEntriesContextFlyout;
         private bool _entriesPointerHooked;
         private string _currentPath = ShellMyComputerPath;
         private string? _selectedEntryPath;
@@ -328,7 +330,9 @@ namespace FileExplorerUI
             RegisterColumnSplitterHandlers(HeaderSplitter4);
             RegisterSidebarSplitterHandlers(SidebarSplitter);
             EntriesListView.ItemsSource = _entries;
-            EntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
+            FileEntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
+            FolderEntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
+            BackgroundEntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
             EntriesListView.SizeChanged += EntriesListView_SizeChanged;
             this.SizeChanged += MainWindow_SizeChanged;
             this.Activated += MainWindow_Activated;
@@ -791,7 +795,7 @@ namespace FileExplorerUI
             bool canDelete = CanDeleteSelectedEntry();
             bool canCopy = CanCopySelectedEntry();
             bool canCut = CanCutSelectedEntry();
-            bool canPaste = CanPasteIntoCurrentDirectory() && _fileManagementCoordinator.HasClipboardItems;
+            bool canPaste = CanPasteIntoCurrentDirectory() && _fileManagementCoordinator.HasAvailablePasteItems();
 
             if (NewFileButton is not null)
             {
@@ -988,7 +992,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (!_fileManagementCoordinator.HasClipboardItems)
+            if (!_fileManagementCoordinator.HasAvailablePasteItems())
             {
                 UpdateStatus("Paste failed: clipboard is empty.");
                 return;
@@ -1188,9 +1192,9 @@ namespace FileExplorerUI
             _lastListHorizontalOffset = viewer.HorizontalOffset;
             _lastListVerticalOffset = viewer.VerticalOffset;
 
-            if (scrolled && _entriesFlyoutOpen && EntriesContextFlyout.IsOpen)
+            if (scrolled && _entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
             {
-                EntriesContextFlyout.Hide();
+                HideActiveEntriesContextFlyout();
             }
 
             if (DetailsHeaderTranslateTransform is not null)
@@ -4438,10 +4442,11 @@ namespace FileExplorerUI
 
         private void ShowEntriesContextFlyout(EntriesContextRequest request)
         {
+            CommandMenuFlyout flyout = SelectEntriesContextFlyout(request);
             // `MenuFlyout.IsOpen` can be false during transition while `Opening` has
             // already marked `_entriesFlyoutOpen = true`. Treat either as "open-ish"
             // and route through pending-reopen path to avoid losing context.
-            bool flyoutActive = _entriesFlyoutOpen || EntriesContextFlyout.IsOpen;
+            bool flyoutActive = _entriesFlyoutOpen || (_activeEntriesContextFlyout?.IsOpen ?? false);
             if (flyoutActive)
             {
                 // During one right-click chain, multiple handlers can race to switch the flyout.
@@ -4454,19 +4459,96 @@ namespace FileExplorerUI
                 }
 
                 _pendingEntriesContextRequest = request;
-                if (EntriesContextFlyout.IsOpen)
+                if (_activeEntriesContextFlyout?.IsOpen == true)
                 {
-                    EntriesContextFlyout.Hide();
+                    _activeEntriesContextFlyout.Hide();
                 }
                 return;
             }
 
             _entriesContextRequest = request;
             _lastEntriesContextItem = request.Entry ?? _lastEntriesContextItem;
-            EntriesContextFlyout.ShowAt(request.Anchor, new FlyoutShowOptions
+            _activeEntriesContextFlyout = flyout;
+            flyout.SetInvocationContext(request.Anchor, request.Position);
+            flyout.ShowAt(request.Anchor, new FlyoutShowOptions
             {
                 Position = request.Position
             });
+        }
+
+        private CommandMenuFlyout SelectEntriesContextFlyout(EntriesContextRequest request)
+        {
+            if (!request.IsItemTarget || request.Entry is null)
+            {
+                return BackgroundEntriesContextFlyout;
+            }
+
+            return request.Entry.IsDirectory
+                ? FolderEntriesContextFlyout
+                : FileEntriesContextFlyout;
+        }
+
+        private void HideActiveEntriesContextFlyout()
+        {
+            if (_entriesFlyoutOpen && _activeEntriesContextFlyout?.IsOpen == true)
+            {
+                _activeEntriesContextFlyout.Hide();
+            }
+        }
+
+        private void UpdateConditionalCommandVisibility(CommandMenuFlyout flyout, string label, int insertIndex, bool shouldShow)
+        {
+            int existingIndex = -1;
+            for (int i = 0; i < flyout.Commands.Count; i++)
+            {
+                if (string.Equals(flyout.Commands[i].Label, label, StringComparison.Ordinal))
+                {
+                    existingIndex = i;
+                    break;
+                }
+            }
+
+            if (shouldShow)
+            {
+                if (existingIndex >= 0)
+                {
+                    return;
+                }
+
+                flyout.Commands.Insert(insertIndex, CreateCommandBarItem(label));
+                return;
+            }
+
+            if (existingIndex >= 0)
+            {
+                flyout.Commands.RemoveAt(existingIndex);
+            }
+        }
+
+        private static CommandMenuFlyoutItem CreateCommandBarItem(string label)
+        {
+            string glyph = label switch
+            {
+                "Paste" => "\uE77F",
+                "Properties" => "\uE946",
+                "Cut" => "\uE8C6",
+                "Copy" => "\uE8C8",
+                "Rename" => "\uE8AC",
+                "Delete" => "\uE74D",
+                "Terminal" => "\uE756",
+                "Refresh" => "\uE72C",
+                _ => "\uE8A5"
+            };
+
+            return new CommandMenuFlyoutItem
+            {
+                Label = label,
+                Icon = new FontIcon
+                {
+                    FontFamily = new FontFamily("Segoe Fluent Icons"),
+                    Glyph = glyph
+                }
+            };
         }
 
         private void EntriesListView_PointerPressedPreview(object sender, PointerRoutedEventArgs e)
@@ -4492,220 +4574,26 @@ namespace FileExplorerUI
                 }
             }
 
-            EntriesContextFlyout.Hide();
+            _activeEntriesContextFlyout?.Hide();
         }
 
-        private void EntriesContextFlyout_Opening(object sender, object e)
+        private void StaticEntriesContextFlyout_Opening(object sender, object e)
         {
             _entriesFlyoutOpen = true;
+            _activeEntriesContextFlyout = sender as CommandMenuFlyout;
             ResetColumnSplitterCursorState();
 
-            EntryViewModel? contextEntry = _entriesContextRequest is { IsItemTarget: true } currentRequest
-                ? (currentRequest.Entry is { IsLoaded: true } ? currentRequest.Entry : _lastEntriesContextItem)
-                : null;
-            FileCommandTarget target = ResolveEntriesContextTarget(contextEntry);
-            var commandIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (FileCommandDescriptor command in _fileCommandCatalog.BuildCommands(target))
+            if (ReferenceEquals(sender, FolderEntriesContextFlyout))
             {
-                commandIds.Add(command.Id);
+                UpdateConditionalCommandVisibility(FolderEntriesContextFlyout, "Paste", 2, _fileManagementCoordinator.HasAvailablePasteItems());
             }
-
-            bool isFileTarget = target.Kind == FileCommandTargetKind.FileEntry;
-            bool isFolderTarget = target.Kind is FileCommandTargetKind.DirectoryEntry or FileCommandTargetKind.DriveRoot;
-            bool isBackgroundTarget = target.Kind is FileCommandTargetKind.ListBackground or FileCommandTargetKind.CurrentDirectory;
-            bool hasItemTarget = contextEntry is { IsLoaded: true };
-            bool canCreate = CanCreateInCurrentDirectory();
-            bool canPaste = CanPasteIntoCurrentDirectory() && _fileManagementCoordinator.HasClipboardItems;
-
-            bool showOpen = commandIds.Contains(FileCommandIds.Open);
-            bool showOpenWith = isFileTarget && commandIds.Contains(FileCommandIds.OpenWith);
-            bool showShare = isFileTarget && commandIds.Contains(FileCommandIds.Share);
-            bool showCompress = (isFileTarget || isFolderTarget) && commandIds.Contains(FileCommandIds.Compress);
-            bool showCreateShortcut = isFileTarget && commandIds.Contains(FileCommandIds.CreateShortcut);
-            bool showCopyPath = (isFileTarget || isFolderTarget) && commandIds.Contains(FileCommandIds.CopyPath);
-            bool showSetTag = (isFileTarget || isFolderTarget) && commandIds.Contains(FileCommandIds.SetTag);
-            bool showOpenInNewWindow = isFolderTarget && commandIds.Contains(FileCommandIds.OpenInNewWindow);
-            bool showPinSidebar = isFolderTarget && (commandIds.Contains(FileCommandIds.PinToSidebar) || commandIds.Contains(FileCommandIds.UnpinFromSidebar));
-            bool showOpenInTerminal = (isFolderTarget || isBackgroundTarget) && commandIds.Contains(FileCommandIds.OpenInTerminal);
-            bool showView = isBackgroundTarget && commandIds.Contains(FileCommandIds.View);
-            bool showSortBy = isBackgroundTarget && commandIds.Contains(FileCommandIds.SortBy);
-            bool showGroupBy = isBackgroundTarget && commandIds.Contains(FileCommandIds.GroupBy);
-            bool showNewFile = isBackgroundTarget && commandIds.Contains(FileCommandIds.NewFile);
-            bool showNewFolder = isBackgroundTarget && commandIds.Contains(FileCommandIds.NewFolder);
-            bool showNewSubMenu = showNewFile || showNewFolder;
-            bool showCut = commandIds.Contains(FileCommandIds.Cut);
-            bool showCopy = commandIds.Contains(FileCommandIds.Copy);
-            bool showPaste = commandIds.Contains(FileCommandIds.Paste) && (isBackgroundTarget || isFolderTarget);
-            bool showRename = commandIds.Contains(FileCommandIds.Rename);
-            bool showDelete = commandIds.Contains(FileCommandIds.Delete);
-            bool showRefresh = isBackgroundTarget && commandIds.Contains(FileCommandIds.Refresh);
-            bool showProperties = commandIds.Contains(FileCommandIds.Properties);
-
-            if (ContextOpenMenuItem is not null)
+            else if (ReferenceEquals(sender, BackgroundEntriesContextFlyout))
             {
-                ContextOpenMenuItem.Visibility = showOpen ? Visibility.Visible : Visibility.Collapsed;
-                ContextOpenMenuItem.IsEnabled = false;
-            }
-
-            if (ContextOpenWithMenuItem is not null)
-            {
-                ContextOpenWithMenuItem.Visibility = showOpenWith ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextShareMenuItem is not null)
-            {
-                ContextShareMenuItem.Visibility = showShare ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextCompressSubMenu is not null)
-            {
-                ContextCompressSubMenu.Visibility = showCompress ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextCreateShortcutMenuItem is not null)
-            {
-                ContextCreateShortcutMenuItem.Visibility = showCreateShortcut ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextCopyPathMenuItem is not null)
-            {
-                ContextCopyPathMenuItem.Visibility = showCopyPath ? Visibility.Visible : Visibility.Collapsed;
-                ContextCopyPathMenuItem.Text = isFileTarget ? "Copy file path" : "Copy folder path";
-            }
-
-            if (ContextSetTagMenuItem is not null)
-            {
-                ContextSetTagMenuItem.Visibility = showSetTag ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextOpenInNewWindowMenuItem is not null)
-            {
-                ContextOpenInNewWindowMenuItem.Visibility = showOpenInNewWindow ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextPinSidebarMenuItem is not null)
-            {
-                ContextPinSidebarMenuItem.Visibility = showPinSidebar ? Visibility.Visible : Visibility.Collapsed;
-                ContextPinSidebarMenuItem.Text = "Pin to sidebar";
-            }
-
-            if (ContextOpenInTerminalMenuItem is not null)
-            {
-                ContextOpenInTerminalMenuItem.Visibility = showOpenInTerminal ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextViewSubMenu is not null)
-            {
-                ContextViewSubMenu.Visibility = showView ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextSortBySubMenu is not null)
-            {
-                ContextSortBySubMenu.Visibility = showSortBy ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextGroupBySubMenu is not null)
-            {
-                ContextGroupBySubMenu.Visibility = showGroupBy ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextNewSubMenu is not null)
-            {
-                ContextNewSubMenu.Visibility = showNewSubMenu ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextNewFileMenuItem is not null)
-            {
-                ContextNewFileMenuItem.Visibility = showNewFile ? Visibility.Visible : Visibility.Collapsed;
-                ContextNewFileMenuItem.IsEnabled = showNewFile && canCreate;
-            }
-
-            if (ContextNewFolderMenuItem is not null)
-            {
-                ContextNewFolderMenuItem.Visibility = showNewFolder ? Visibility.Visible : Visibility.Collapsed;
-                ContextNewFolderMenuItem.IsEnabled = showNewFolder && canCreate;
-            }
-
-            if (ContextCutMenuItem is not null)
-            {
-                ContextCutMenuItem.Visibility = showCut ? Visibility.Visible : Visibility.Collapsed;
-                ContextCutMenuItem.IsEnabled = hasItemTarget && CanCutSelectedEntry();
-            }
-
-            if (ContextCopyMenuItem is not null)
-            {
-                ContextCopyMenuItem.Visibility = showCopy ? Visibility.Visible : Visibility.Collapsed;
-                ContextCopyMenuItem.IsEnabled = hasItemTarget && CanCopySelectedEntry();
-            }
-
-            if (ContextPasteMenuItem is not null)
-            {
-                ContextPasteMenuItem.Visibility = showPaste ? Visibility.Visible : Visibility.Collapsed;
-                ContextPasteMenuItem.IsEnabled = isBackgroundTarget && canPaste;
-            }
-
-            if (ContextRenameMenuItem is not null)
-            {
-                ContextRenameMenuItem.Visibility = showRename ? Visibility.Visible : Visibility.Collapsed;
-                ContextRenameMenuItem.IsEnabled = hasItemTarget && CanRenameSelectedEntry();
-            }
-
-            if (ContextDeleteMenuItem is not null)
-            {
-                ContextDeleteMenuItem.Visibility = showDelete ? Visibility.Visible : Visibility.Collapsed;
-                ContextDeleteMenuItem.IsEnabled = hasItemTarget && CanDeleteSelectedEntry();
-            }
-
-            if (ContextRefreshMenuItem is not null)
-            {
-                ContextRefreshMenuItem.Visibility = showRefresh ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            if (ContextPropertiesMenuItem is not null)
-            {
-                ContextPropertiesMenuItem.Visibility = showProperties ? Visibility.Visible : Visibility.Collapsed;
-            }
-
-            bool showPrimaryGroup = showOpen ||
-                showOpenWith ||
-                showShare ||
-                showCompress ||
-                showCreateShortcut ||
-                showCopyPath ||
-                showSetTag ||
-                showOpenInNewWindow ||
-                showPinSidebar ||
-                showOpenInTerminal ||
-                showView ||
-                showSortBy ||
-                showGroupBy ||
-                showNewSubMenu;
-            bool showEditGroup = showCut || showCopy || showPaste;
-            bool showManageGroup = showRename || showDelete || showRefresh;
-
-            if (ContextPrimarySeparator is not null)
-            {
-                ContextPrimarySeparator.Visibility = showPrimaryGroup && (showEditGroup || showManageGroup || showProperties)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
-
-            if (ContextEditSeparator is not null)
-            {
-                ContextEditSeparator.Visibility = showEditGroup && (showManageGroup || showProperties)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
-
-            if (ContextTailSeparator is not null)
-            {
-                ContextTailSeparator.Visibility = (showManageGroup || showEditGroup || showPrimaryGroup) && showProperties
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+                UpdateConditionalCommandVisibility(BackgroundEntriesContextFlyout, "Paste", 0, _fileManagementCoordinator.HasAvailablePasteItems());
             }
         }
 
-        private void EntriesContextFlyout_Closed(object sender, object e)
+        private void StaticEntriesContextFlyout_Closed(object sender, object e)
         {
             _entriesFlyoutOpen = false;
 
@@ -4716,7 +4604,9 @@ namespace FileExplorerUI
 
                 _entriesContextRequest = pendingRequest;
                 _lastEntriesContextItem = pendingRequest.Entry ?? _lastEntriesContextItem;
-                EntriesContextFlyout.ShowAt(pendingRequest.Anchor, new FlyoutShowOptions
+                _activeEntriesContextFlyout = SelectEntriesContextFlyout(pendingRequest);
+                _activeEntriesContextFlyout.SetInvocationContext(pendingRequest.Anchor, pendingRequest.Position);
+                _activeEntriesContextFlyout.ShowAt(pendingRequest.Anchor, new FlyoutShowOptions
                 {
                     Position = pendingRequest.Position
                 });
@@ -4725,29 +4615,7 @@ namespace FileExplorerUI
 
             _entriesContextRequest = null;
             _lastEntriesContextItem = null;
-            if (_pendingContextRenameEntry is not null)
-            {
-                EntriesListView.Focus(FocusState.Programmatic);
-                EntryViewModel entry = _pendingContextRenameEntry;
-                _pendingContextRenameEntry = null;
-                _ = BeginRenameOverlayAsync(entry);
-                return;
-            }
-
-            PendingEntriesContextAction pendingAction = _pendingEntriesContextAction;
-            _pendingEntriesContextAction = PendingEntriesContextAction.None;
-            switch (pendingAction)
-            {
-                case PendingEntriesContextAction.NewFile:
-                    _ = ExecuteNewFileAsync();
-                    break;
-                case PendingEntriesContextAction.NewFolder:
-                    _ = ExecuteNewFolderAsync();
-                    break;
-                case PendingEntriesContextAction.Paste:
-                    _ = ExecutePasteAsync();
-                    break;
-            }
+            _activeEntriesContextFlyout = null;
         }
 
         private void ResetColumnSplitterCursorState()
@@ -5110,16 +4978,28 @@ namespace FileExplorerUI
         private void ContextRename_Click(object sender, RoutedEventArgs e)
         {
             _ = ExecuteRenameSelectedAsync();
+            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
+            {
+                HideActiveEntriesContextFlyout();
+            }
         }
 
         private void ContextCopy_Click(object sender, RoutedEventArgs e)
         {
             ExecuteCopy();
+            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
+            {
+                HideActiveEntriesContextFlyout();
+            }
         }
 
         private void ContextCut_Click(object sender, RoutedEventArgs e)
         {
             ExecuteCut();
+            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
+            {
+                HideActiveEntriesContextFlyout();
+            }
         }
 
         private async void ContextPaste_Click(object sender, RoutedEventArgs e)
@@ -5127,6 +5007,10 @@ namespace FileExplorerUI
             if (_entriesFlyoutOpen)
             {
                 _pendingEntriesContextAction = PendingEntriesContextAction.Paste;
+                if ((_activeEntriesContextFlyout?.IsOpen ?? false))
+                {
+                    HideActiveEntriesContextFlyout();
+                }
                 return;
             }
 
@@ -5138,6 +5022,10 @@ namespace FileExplorerUI
             if (_entriesFlyoutOpen)
             {
                 _pendingEntriesContextAction = PendingEntriesContextAction.NewFile;
+                if ((_activeEntriesContextFlyout?.IsOpen ?? false))
+                {
+                    HideActiveEntriesContextFlyout();
+                }
                 return;
             }
 
@@ -5149,6 +5037,10 @@ namespace FileExplorerUI
             if (_entriesFlyoutOpen)
             {
                 _pendingEntriesContextAction = PendingEntriesContextAction.NewFolder;
+                if ((_activeEntriesContextFlyout?.IsOpen ?? false))
+                {
+                    HideActiveEntriesContextFlyout();
+                }
                 return;
             }
 
@@ -5157,11 +5049,19 @@ namespace FileExplorerUI
 
         private async void ContextDelete_Click(object sender, RoutedEventArgs e)
         {
+            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
+            {
+                HideActiveEntriesContextFlyout();
+            }
             await ExecuteDeleteSelectedAsync();
         }
 
         private async void ContextRefresh_Click(object sender, RoutedEventArgs e)
         {
+            if (_entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
+            {
+                HideActiveEntriesContextFlyout();
+            }
             await LoadFirstPageAsync();
         }
 

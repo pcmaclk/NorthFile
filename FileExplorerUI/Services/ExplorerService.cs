@@ -114,6 +114,34 @@ public sealed class ExplorerService
         );
     }
 
+    public List<FileExplorerUI.SidebarTreeEntry> EnumerateSidebarDirectories(string path, int maxChildren)
+    {
+        var list = new List<FileExplorerUI.SidebarTreeEntry>();
+        try
+        {
+            foreach (string dir in Directory.EnumerateDirectories(path))
+            {
+                string name = Path.GetFileName(dir.TrimEnd('\\'));
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = dir;
+                }
+
+                list.Add(new FileExplorerUI.SidebarTreeEntry(name, dir));
+                if (list.Count >= maxChildren)
+                {
+                    break;
+                }
+            }
+        }
+        catch
+        {
+            return list;
+        }
+
+        return list;
+    }
+
     public bool DirectoryHasChildDirectories(string path)
     {
         try

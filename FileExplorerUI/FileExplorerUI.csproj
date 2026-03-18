@@ -79,16 +79,8 @@
       <WinUIAssetFiles Include="$(OutDir)Assets\**\*" />
     </ItemGroup>
 
-    <Copy
-      SourceFiles="@(WinUIGeneratedFiles)"
-      DestinationFolder="$(PublishDir)"
-      SkipUnchangedFiles="true"
-      Condition="'@(WinUIGeneratedFiles)' != ''" />
+    <Copy SourceFiles="@(WinUIGeneratedFiles)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'@(WinUIGeneratedFiles)' != ''" />
 
-    <Copy
-      SourceFiles="@(WinUIAssetFiles)"
-      DestinationFiles="@(WinUIAssetFiles->'$(PublishDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')"
-      SkipUnchangedFiles="true"
-      Condition="'@(WinUIAssetFiles)' != ''" />
+    <Copy SourceFiles="@(WinUIAssetFiles)" DestinationFiles="@(WinUIAssetFiles->'$(PublishDir)Assets\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" Condition="'@(WinUIAssetFiles)' != ''" />
   </Target>
 </Project>

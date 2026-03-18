@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Reworked the list context menu into a `CommandMenuFlyout`-based top-level presenter with a native `MenuFlyout` item tree, three separate file/folder/background menu definitions, a direction-aware bottom command bar, dynamic folder/background paste visibility, and a compact-sidebar flyout fix that went back to one-level child probing instead of blocking the UI thread with `GetAwaiter().GetResult()`.
 - Added the placeholder file/folder/background context-menu matrix to the planning docs, including the decision that compression should later support both ZIP and 7z, and that background `New` should become a submenu.
 - Started using the standalone file-command model for list context-menu visibility decisions, so file-item vs background menu differences now begin to flow from the shared target/trait/catalog layer.
 - Added a standalone file-command model layer under `FileExplorerUI/Commands` with target kinds, file traits, capability flags, a target resolver, and provider-based command catalog primitives so future file-type-specific commands can grow outside `MainWindow`.

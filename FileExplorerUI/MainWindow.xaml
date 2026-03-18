@@ -5,6 +5,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:FileExplorerUI"
+    xmlns:controls="using:FileExplorerUI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
@@ -19,7 +20,7 @@
         RowSpacing="8"
         Padding="8,8,8,0">
         <Grid
-            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,280"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,280"
             Height="36"
             ColumnSpacing="8">
             <Button
@@ -156,7 +157,90 @@
                     Glyph="&#xE77F;" />
             </Button>
 
-            <Grid Grid.Column="9">
+            <Button
+                x:Name="ContextPrototypeButton"
+                Grid.Column="9"
+                Width="32"
+                Height="32"
+                Padding="0"
+                Style="{ThemeResource SubtleButtonStyle}"
+                ToolTipService.ToolTip="Context menu prototype">
+                <Button.Flyout>
+                    <controls:CommandMenuFlyout
+                        Placement="BottomEdgeAlignedLeft"
+                        MenuFlyoutPresenterStyle="{StaticResource CommandMenuFlyoutPresenterStyle}">
+                        <controls:CommandMenuFlyout.Commands>
+                            <controls:CommandMenuFlyoutItem Label="Cut">
+                                <controls:CommandMenuFlyoutItem.Icon>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C6;" />
+                                </controls:CommandMenuFlyoutItem.Icon>
+                            </controls:CommandMenuFlyoutItem>
+                            <controls:CommandMenuFlyoutItem Label="Copy">
+                                <controls:CommandMenuFlyoutItem.Icon>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" />
+                                </controls:CommandMenuFlyoutItem.Icon>
+                            </controls:CommandMenuFlyoutItem>
+                            <controls:CommandMenuFlyoutItem Label="Paste">
+                                <controls:CommandMenuFlyoutItem.Icon>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE77F;" />
+                                </controls:CommandMenuFlyoutItem.Icon>
+                            </controls:CommandMenuFlyoutItem>
+                            <controls:CommandMenuFlyoutItem Label="Rename">
+                                <controls:CommandMenuFlyoutItem.Icon>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8AC;" />
+                                </controls:CommandMenuFlyoutItem.Icon>
+                            </controls:CommandMenuFlyoutItem>
+                            <controls:CommandMenuFlyoutItem Label="Delete">
+                                <controls:CommandMenuFlyoutItem.Icon>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" />
+                                </controls:CommandMenuFlyoutItem.Icon>
+                            </controls:CommandMenuFlyoutItem>
+                        </controls:CommandMenuFlyout.Commands>
+
+                        <MenuFlyoutItem Text="Open">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8E5;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutSubItem Text="Open with">
+                            <MenuFlyoutSubItem.Icon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7AC;" />
+                            </MenuFlyoutSubItem.Icon>
+                            <MenuFlyoutItem Text="Notepad">
+                                <MenuFlyoutItem.Icon>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8A5;" />
+                                </MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                            <MenuFlyoutItem Text="VS Code">
+                                <MenuFlyoutItem.Icon>
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE943;" />
+                                </MenuFlyoutItem.Icon>
+                            </MenuFlyoutItem>
+                        </MenuFlyoutSubItem>
+                        <MenuFlyoutItem Text="Share">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72D;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="Compressed file">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7B8;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="Copy path">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" />
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                    </controls:CommandMenuFlyout>
+                </Button.Flyout>
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="&#xE713;" />
+            </Button>
+
+            <Grid Grid.Column="10">
                 <Border
                     x:Name="AddressBreadcrumbBorder"
                     Height="32"
@@ -274,7 +358,7 @@
 
             <TextBox
                 x:Name="SearchTextBox"
-                Grid.Column="10"
+                Grid.Column="11"
                 Height="32"
                 PlaceholderText="Search in current folder"
                 KeyDown="SearchTextBox_KeyDown" />
@@ -446,53 +530,97 @@
                                 </Style>
                             </ListView.ItemContainerStyle>
                             <ListView.Resources>
-                                <MenuFlyout
-                                    x:Name="EntriesContextFlyout"
-                                    Opening="EntriesContextFlyout_Opening"
-                                    Closed="EntriesContextFlyout_Closed">
-                                    <MenuFlyoutItem x:Name="ContextOpenMenuItem" IsEnabled="False" Text="Open" />
-                                    <MenuFlyoutItem x:Name="ContextOpenWithMenuItem" IsEnabled="False" Text="Open with" />
-                                    <MenuFlyoutItem x:Name="ContextShareMenuItem" IsEnabled="False" Text="Share" />
-                                    <MenuFlyoutSubItem x:Name="ContextCompressSubMenu" Text="Compress">
-                                        <MenuFlyoutItem x:Name="ContextCompressZipMenuItem" IsEnabled="False" Text="Compress to ZIP" />
-                                        <MenuFlyoutItem x:Name="ContextCompress7zMenuItem" IsEnabled="False" Text="Compress to 7z" />
+                                <Style BasedOn="{StaticResource ContextMenuFlyoutItemStyle}" TargetType="MenuFlyoutItem" />
+                                <Style BasedOn="{StaticResource ContextMenuFlyoutSubItemStyle}" TargetType="MenuFlyoutSubItem" />
+                                <Style x:Key="ContextMenuNoIconItemStyle" BasedOn="{StaticResource ContextMenuFlyoutItemStyle}" TargetType="MenuFlyoutItem">
+                                    <Setter Property="Padding" Value="0,0,24,0" />
+                                </Style>
+                                <controls:CommandMenuFlyout
+                                    x:Name="FileEntriesContextFlyout"
+                                    MenuFlyoutPresenterStyle="{StaticResource CommandMenuFlyoutPresenterStyle}"
+                                    Opening="StaticEntriesContextFlyout_Opening"
+                                    Closed="StaticEntriesContextFlyout_Closed">
+                                    <controls:CommandMenuFlyout.Commands>
+                                        <controls:CommandMenuFlyoutItem Label="Cut"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C6;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem Label="Copy"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem Label="Rename"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8AC;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem Label="Delete"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                    </controls:CommandMenuFlyout.Commands>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Open"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8E5;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Open with"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7AC;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Share"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72D;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutSubItem Text="Compress">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7B8;" /></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem IsEnabled="False" Text="Compress to ZIP" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="Compress to 7z" />
                                     </MenuFlyoutSubItem>
-                                    <MenuFlyoutItem x:Name="ContextCreateShortcutMenuItem" IsEnabled="False" Text="Create shortcut" />
-                                    <MenuFlyoutItem x:Name="ContextCopyPathMenuItem" IsEnabled="False" Text="Copy path" />
-                                    <MenuFlyoutItem x:Name="ContextSetTagMenuItem" IsEnabled="False" Text="Set tag" />
-                                    <MenuFlyoutItem x:Name="ContextOpenInNewWindowMenuItem" IsEnabled="False" Text="Open in new window" />
-                                    <MenuFlyoutItem x:Name="ContextPinSidebarMenuItem" IsEnabled="False" Text="Pin to sidebar" />
-                                    <MenuFlyoutItem x:Name="ContextOpenInTerminalMenuItem" IsEnabled="False" Text="Open in terminal" />
-                                    <MenuFlyoutSubItem x:Name="ContextViewSubMenu" Text="View">
+                                    <MenuFlyoutItem IsEnabled="False" Text="Create shortcut"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE71B;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Copy file path"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Set tag"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8EC;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Properties"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                </controls:CommandMenuFlyout>
+
+                                <controls:CommandMenuFlyout
+                                    x:Name="FolderEntriesContextFlyout"
+                                    MenuFlyoutPresenterStyle="{StaticResource CommandMenuFlyoutPresenterStyle}"
+                                    Opening="StaticEntriesContextFlyout_Opening"
+                                    Closed="StaticEntriesContextFlyout_Closed">
+                                    <controls:CommandMenuFlyout.Commands>
+                                        <controls:CommandMenuFlyoutItem Label="Cut"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C6;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem Label="Copy"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem Label="Paste"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE77F;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem Label="Rename"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8AC;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem Label="Delete"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                    </controls:CommandMenuFlyout.Commands>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Open"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8E5;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Open in new window"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8A7;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Pin to sidebar / Unpin from sidebar"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE718;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutSubItem Text="Compress">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7B8;" /></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem IsEnabled="False" Text="Compress to ZIP" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="Compress to 7z" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Copy folder path"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Open in terminal"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE756;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Set tag"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8EC;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Properties"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                </controls:CommandMenuFlyout>
+
+                                <controls:CommandMenuFlyout
+                                    x:Name="BackgroundEntriesContextFlyout"
+                                    MenuFlyoutPresenterStyle="{StaticResource CommandMenuFlyoutPresenterStyle}"
+                                    Opening="StaticEntriesContextFlyout_Opening"
+                                    Closed="StaticEntriesContextFlyout_Closed">
+                                    <controls:CommandMenuFlyout.Commands>
+                                        <controls:CommandMenuFlyoutItem Label="Paste"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE77F;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem Label="Refresh"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                    </controls:CommandMenuFlyout.Commands>
+                                    <MenuFlyoutSubItem Text="View">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE890;" /></MenuFlyoutSubItem.Icon>
                                         <MenuFlyoutItem IsEnabled="False" Text="Details" />
                                         <MenuFlyoutItem IsEnabled="False" Text="List" />
                                     </MenuFlyoutSubItem>
-                                    <MenuFlyoutSubItem x:Name="ContextSortBySubMenu" Text="Sort by">
-                                        <MenuFlyoutItem IsEnabled="False" Text="Name" />
-                                        <MenuFlyoutItem IsEnabled="False" Text="Type" />
-                                        <MenuFlyoutItem IsEnabled="False" Text="Size" />
-                                        <MenuFlyoutItem IsEnabled="False" Text="Modified date" />
+                                    <MenuFlyoutSubItem Text="Sort by">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8CB;" /></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem Style="{StaticResource ContextMenuNoIconItemStyle}" IsEnabled="False" Text="Name" />
+                                        <MenuFlyoutItem Style="{StaticResource ContextMenuNoIconItemStyle}" IsEnabled="False" Text="Type" />
+                                        <MenuFlyoutItem Style="{StaticResource ContextMenuNoIconItemStyle}" IsEnabled="False" Text="Size" />
+                                        <MenuFlyoutItem Style="{StaticResource ContextMenuNoIconItemStyle}" IsEnabled="False" Text="Modified date" />
                                     </MenuFlyoutSubItem>
-                                    <MenuFlyoutSubItem x:Name="ContextGroupBySubMenu" Text="Group by">
-                                        <MenuFlyoutItem IsEnabled="False" Text="None" />
-                                        <MenuFlyoutItem IsEnabled="False" Text="Type" />
-                                        <MenuFlyoutItem IsEnabled="False" Text="Modified date" />
+                                    <MenuFlyoutSubItem Text="Group by">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE902;" /></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem Style="{StaticResource ContextMenuNoIconItemStyle}" IsEnabled="False" Text="None" />
+                                        <MenuFlyoutItem Style="{StaticResource ContextMenuNoIconItemStyle}" IsEnabled="False" Text="Type" />
+                                        <MenuFlyoutItem Style="{StaticResource ContextMenuNoIconItemStyle}" IsEnabled="False" Text="Modified date" />
                                     </MenuFlyoutSubItem>
-                                    <MenuFlyoutSubItem x:Name="ContextNewSubMenu" Text="New">
-                                        <MenuFlyoutItem x:Name="ContextNewFileMenuItem" Click="ContextNewFile_Click" Text="New File" />
-                                        <MenuFlyoutItem x:Name="ContextNewFolderMenuItem" Click="ContextNewFolder_Click" Text="New Folder" />
+                                    <MenuFlyoutSubItem Text="New">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE710;" /></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem IsEnabled="False" Text="New File" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="New Folder" />
                                     </MenuFlyoutSubItem>
-                                    <MenuFlyoutSeparator x:Name="ContextPrimarySeparator" />
-                                    <MenuFlyoutItem x:Name="ContextCutMenuItem" Click="ContextCut_Click" Text="Cut" />
-                                    <MenuFlyoutItem x:Name="ContextCopyMenuItem" Click="ContextCopy_Click" Text="Copy" />
-                                    <MenuFlyoutItem x:Name="ContextPasteMenuItem" Click="ContextPaste_Click" Text="Paste" />
-                                    <MenuFlyoutSeparator x:Name="ContextEditSeparator" />
-                                    <MenuFlyoutItem x:Name="ContextRenameMenuItem" Click="ContextRename_Click" Text="Rename" />
-                                    <MenuFlyoutItem x:Name="ContextDeleteMenuItem" Click="ContextDelete_Click" Text="Delete" />
-                                    <MenuFlyoutItem x:Name="ContextRefreshMenuItem" Click="ContextRefresh_Click" Text="Refresh" />
-                                    <MenuFlyoutSeparator x:Name="ContextTailSeparator" />
-                                    <MenuFlyoutItem x:Name="ContextPropertiesMenuItem" IsEnabled="False" Text="Properties" />
-                                </MenuFlyout>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Open in terminal"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE756;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="Properties"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                </controls:CommandMenuFlyout>
                             </ListView.Resources>
                             <ListView.ItemTemplate>
                                 <DataTemplate>

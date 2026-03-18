@@ -718,10 +718,7 @@ namespace FileExplorerUI
 
         private CompactSidebarMenuItem CreateTreeCompactItem(SidebarTreeEntry entry, int depth)
         {
-            bool hasChildren = _explorerService.EnumerateSidebarDirectoriesAsync(entry.FullPath, default, CompactTreeProbeLimit)
-                .GetAwaiter()
-                .GetResult()
-                .Count > 0;
+            bool hasChildren = _explorerService.DirectoryHasChildDirectories(entry.FullPath);
             Func<IReadOnlyList<CompactSidebarMenuItem>>? loader = hasChildren
                 ? () => LoadTreeCompactChildren(entry.FullPath, depth + 1)
                 : null;
@@ -731,9 +728,7 @@ namespace FileExplorerUI
 
         private IReadOnlyList<CompactSidebarMenuItem> LoadTreeCompactChildren(string path, int depth)
         {
-            List<SidebarTreeEntry> childEntries = _explorerService.EnumerateSidebarDirectoriesAsync(path, default, CompactTreeChildLimit)
-                .GetAwaiter()
-                .GetResult();
+            List<SidebarTreeEntry> childEntries = _explorerService.EnumerateSidebarDirectories(path, CompactTreeChildLimit);
             var children = new List<CompactSidebarMenuItem>(childEntries.Count);
             foreach (SidebarTreeEntry child in childEntries)
             {

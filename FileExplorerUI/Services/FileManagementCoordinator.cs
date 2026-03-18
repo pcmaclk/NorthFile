@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace FileExplorerUI.Services;
 
@@ -47,6 +48,24 @@ public sealed class FileManagementCoordinator
     public FileClipboardState? ClipboardState => _clipboardState;
 
     public bool HasClipboardItems => _clipboardState is { Items.Count: > 0 };
+
+    public bool HasAvailablePasteItems()
+    {
+        if (HasClipboardItems)
+        {
+            return true;
+        }
+
+        try
+        {
+            DataPackageView content = Clipboard.GetContent();
+            return content.Contains(StandardDataFormats.StorageItems);
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public async Task<CreatedEntryInfo> CreateEntryAsync(string directoryPath, bool isDirectory)
     {
