@@ -39,6 +39,7 @@ public sealed class FileManagementCoordinator
 {
     private readonly ExplorerService _explorerService;
     private FileClipboardState? _clipboardState;
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
 
     public FileManagementCoordinator(ExplorerService explorerService)
     {
@@ -104,19 +105,19 @@ public sealed class FileManagementCoordinator
     {
         if (string.IsNullOrWhiteSpace(proposedName))
         {
-            error = "Name failed: name is empty.";
+            error = LocalizedStrings.Instance.Get("ErrorNameEmpty");
             return false;
         }
 
         if (proposedName is "." or "..")
         {
-            error = $"Name failed: '{proposedName}' is reserved.";
+            error = string.Format(LocalizedStrings.Instance.Get("ErrorNameReserved"), proposedName);
             return false;
         }
 
         if (proposedName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
-            error = $"Name failed: '{proposedName}' contains invalid characters.";
+            error = string.Format(LocalizedStrings.Instance.Get("ErrorNameInvalidChars"), proposedName);
             return false;
         }
 
@@ -124,7 +125,7 @@ public sealed class FileManagementCoordinator
         if (!string.Equals(proposedName, currentName, StringComparison.OrdinalIgnoreCase) &&
             _explorerService.PathExists(targetPath))
         {
-            error = $"Name failed: '{proposedName}' already exists.";
+            error = string.Format(LocalizedStrings.Instance.Get("ErrorNameAlreadyExists"), proposedName);
             return false;
         }
 
@@ -189,14 +190,14 @@ public sealed class FileManagementCoordinator
 
             if (samePath)
             {
-                results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: false, SamePath: true, IsDirectory: item.IsDirectory, ErrorMessage: "Source and target are the same."));
+                results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: false, SamePath: true, IsDirectory: item.IsDirectory, ErrorMessage: S("ErrorPasteSameSourceAndTarget")));
                 allApplied = false;
                 continue;
             }
 
             if (conflict)
             {
-                results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: true, SamePath: false, IsDirectory: item.IsDirectory, ErrorMessage: "Target already exists."));
+                results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: true, SamePath: false, IsDirectory: item.IsDirectory, ErrorMessage: S("ErrorPasteTargetAlreadyExists")));
                 allApplied = false;
                 continue;
             }

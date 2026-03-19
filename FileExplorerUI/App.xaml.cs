@@ -6,8 +6,10 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Xaml.Shapes;
+using Microsoft.Windows.Globalization;
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -28,6 +30,11 @@ namespace FileExplorerUI
     public partial class App : Application
     {
         private Window? _window;
+
+        public void SetMainWindow(Window window)
+        {
+            _window = window;
+        }
 
         /// <summary>
         /// Initializes the singleton application object.  This is the first line of authored code
@@ -50,8 +57,74 @@ namespace FileExplorerUI
         /// <param name="args">Details about the launch request and process.</param>
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
+#if DEBUG
+            ApplyLaunchArguments(args.Arguments);
+#endif
             _window = new MainWindow();
             _window.Activate();
+        }
+
+        private static void ApplyLaunchArguments(string arguments)
+        {
+            List<string> parts = new();
+            if (!string.IsNullOrWhiteSpace(arguments))
+            {
+                parts.AddRange(arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            }
+
+            string[] commandLineArgs = Environment.GetCommandLineArgs();
+            if (commandLineArgs.Length > 1)
+            {
+                parts.AddRange(commandLineArgs.Skip(1));
+            }
+
+            string? language = ResolveLaunchLanguageTag(parts);
+            if (string.IsNullOrWhiteSpace(language))
+            {
+                return;
+            }
+
+            ApplyDebugLanguageOverride(language);
+            LocalizedStrings.Instance.SetLanguage(language);
+        }
+
+        private static void ApplyDebugLanguageOverride(string? languageTag)
+        {
+            if (string.IsNullOrWhiteSpace(languageTag))
+            {
+                return;
+            }
+
+            try
+            {
+                var culture = CultureInfo.GetCultureInfo(languageTag);
+                CultureInfo.DefaultThreadCurrentCulture = culture;
+                CultureInfo.DefaultThreadCurrentUICulture = culture;
+                CultureInfo.CurrentCulture = culture;
+                CultureInfo.CurrentUICulture = culture;
+                ApplicationLanguages.PrimaryLanguageOverride = languageTag;
+            }
+            catch (CultureNotFoundException)
+            {
+            }
+        }
+
+        private static string? ResolveLaunchLanguageTag(IEnumerable<string> parts)
+        {
+            const string languagePrefix = "--lang=";
+            foreach (string part in parts)
+            {
+                if (part.StartsWith(languagePrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    string language = part[languagePrefix.Length..].Trim('"');
+                    if (!string.IsNullOrWhiteSpace(language))
+                    {
+                        return language;
+                    }
+                }
+            }
+
+            return null;
         }
     }
 }

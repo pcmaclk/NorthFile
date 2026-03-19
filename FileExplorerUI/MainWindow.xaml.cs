@@ -17,8 +17,10 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.Globalization;
 using Windows.Foundation;
 using WinRT.Interop;
 
@@ -83,6 +85,10 @@ namespace FileExplorerUI
         private const double SidebarTreeRenameWidthPadding = 12;
         private const double SidebarTreeRenameRightMargin = 8;
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
+        private static string S(string key) => LocalizedStrings.Instance.Get(key);
+        private static string SF(string key, params object[] args) => string.Format(S(key), args);
+        private void UpdateStatusKey(string key, params object[] args) => UpdateStatus(SF(key, args));
+        private static string CreateKindLabel(bool isDirectory) => S(isDirectory ? "CreateKindFolder" : "CreateKindFile");
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -239,6 +245,7 @@ namespace FileExplorerUI
         private readonly List<BreadcrumbItemViewModel> _hiddenBreadcrumbItems = new();
         private bool _breadcrumbWidthsReady;
         private int _breadcrumbVisibleStartIndex = -1;
+        private bool _lastTitleWasReadFailed;
 
         private enum CommandDockSide
         {
@@ -322,6 +329,7 @@ namespace FileExplorerUI
         private const double BreadcrumbOverflowButtonWidth = 34;
         private const double BreadcrumbItemSpacing = 2;
         private const double BreadcrumbWidthReserve = 4;
+        private const string BreadcrumbMyComputerGlyph = "\uE7F4";
 
         public MainWindow()
         {
@@ -348,15 +356,66 @@ namespace FileExplorerUI
             this.Activated += MainWindow_Activated;
             _pathDefaultBorderBrush = PathTextBox.BorderBrush;
             _engineVersion = _explorerService.GetEngineVersion();
+            LocalizedStrings.Instance.PropertyChanged += LocalizedStrings_PropertyChanged;
+#if !DEBUG
+            LanguageToggleButton.Visibility = Visibility.Collapsed;
+#endif
 
             UpdateNavButtonsState();
-            this.AppWindow.Title = $"NorthFile | Engine {_engineVersion}";
+            UpdateWindowTitle();
             ApplyTitleBarTheme();
             StyledSidebarView.NavigateRequested += StyledSidebarView_NavigateRequested;
             BuildSidebarItems();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
             _ = LoadFirstPageAsync();
+        }
+
+        private void LocalizedStrings_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is not "Item[]" and not nameof(LocalizedStrings.DebugLanguageButtonText))
+            {
+                return;
+            }
+
+            _ = DispatcherQueue.TryEnqueue(RefreshLocalizedUi);
+        }
+
+        private void RefreshLocalizedUi()
+        {
+            UpdateDetailsHeaders();
+            UpdateWindowTitle();
+
+            if (_isLoading)
+            {
+                UpdateStatus(S("StatusLoading"));
+                return;
+            }
+
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateStatus(SF("StatusDriveCount", _entries.Count));
+                return;
+            }
+
+            UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
+        }
+
+        private void UpdateWindowTitle()
+        {
+            if (_lastTitleWasReadFailed)
+            {
+                this.AppWindow.Title = SF("WindowTitleReadFailedFormat", _engineVersion);
+                return;
+            }
+
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                this.AppWindow.Title = SF("WindowTitleDrivesFormat", _engineVersion, _entries.Count);
+                return;
+            }
+
+            this.AppWindow.Title = SF("WindowTitleItemsFormat", _engineVersion, _entries.Count);
         }
 
         private void MainWindowRoot_ActualThemeChanged(FrameworkElement sender, object args)
@@ -774,13 +833,13 @@ namespace FileExplorerUI
         {
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                errorMessage = "open a folder first.";
+                errorMessage = S("ErrorOpenFolderFirst");
                 return false;
             }
 
             if (!_explorerService.DirectoryExists(_currentPath))
             {
-                errorMessage = "current folder is not available.";
+                errorMessage = S("ErrorCurrentFolderUnavailable");
                 return false;
             }
 
@@ -879,15 +938,13 @@ namespace FileExplorerUI
         {
             if (!CanCreateInCurrentDirectory())
             {
-                string createKind = isDirectory ? "folder" : "file";
-                UpdateStatus($"New {createKind} failed: open a folder first.");
+                UpdateStatusKey("StatusNewFailedOpenFolderFirst", CreateKindLabel(isDirectory));
                 return;
             }
 
             if (!TryEnsureCurrentDirectoryAvailable(out string createError))
             {
-                string createKind = isDirectory ? "folder" : "file";
-                UpdateStatus($"New {createKind} failed: {createError}");
+                UpdateStatusKey("StatusNewFailedWithReason", CreateKindLabel(isDirectory), createError);
                 return;
             }
 
@@ -898,14 +955,14 @@ namespace FileExplorerUI
         {
             if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
             {
-                UpdateStatus("Rename failed: select a loaded entry first.");
+                UpdateStatusKey("StatusRenameFailedSelectLoaded");
                 return Task.CompletedTask;
             }
 
             int selectedIndex = EntriesListView.SelectedIndex;
             if (selectedIndex < 0 || selectedIndex >= _entries.Count)
             {
-                UpdateStatus("Rename failed: invalid selected index.");
+                UpdateStatusKey("StatusRenameFailedInvalidIndex");
                 return Task.CompletedTask;
             }
 
@@ -922,14 +979,14 @@ namespace FileExplorerUI
         {
             if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
             {
-                UpdateStatus("Delete failed: select a loaded entry first.");
+                UpdateStatusKey("StatusDeleteFailedSelectLoaded");
                 return;
             }
 
             int selectedIndex = EntriesListView.SelectedIndex;
             if (selectedIndex < 0 || selectedIndex >= _entries.Count)
             {
-                UpdateStatus("Delete failed: invalid selected index.");
+                UpdateStatusKey("StatusDeleteFailedInvalidIndex");
                 return;
             }
 
@@ -937,7 +994,7 @@ namespace FileExplorerUI
             bool confirmed = await ConfirmDeleteAsync(entry.Name, recursive);
             if (!confirmed)
             {
-                UpdateStatus("Delete canceled by user.");
+                UpdateStatusKey("StatusDeleteCanceled");
                 return;
             }
 
@@ -949,7 +1006,7 @@ namespace FileExplorerUI
         {
             if (!CanCopySelectedEntry())
             {
-                UpdateStatus("Copy failed: select a loaded entry first.");
+                UpdateStatusKey("StatusCopyFailedSelectLoaded");
                 return;
             }
 
@@ -960,7 +1017,7 @@ namespace FileExplorerUI
         {
             if (!CanCutSelectedEntry())
             {
-                UpdateStatus("Cut failed: select a loaded entry first.");
+                UpdateStatusKey("StatusCutFailedSelectLoaded");
                 return;
             }
 
@@ -976,57 +1033,57 @@ namespace FileExplorerUI
         {
             if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
             {
-                UpdateStatus("Copy failed: select a loaded entry first.");
+                UpdateStatusKey("StatusCopyFailedSelectLoaded");
                 return;
             }
 
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                UpdateStatus("Copy failed: drive roots are not supported yet.");
+                UpdateStatusKey("StatusCopyFailedDriveRootsUnsupported");
                 return;
             }
 
             _fileManagementCoordinator.SetClipboard(new[] { entry.FullPath }, FileTransferMode.Copy);
             UpdateFileCommandStates();
-            UpdateStatus($"Copy ready: {entry.Name}");
+            UpdateStatusKey("StatusCopyReady", entry.Name);
         }
 
         private void CutSelectedEntry()
         {
             if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
             {
-                UpdateStatus("Cut failed: select a loaded entry first.");
+                UpdateStatusKey("StatusCutFailedSelectLoaded");
                 return;
             }
 
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                UpdateStatus("Cut failed: drive roots are not supported yet.");
+                UpdateStatusKey("StatusCutFailedDriveRootsUnsupported");
                 return;
             }
 
             _fileManagementCoordinator.SetClipboard(new[] { entry.FullPath }, FileTransferMode.Cut);
             UpdateFileCommandStates();
-            UpdateStatus($"Cut ready: {entry.Name}");
+            UpdateStatusKey("StatusCutReady", entry.Name);
         }
 
         private async Task PasteIntoCurrentDirectoryAsync()
         {
             if (!CanPasteIntoCurrentDirectory())
             {
-                UpdateStatus("Paste failed: open a folder first.");
+                UpdateStatusKey("StatusPasteFailedOpenFolderFirst");
                 return;
             }
 
             if (!TryEnsureCurrentDirectoryAvailable(out string pasteError))
             {
-                UpdateStatus($"Paste failed: {pasteError}");
+                UpdateStatusKey("StatusPasteFailedWithReason", pasteError);
                 return;
             }
 
             if (!_fileManagementCoordinator.HasAvailablePasteItems())
             {
-                UpdateStatus("Paste failed: clipboard is empty.");
+                UpdateStatusKey("StatusPasteFailedClipboardEmpty");
                 return;
             }
 
@@ -1069,20 +1126,20 @@ namespace FileExplorerUI
                 {
                     if (conflictCount > 0)
                     {
-                        UpdateStatus($"Paste skipped: {conflictCount} target item(s) already exist.");
+                        UpdateStatusKey("StatusPasteSkippedConflicts", conflictCount);
                     }
                     else if (samePathCount > 0)
                     {
-                        UpdateStatus("Paste skipped: source and target are the same.");
+                        UpdateStatusKey("StatusPasteSkippedSamePath");
                     }
                     else if (failureCount > 0 && result.Items.Count > 0)
                     {
                         string? message = result.Items[0].ErrorMessage;
-                        UpdateStatus($"Paste failed: {message}");
+                        UpdateStatusKey("StatusPasteFailedWithReason", message ?? string.Empty);
                     }
                     else
                     {
-                        UpdateStatus("Paste skipped: nothing was applied.");
+                        UpdateStatusKey("StatusPasteSkippedNothingApplied");
                     }
                     return;
                 }
@@ -1107,27 +1164,27 @@ namespace FileExplorerUI
                 _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
 
                 UpdateFileCommandStates();
-                string modeText = result.Mode == FileTransferMode.Cut ? "Move" : "Paste";
-                UpdateStatus($"{modeText} success: {appliedCount} item(s), conflicts {conflictCount}, same-path {samePathCount}, failures {failureCount}.");
+                string modeText = result.Mode == FileTransferMode.Cut ? S("OperationMove") : S("OperationPaste");
+                UpdateStatusKey("StatusTransferSuccess", modeText, appliedCount, conflictCount, samePathCount, failureCount);
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Paste failed: {ex.Message}");
+                UpdateStatusKey("StatusPasteFailedWithReason", ex.Message);
             }
         }
 
         private async Task CreateNewEntryAsync(bool isDirectory)
         {
-            string createKind = isDirectory ? "folder" : "file";
+            string createKind = CreateKindLabel(isDirectory);
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                UpdateStatus($"New {createKind} failed: open a folder first.");
+                UpdateStatusKey("StatusNewFailedOpenFolderFirst", createKind);
                 return;
             }
 
             if (!_explorerService.DirectoryExists(_currentPath))
             {
-                UpdateStatus($"New {createKind} failed: current folder is not available.");
+                UpdateStatusKey("StatusNewFailedWithReason", createKind, S("ErrorCurrentFolderUnavailable"));
                 return;
             }
 
@@ -1149,12 +1206,12 @@ namespace FileExplorerUI
 
                 InsertLocalCreatedEntry(entry, insertIndex);
                 _pendingCreatedEntrySelection = entry;
-                UpdateStatus($"Create success: {created.Name}");
+                UpdateStatusKey("StatusCreateSuccess", created.Name);
                 await StartRenameForCreatedEntryAsync(entry, insertIndex);
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Create failed: {ex.Message}");
+                UpdateStatusKey("StatusCreateFailed", ex.Message);
             }
         }
 
@@ -1328,7 +1385,7 @@ namespace FileExplorerUI
             if (!_explorerService.DirectoryExists(target))
             {
                 SetPathInputInvalid();
-                UpdateStatus($"Path not found: {target}");
+                UpdateStatusKey("StatusPathNotFound", target);
                 return;
             }
             SetPathInputValid();
@@ -1358,7 +1415,7 @@ namespace FileExplorerUI
         {
             if (!_hasMore)
             {
-                UpdateStatus("No more entries.");
+                UpdateStatusKey("StatusNoMoreEntries");
                 return;
             }
 
@@ -1444,7 +1501,7 @@ namespace FileExplorerUI
                             _totalEntries = 0;
                         }
 
-                        UpdateStatus($"Path: {path} | Access denied. Skip current directory.");
+                        UpdateStatusKey("StatusPathAccessDeniedSkip", path);
                         return;
                     }
 
@@ -1473,8 +1530,9 @@ namespace FileExplorerUI
                 _currentPageSize = ClampPageSize(page.SuggestedNextLimit, requestedPageSize);
                 string source = _explorerService.DescribeBatchSource(page.SourceKind);
 
-                this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Items: {_entries.Count}";
-                UpdateStatus($"当前文件夹下 {_totalEntries} 个项目");
+                _lastTitleWasReadFailed = false;
+                UpdateWindowTitle();
+                UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
                 LogPerfSnapshot(
                     mode: string.IsNullOrWhiteSpace(_currentQuery) ? "browse" : "search",
                     path: path,
@@ -1493,8 +1551,9 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Read Failed";
-                UpdateStatus($"Path: {path} | Error: {ex.Message}");
+                _lastTitleWasReadFailed = true;
+                UpdateWindowTitle();
+                UpdateStatusKey("StatusPathError", path, ex.Message);
             }
             finally
             {
@@ -1519,17 +1578,17 @@ namespace FileExplorerUI
                 return;
             }
 
-            NameHeaderTextBlock.Text = "名称";
-            TypeHeaderTextBlock.Text = "类型";
+            NameHeaderTextBlock.Text = S("ColumnNameHeader");
+            TypeHeaderTextBlock.Text = S("ColumnTypeHeader");
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                SizeHeaderTextBlock.Text = "总大小";
-                ModifiedHeaderTextBlock.Text = "可用空间";
+                SizeHeaderTextBlock.Text = S("ColumnTotalSizeHeader");
+                ModifiedHeaderTextBlock.Text = S("ColumnFreeSpaceHeader");
                 return;
             }
 
-            SizeHeaderTextBlock.Text = "大小";
-            ModifiedHeaderTextBlock.Text = "修改日期";
+            SizeHeaderTextBlock.Text = S("ColumnSizeHeader");
+            ModifiedHeaderTextBlock.Text = S("ColumnModifiedHeader");
         }
 
         private static void LogPerfSnapshot(
@@ -1569,7 +1628,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Path: {path} | Invalidate warning({reason}): {ex.Message}");
+                UpdateStatusKey("StatusPathInvalidateWarning", path, reason, ex.Message);
             }
         }
 
@@ -1624,25 +1683,25 @@ namespace FileExplorerUI
 
             var quickAccess = new NavigationViewItem
             {
-                Content = "固定",
+                Content = S("SidebarPinned"),
                 Icon = new SymbolIcon(Symbol.Favorite),
                 SelectsOnInvoked = false
             };
-            quickAccess.MenuItems.Add(CreateLeaf("桌面", desktopPath, Symbol.Home, true, false));
-            quickAccess.MenuItems.Add(CreateLeaf("文档", documentsPath, Symbol.Document, true, false));
-            quickAccess.MenuItems.Add(CreateLeaf("下载", downloadsPath, Symbol.Download, true, false));
+            quickAccess.MenuItems.Add(CreateLeaf(S("SidebarDesktop"), desktopPath, Symbol.Home, true, false));
+            quickAccess.MenuItems.Add(CreateLeaf(S("SidebarDocuments"), documentsPath, Symbol.Document, true, false));
+            quickAccess.MenuItems.Add(CreateLeaf(S("SidebarDownloads"), downloadsPath, Symbol.Download, true, false));
             SidebarNavView.MenuItems.Add(quickAccess);
 
-            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = "云盘", Icon = new SymbolIcon(Symbol.World), SelectsOnInvoked = false });
-            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = "网络", Icon = new SymbolIcon(Symbol.Globe), SelectsOnInvoked = false });
-            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = "标签", Icon = new SymbolIcon(Symbol.Tag), SelectsOnInvoked = false });
+            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarCloud"), Icon = new SymbolIcon(Symbol.World), SelectsOnInvoked = false });
+            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarNetwork"), Icon = new SymbolIcon(Symbol.Globe), SelectsOnInvoked = false });
+            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarTags"), Icon = new SymbolIcon(Symbol.Tag), SelectsOnInvoked = false });
 
             StyledSidebarView.ConfigurePinnedPaths(desktopPath, documentsPath, downloadsPath, picturesPath);
             StyledSidebarView.SetExtraItems(new[]
             {
-                new SidebarNavItemModel("cloud", "云盘", null, "\uE753", selectable: false),
-                new SidebarNavItemModel("network", "网络", null, "\uE774", selectable: false),
-                new SidebarNavItemModel("tags", "标签", null, "\uE8EC", selectable: false)
+                new SidebarNavItemModel("cloud", S("SidebarCloud"), null, "\uE753", selectable: false),
+                new SidebarNavItemModel("network", S("SidebarNetwork"), null, "\uE774", selectable: false),
+                new SidebarNavItemModel("tags", S("SidebarTags"), null, "\uE8EC", selectable: false)
             });
 
             EnsureSidebarTreeView();
@@ -1680,7 +1739,7 @@ namespace FileExplorerUI
             StyledSidebarView.AttachTreeView(_sidebarTreeView);
 
             _sidebarTreeContextFlyout = new MenuFlyout();
-            var renameItem = new MenuFlyoutItem { Text = "Rename" };
+            var renameItem = new MenuFlyoutItem { Text = S("CommonRename") };
             renameItem.Click += SidebarTreeContextRename_Click;
             _sidebarTreeContextFlyout.Items.Add(renameItem);
         }
@@ -1698,7 +1757,7 @@ namespace FileExplorerUI
             _sidebarTreeCts = cts;
 
             _sidebarTreeView.RootNodes.Clear();
-            var computerEntry = new SidebarTreeEntry("我的电脑", "shell:mycomputer", "\uE7F4");
+            var computerEntry = new SidebarTreeEntry(S("SidebarMyComputer"), "shell:mycomputer", "\uE7F4");
             var computerNode = CreateSidebarTreeNode(computerEntry, hasUnrealizedChildren: false);
             computerNode.IsExpanded = true;
             _sidebarTreeView.RootNodes.Add(computerNode);
@@ -2057,16 +2116,16 @@ namespace FileExplorerUI
 
                 if (IsRustAccessDenied(rustErrorCode, rustErrorMessage))
                 {
-                    UpdateStatus($"Path: {path} | Access denied.");
+                    UpdateStatusKey("StatusPathAccessDenied", path);
                     return false;
                 }
 
-                UpdateStatus($"Path: {path} | Error: Rust error {rustErrorCode}: {rustErrorMessage}");
+                UpdateStatusKey("StatusPathRustError", path, rustErrorCode, rustErrorMessage);
                 return false;
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Path: {path} | Error: {ex.Message}");
+                UpdateStatusKey("StatusPathError", path, ex.Message);
                 return false;
             }
         }
@@ -2080,8 +2139,8 @@ namespace FileExplorerUI
                 string root = drive.RootDirectory.FullName;
                 string label = drive.Name.TrimEnd('\\');
                 string type = string.IsNullOrWhiteSpace(drive.VolumeLabel)
-                    ? "本地磁盘"
-                    : $"{drive.VolumeLabel} ({drive.DriveFormat})";
+                    ? S("DriveTypeLocalDisk")
+                    : SF("DriveTypeVolumeFormat", drive.VolumeLabel, drive.DriveFormat);
 
                 _entries.Add(new EntryViewModel
                 {
@@ -2106,8 +2165,9 @@ namespace FileExplorerUI
             _hasMore = false;
             EntriesListView.SelectedItem = null;
             UpdateFileCommandStates();
-            this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Drives: {_entries.Count}";
-            UpdateStatus($"我的电脑下 {_entries.Count} 个驱动器");
+            _lastTitleWasReadFailed = false;
+            UpdateWindowTitle();
+            UpdateStatus(SF("StatusDriveCount", _entries.Count));
         }
 
         private void SidebarTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
@@ -2136,7 +2196,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Sidebar tree expand failed: {ex.Message}");
+                UpdateStatusKey("StatusSidebarTreeExpandFailed", ex.Message);
             }
         }
 
@@ -2232,7 +2292,7 @@ namespace FileExplorerUI
         {
             if (_pendingSidebarTreeContextEntry is null)
             {
-                UpdateStatus("Rename failed: select a tree node first.");
+                UpdateStatusKey("StatusRenameFailedSelectTreeNode");
                 return;
             }
 
@@ -2259,7 +2319,7 @@ namespace FileExplorerUI
             Debug.WriteLine($"[Tree] Selected: {entry.FullPath}");
             if (_isLoading)
             {
-                UpdateStatus("Sidebar tree nav ignored: loading in progress.");
+                UpdateStatusKey("StatusSidebarTreeNavIgnoredLoading");
                 return;
             }
 
@@ -2275,7 +2335,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Sidebar tree nav failed: {ex.Message}");
+                UpdateStatusKey("StatusSidebarTreeNavFailed", ex.Message);
             }
         }
 
@@ -2351,7 +2411,7 @@ namespace FileExplorerUI
 
             if (_isLoading)
             {
-                UpdateStatus("Sidebar nav ignored: loading in progress.");
+                UpdateStatusKey("StatusSidebarNavIgnoredLoading");
                 return;
             }
 
@@ -2366,7 +2426,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Sidebar nav failed: {ex.Message}");
+                UpdateStatusKey("StatusSidebarNavFailed", ex.Message);
             }
         }
 
@@ -2379,7 +2439,7 @@ namespace FileExplorerUI
 
             if (_isLoading)
             {
-                UpdateStatus("Sidebar nav ignored: loading in progress.");
+                UpdateStatusKey("StatusSidebarNavIgnoredLoading");
                 return;
             }
 
@@ -2395,7 +2455,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Sidebar nav failed: {ex.Message}");
+                UpdateStatusKey("StatusSidebarNavFailed", ex.Message);
                 StyledSidebarView.SetSelectedPath(_currentPath);
             }
         }
@@ -2755,21 +2815,21 @@ namespace FileExplorerUI
         {
             if (c.error_code != 0)
             {
-                return $"Error({c.error_code})";
+                return SF("UsnCapabilityError", c.error_code);
             }
             if (c.available != 0)
             {
-                return "Available";
+                return S("UsnCapabilityAvailable");
             }
             if (c.is_ntfs_local == 0)
             {
-                return "NotNTFS";
+                return S("UsnCapabilityNotNtfs");
             }
             if (c.access_denied != 0)
             {
-                return "Denied";
+                return S("UsnCapabilityDenied");
             }
-            return "Unavailable";
+            return S("UsnCapabilityUnavailable");
         }
 
         private static string DescribeSourceDetail(byte sourceKind, RustUsnCapability c)
@@ -2780,21 +2840,21 @@ namespace FileExplorerUI
             }
             if (c.error_code != 0)
             {
-                return $" (NTFS fallback: probe error {c.error_code})";
+                return SF("UsnFallbackProbeError", c.error_code);
             }
             if (c.is_ntfs_local == 0)
             {
-                return " (NTFS fallback: not local NTFS)";
+                return S("UsnFallbackNotLocalNtfs");
             }
             if (c.access_denied != 0)
             {
-                return " (NTFS fallback: access denied)";
+                return S("UsnFallbackAccessDenied");
             }
             if (c.available != 0)
             {
-                return " (NTFS fallback: probe succeeded, batch path unavailable)";
+                return S("UsnFallbackBatchUnavailable");
             }
-            return " (NTFS fallback: unavailable)";
+            return S("UsnFallbackUnavailable");
         }
 
         private static uint ClampPageSize(uint suggested, uint fallback)
@@ -3139,12 +3199,12 @@ namespace FileExplorerUI
         {
             if (isDirectory)
             {
-                return isLink ? "文件夹链接" : "文件夹";
+                return S(isLink ? "FileTypeFolderLink" : "FileTypeFolder");
             }
 
             if (isLink)
             {
-                return "文件链接";
+                return S("FileTypeFileLink");
             }
 
             return GetFileTypeText(name);
@@ -3298,10 +3358,10 @@ namespace FileExplorerUI
             string ext = Path.GetExtension(name);
             if (string.IsNullOrWhiteSpace(ext))
             {
-                return "文件";
+                return S("FileTypeGeneric");
             }
 
-            return $"{ext.TrimStart('.').ToUpperInvariant()} 文件";
+            return SF("FileTypeWithExtension", ext.TrimStart('.').ToUpperInvariant());
         }
 
         private static string GetFileSizeText(string fullPath)
@@ -3334,7 +3394,7 @@ namespace FileExplorerUI
                     return "-";
                 }
 
-                return dt.ToString("yyyy-MM-dd HH:mm");
+                return dt.ToString("g", CultureInfo.CurrentCulture);
             }
             catch
             {
@@ -3468,7 +3528,7 @@ namespace FileExplorerUI
                 IconForeground = GetEntryIconBrush(isDirectory, isLink: false, name),
                 MftRef = 0,
                 SizeText = isDirectory ? string.Empty : "0 B",
-                ModifiedText = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
+                ModifiedText = DateTime.Now.ToString("g", CultureInfo.CurrentCulture),
                 IsDirectory = isDirectory,
                 IsLink = false,
                 IsLoaded = true,
@@ -3481,7 +3541,8 @@ namespace FileExplorerUI
             _entries.Insert(insertIndex, entry);
             _totalEntries++;
             _hasMore = _nextCursor < _totalEntries;
-            this.AppWindow.Title = $"NorthFile | Engine {_engineVersion} | Items: {_entries.Count}";
+            _lastTitleWasReadFailed = false;
+            UpdateWindowTitle();
             return entry;
         }
 
@@ -3723,7 +3784,7 @@ namespace FileExplorerUI
                 return true;
             }
 
-            UpdateStatus("Rename failed: could not start inline editor.");
+            UpdateStatusKey("StatusRenameFailedCouldNotStartInlineEditor");
             return false;
         }
 
@@ -3878,7 +3939,7 @@ namespace FileExplorerUI
                 entry.IconGlyph = GetEntryIconGlyph(entry.PendingCreateIsDirectory, isLink: false, proposedName);
                 entry.IconForeground = GetEntryIconBrush(entry.PendingCreateIsDirectory, isLink: false, proposedName);
                 entry.SizeText = entry.PendingCreateIsDirectory ? string.Empty : "0 B";
-                entry.ModifiedText = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                entry.ModifiedText = DateTime.Now.ToString("g", CultureInfo.CurrentCulture);
                 entry.IsPendingCreate = false;
                 entry.MftRef = 0;
                 entry.IsLoaded = true;
@@ -3889,7 +3950,7 @@ namespace FileExplorerUI
                     await PopulateSidebarTreeChildrenAsync(parentNode, _currentPath, CancellationToken.None, expandAfterLoad: true);
                 }
 
-                UpdateStatus($"Create success: {proposedName}");
+                UpdateStatusKey("StatusCreateSuccess", proposedName);
                 _ = DispatcherQueue.TryEnqueue(() =>
                 {
                     SelectEntryInList(entry, ensureVisible: true);
@@ -3898,7 +3959,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Create failed: {ex.Message}");
+                UpdateStatusKey("StatusCreateFailed", ex.Message);
                 RenameOverlayTextBox.Focus(FocusState.Programmatic);
                 SelectRenameTargetText(RenameOverlayTextBox, entry);
             }
@@ -4010,14 +4071,14 @@ namespace FileExplorerUI
             TreeViewItem? item = node is not null ? FindTreeViewItemForNode(node) : null;
             if (item is null)
             {
-                UpdateStatus("Rename failed: tree item is not available.");
+                UpdateStatusKey("StatusRenameFailedTreeItemUnavailable");
                 return;
             }
 
             EnsureSidebarTreeRenameOverlay();
             if (_sidebarTreeRenameOverlayCanvas is null || _sidebarTreeRenameOverlayBorder is null || _sidebarTreeRenameTextBox is null)
             {
-                UpdateStatus("Rename failed: tree rename overlay is not available.");
+                UpdateStatusKey("StatusRenameFailedTreeOverlayUnavailable");
                 return;
             }
 
@@ -4068,7 +4129,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            UpdateStatus("Rename failed: tree text anchor is not available.");
+            UpdateStatusKey("StatusRenameFailedTreeTextAnchorUnavailable");
         }
 
         private void EnsureSidebarTreeRenameOverlay()
@@ -4374,11 +4435,11 @@ namespace FileExplorerUI
                     FileName = targetPath,
                     UseShellExecute = true
                 });
-                UpdateStatus($"Opened: {row.Name}");
+                UpdateStatusKey("StatusOpened", row.Name);
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Open failed: {ex.Message}");
+                UpdateStatusKey("StatusOpenFailed", ex.Message);
             }
         }
 
@@ -4557,14 +4618,14 @@ namespace FileExplorerUI
         {
             string glyph = label switch
             {
-                "Paste" => "\uE77F",
-                "Properties" => "\uE946",
-                "Cut" => "\uE8C6",
-                "Copy" => "\uE8C8",
-                "Rename" => "\uE8AC",
-                "Delete" => "\uE74D",
-                "Terminal" => "\uE756",
-                "Refresh" => "\uE72C",
+                var value when string.Equals(value, S("CommonPaste"), StringComparison.Ordinal) => "\uE77F",
+                var value when string.Equals(value, S("CommonProperties"), StringComparison.Ordinal) => "\uE946",
+                var value when string.Equals(value, S("CommonCut"), StringComparison.Ordinal) => "\uE8C6",
+                var value when string.Equals(value, S("CommonCopy"), StringComparison.Ordinal) => "\uE8C8",
+                var value when string.Equals(value, S("CommonRename"), StringComparison.Ordinal) => "\uE8AC",
+                var value when string.Equals(value, S("CommonDelete"), StringComparison.Ordinal) => "\uE74D",
+                var value when string.Equals(value, S("CommonOpenInTerminal"), StringComparison.Ordinal) => "\uE756",
+                var value when string.Equals(value, S("CommonRefresh"), StringComparison.Ordinal) => "\uE72C",
                 _ => "\uE8A5"
             };
 
@@ -4613,11 +4674,11 @@ namespace FileExplorerUI
 
             if (ReferenceEquals(sender, FolderEntriesContextFlyout))
             {
-                UpdateConditionalCommandVisibility(FolderEntriesContextFlyout, "Paste", 2, _fileManagementCoordinator.HasAvailablePasteItems());
+                UpdateConditionalCommandVisibility(FolderEntriesContextFlyout, S("CommonPaste"), 2, _fileManagementCoordinator.HasAvailablePasteItems());
             }
             else if (ReferenceEquals(sender, BackgroundEntriesContextFlyout))
             {
-                UpdateConditionalCommandVisibility(BackgroundEntriesContextFlyout, "Paste", 0, _fileManagementCoordinator.HasAvailablePasteItems());
+                UpdateConditionalCommandVisibility(BackgroundEntriesContextFlyout, S("CommonPaste"), 0, _fileManagementCoordinator.HasAvailablePasteItems());
             }
         }
 
@@ -4782,7 +4843,7 @@ namespace FileExplorerUI
 
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                return FileCommandTargetResolver.ResolveVirtualNode(ShellMyComputerPath, "My Computer");
+                return FileCommandTargetResolver.ResolveVirtualNode(ShellMyComputerPath, S("SidebarMyComputer"));
             }
 
             return FileCommandTargetResolver.ResolveListBackground(_currentPath);
@@ -4792,7 +4853,7 @@ namespace FileExplorerUI
         {
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                UpdateStatus("Already at root.");
+                UpdateStatusKey("StatusAlreadyAtRoot");
                 return;
             }
 
@@ -4869,7 +4930,18 @@ namespace FileExplorerUI
 
             try
             {
-                if (_explorerService.DirectoryExists(basePath))
+                if (string.Equals(basePath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (DriveInfo drive in _explorerService.GetReadyDrives())
+                    {
+                        flyout.Items.Add(new MenuFlyoutItem
+                        {
+                            Text = drive.Name,
+                            Tag = drive.Name
+                        });
+                    }
+                }
+                else if (_explorerService.DirectoryExists(basePath))
                 {
                     string[] dirs = _explorerService.GetDirectories(basePath);
                     Array.Sort(dirs, StringComparer.OrdinalIgnoreCase);
@@ -4908,7 +4980,7 @@ namespace FileExplorerUI
             {
                 flyout.Items.Add(new MenuFlyoutItem
                 {
-                    Text = "(empty)",
+                    Text = S("CommonEmpty"),
                     IsEnabled = false
                 });
             }
@@ -4949,7 +5021,7 @@ namespace FileExplorerUI
             {
                 flyout.Items.Add(new MenuFlyoutItem
                 {
-                    Text = "(empty)",
+                    Text = S("CommonEmpty"),
                     IsEnabled = false
                 });
             }
@@ -4985,6 +5057,16 @@ namespace FileExplorerUI
             return _explorerService.DirectoryHasChildDirectories(path);
         }
 
+        private bool HasBreadcrumbChildren(string path)
+        {
+            if (string.Equals(path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return _explorerService.GetReadyDrives().Count > 0;
+            }
+
+            return HasChildDirectory(path);
+        }
+
         private async void BreadcrumbSubdirMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not MenuFlyoutItem item || item.Tag is not string target)
@@ -5011,19 +5093,19 @@ namespace FileExplorerUI
         {
             if (string.IsNullOrWhiteSpace(newName))
             {
-                error = "Rename failed: name is empty.";
+                error = S("ErrorRenameNameEmpty");
                 return false;
             }
 
             if (newName is "." or "..")
             {
-                error = $"Rename failed: '{newName}' is reserved.";
+                error = SF("ErrorRenameReservedName", newName);
                 return false;
             }
 
             if (newName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
             {
-                error = $"Rename failed: '{newName}' contains invalid characters.";
+                error = SF("ErrorRenameInvalidChars", newName);
                 return false;
             }
 
@@ -5032,7 +5114,7 @@ namespace FileExplorerUI
             if (!string.Equals(entry.FullPath, targetPath, StringComparison.OrdinalIgnoreCase) &&
                 _explorerService.PathExists(targetPath))
             {
-                error = $"Rename failed: '{newName}' already exists.";
+                error = SF("ErrorRenameAlreadyExists", newName);
                 return false;
             }
 
@@ -5088,12 +5170,12 @@ namespace FileExplorerUI
 
                 UpdateListEntryNameForCurrentDirectory(sourcePath, newName);
 
-                UpdateStatus($"Rename success: {entry.Name} -> {newName}");
+                UpdateStatusKey("StatusRenameSuccess", entry.Name, newName);
                 _ = DispatcherQueue.TryEnqueue(FocusSidebarSurface);
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Rename failed: {ex.Message}");
+                UpdateStatusKey("StatusRenameFailedWithReason", ex.Message);
             }
         }
 
@@ -5132,7 +5214,7 @@ namespace FileExplorerUI
                 {
                     _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
                 }
-                UpdateStatus($"Rename success: {oldName} -> {newName}");
+                UpdateStatusKey("StatusRenameSuccess", oldName, newName);
             }
             catch (Exception ex)
             {
@@ -5140,7 +5222,7 @@ namespace FileExplorerUI
                 {
                     CompleteCreatedEntrySelectionIfPending(entry, ensureVisible: false);
                 }
-                UpdateStatus($"Rename failed: {ex.Message}");
+                UpdateStatusKey("StatusRenameFailedWithReason", ex.Message);
             }
         }
 
@@ -5156,11 +5238,11 @@ namespace FileExplorerUI
                 }
                 ApplyLocalDelete(selectedIndex);
                 _ = RefreshCurrentDirectoryInBackgroundAsync();
-                UpdateStatus($"Delete success: {entry.Name} (recursive: {recursive})");
+                UpdateStatusKey("StatusDeleteSuccess", entry.Name, recursive);
             }
             catch (Exception ex)
             {
-                UpdateStatus($"Delete failed: {ex.Message}");
+                UpdateStatusKey("StatusDeleteFailedWithReason", ex.Message);
             }
         }
 
@@ -5184,9 +5266,10 @@ namespace FileExplorerUI
             {
                 Breadcrumbs.Add(new BreadcrumbItemViewModel
                 {
-                    Label = "我的电脑",
+                    Label = S("SidebarMyComputer"),
                     FullPath = ShellMyComputerPath,
                     HasChildren = false,
+                    IconGlyph = BreadcrumbMyComputerGlyph,
                     ChevronVisibility = Visibility.Collapsed,
                     IsLast = true,
                     MeasuredWidth = 0
@@ -5196,35 +5279,43 @@ namespace FileExplorerUI
 
             string fullPath = Path.GetFullPath(path);
             string root = Path.GetPathRoot(fullPath) ?? string.Empty;
+
+            Breadcrumbs.Add(new BreadcrumbItemViewModel
+            {
+                Label = S("SidebarMyComputer"),
+                FullPath = ShellMyComputerPath,
+                HasChildren = HasBreadcrumbChildren(ShellMyComputerPath),
+                IconGlyph = BreadcrumbMyComputerGlyph,
+                ChevronVisibility = Visibility.Collapsed
+            });
+
             if (!string.IsNullOrEmpty(root))
             {
                 Breadcrumbs.Add(new BreadcrumbItemViewModel
                 {
                     Label = root,
                     FullPath = root,
-                    HasChildren = HasChildDirectory(root),
+                    HasChildren = HasBreadcrumbChildren(root),
                     ChevronVisibility = Visibility.Collapsed
                 });
             }
 
             string remaining = fullPath.Substring(root.Length).Trim('\\');
-            if (string.IsNullOrEmpty(remaining))
+            if (!string.IsNullOrEmpty(remaining))
             {
-                return;
-            }
-
-            string current = root;
-            string[] parts = remaining.Split('\\', StringSplitOptions.RemoveEmptyEntries);
-            foreach (string part in parts)
-            {
-                current = string.IsNullOrEmpty(current) ? part : Path.Combine(current, part);
-                Breadcrumbs.Add(new BreadcrumbItemViewModel
+                string current = root;
+                string[] parts = remaining.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+                foreach (string part in parts)
                 {
-                    Label = part,
-                    FullPath = current,
-                    HasChildren = HasChildDirectory(current),
-                    ChevronVisibility = Visibility.Collapsed
-                });
+                    current = string.IsNullOrEmpty(current) ? part : Path.Combine(current, part);
+                    Breadcrumbs.Add(new BreadcrumbItemViewModel
+                    {
+                        Label = part,
+                        FullPath = current,
+                        HasChildren = HasBreadcrumbChildren(current),
+                        ChevronVisibility = Visibility.Collapsed
+                    });
+                }
             }
 
             for (int i = 0; i < Breadcrumbs.Count; i++)
@@ -5394,10 +5485,10 @@ namespace FileExplorerUI
 
             var dialog = new ContentDialog
             {
-                Title = "Rename",
+                Title = S("DialogRenameTitle"),
                 Content = input,
-                PrimaryButtonText = "Rename",
-                CloseButtonText = "Cancel",
+                PrimaryButtonText = S("DialogRenamePrimaryButton"),
+                CloseButtonText = S("DialogCancelButton"),
                 DefaultButton = ContentDialogButton.Primary
             };
 
@@ -5419,10 +5510,10 @@ namespace FileExplorerUI
         {
             var dialog = new ContentDialog
             {
-                Title = "Confirm Delete",
-                Content = $"Delete '{name}'?\nRecursive: {recursive}",
-                PrimaryButtonText = "Delete",
-                CloseButtonText = "Cancel",
+                Title = S("DialogDeleteTitle"),
+                Content = SF("DialogDeleteContent", name, recursive),
+                PrimaryButtonText = S("DialogDeletePrimaryButton"),
+                CloseButtonText = S("DialogCancelButton"),
                 DefaultButton = ContentDialogButton.Close
             };
 
@@ -5433,6 +5524,28 @@ namespace FileExplorerUI
 
             ContentDialogResult result = await dialog.ShowAsync();
             return result == ContentDialogResult.Primary;
+        }
+
+        private void LanguageToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            string language = LocalizedStrings.Instance.ToggleDebugLanguage();
+            string exePath = Environment.ProcessPath
+                ?? Process.GetCurrentProcess().MainModule?.FileName
+                ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
+            {
+                UpdateStatus(SF("StatusLanguageSwitched", language));
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = exePath,
+                Arguments = $"--lang={language}",
+                UseShellExecute = true
+            });
+
+            Close();
         }
 
         private void EnterAddressEditMode(bool selectAll)
@@ -5759,6 +5872,7 @@ namespace FileExplorerUI
     {
         private string _label = string.Empty;
         private string _fullPath = string.Empty;
+        private string _iconGlyph = string.Empty;
         private bool _hasChildren;
         private bool _isLast;
         private double _measuredWidth;
@@ -5791,6 +5905,22 @@ namespace FileExplorerUI
                 }
                 _fullPath = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FullPath)));
+            }
+        }
+
+        public string IconGlyph
+        {
+            get => _iconGlyph;
+            set
+            {
+                if (_iconGlyph == value)
+                {
+                    return;
+                }
+
+                _iconGlyph = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IconGlyph)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IconVisibility)));
             }
         }
 
@@ -5835,6 +5965,10 @@ namespace FileExplorerUI
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ChevronVisibility)));
             }
         }
+
+        public Visibility IconVisibility => string.IsNullOrWhiteSpace(_iconGlyph)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
 
         public double MeasuredWidth
         {

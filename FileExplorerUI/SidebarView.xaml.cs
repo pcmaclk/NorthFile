@@ -12,6 +12,7 @@ namespace FileExplorerUI
     public sealed partial class SidebarView : UserControl
     {
         private const int CompactTreeChildLimit = 200;
+        private static string S(string key) => LocalizedStrings.Instance.Get(key);
         private readonly ExplorerService _explorerService = new();
         private readonly Dictionary<string, string> _pinnedPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<SidebarVisualItem> _visualItems = new();
@@ -71,11 +72,11 @@ namespace FileExplorerUI
             RegisterGroupHover(NetworkGroupBorder);
             RegisterGroupHover(TagsGroupBorder);
 
-            ToolTipService.SetToolTip(PinnedGroupBorder, "固定");
-            ToolTipService.SetToolTip(CloudGroupBorder, "云盘");
-            ToolTipService.SetToolTip(NetworkGroupBorder, "网络");
-            ToolTipService.SetToolTip(TagsGroupBorder, "标签");
-            ToolTipService.SetToolTip(TreeCompactBorder, "我的电脑");
+            ToolTipService.SetToolTip(PinnedGroupBorder, S("SidebarPinned"));
+            ToolTipService.SetToolTip(CloudGroupBorder, S("SidebarCloud"));
+            ToolTipService.SetToolTip(NetworkGroupBorder, S("SidebarNetwork"));
+            ToolTipService.SetToolTip(TagsGroupBorder, S("SidebarTags"));
+            ToolTipService.SetToolTip(TreeCompactBorder, S("SidebarMyComputer"));
         }
 
         public void ConfigurePinnedPaths(string desktopPath, string documentsPath, string downloadsPath, string picturesPath)
@@ -421,7 +422,7 @@ namespace FileExplorerUI
                     CloudGroupBorder,
                     new[]
                     {
-                        new CompactFlyoutItem("OneDrive", "\uE753", null, false)
+                        new CompactFlyoutItem(S("SidebarOneDrive"), "\uE753", null, false)
                     });
                 return;
             }
@@ -439,7 +440,7 @@ namespace FileExplorerUI
                     NetworkGroupBorder,
                     new[]
                     {
-                        new CompactFlyoutItem("暂无项目", "\uE774", null, false)
+                        new CompactFlyoutItem(S("SidebarNetworkEmpty"), "\uE774", null, false)
                     });
                 return;
             }
@@ -465,9 +466,9 @@ namespace FileExplorerUI
                     TagsGroupBorder,
                     new[]
                     {
-                        new CompactFlyoutItem("工作", "\uE8EC", null, false),
-                        new CompactFlyoutItem("重点", "\uE8EC", null, false),
-                        new CompactFlyoutItem("归档", "\uE8EC", null, false)
+                        new CompactFlyoutItem(S("SidebarTagWork"), "\uE8EC", null, false),
+                        new CompactFlyoutItem(S("SidebarTagFocus"), "\uE8EC", null, false),
+                        new CompactFlyoutItem(S("SidebarTagArchive"), "\uE8EC", null, false)
                     });
                 return;
             }
@@ -696,10 +697,10 @@ namespace FileExplorerUI
         {
             return new[]
             {
-                CreatePinnedCompactItem("桌面", "\uE80F", "Desktop"),
-                CreatePinnedCompactItem("文档", "\uE8A5", "Documents"),
-                CreatePinnedCompactItem("下载", "\uE896", "Downloads"),
-                CreatePinnedCompactItem("图片", "\uE91B", "Pictures")
+                CreatePinnedCompactItem(S("SidebarDesktop"), "\uE80F", "Desktop"),
+                CreatePinnedCompactItem(S("SidebarDocuments"), "\uE8A5", "Documents"),
+                CreatePinnedCompactItem(S("SidebarDownloads"), "\uE896", "Downloads"),
+                CreatePinnedCompactItem(S("SidebarPictures"), "\uE91B", "Pictures")
             };
         }
 

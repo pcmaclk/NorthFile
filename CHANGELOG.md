@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Refined the current WinUI localization/debug-language pass:
+  - fixed debug `--lang=...` startup override so `x:Uid` text and runtime resource text switch together
+  - updated sidebar wording from `Pinned / 固定` to `Favorites / 收藏`
+  - updated `My Computer / 我的电脑` wording to `This PC / 此电脑`
+  - aligned related command wording such as `Add to favorites / 添加到收藏`
+  - completed the address-bar breadcrumb root behavior so drive paths now include the `This PC / 此电脑` root, show its icon, and expose a drive-list chevron menu
+- Completed the first WinUI localization pass:
+  - moved core static XAML text toward `x:Uid`
+  - kept runtime status/error text on shared resource-key lookups
+  - localized the main toolbar, sidebar, context menus, dialog text, status text, drive labels, and key interop-facing error messages
+  - removed debug language persistence and returned default language selection to system UI culture
+  - limited `--lang=...` launch overrides and the debug language toggle button to `DEBUG` builds only
+  - added a localization conventions document to define `x:Uid` vs code-resource boundaries and key naming rules
+- Added a minimal WinUI localization resource layer with `Strings/*/Resources.resw` plus a shared `LocalizedStrings` loader, and moved the current context-menu, sidebar, and toolbar text onto resource-backed lookups without changing behavior.
 - Cleaned up the context-menu resource structure by inlining `CommandMenuFlyoutPresenterStyle` into `App.xaml`, removing the old single-style `Themes/Generic.xaml`, and pruning the earlier prototype-only context-menu code.
 - Refactored the list-column splitter and sidebar splitter state in `MainWindow.xaml.cs` so they no longer share magic tags and ad hoc drag fields, and reorganized `SidebarView.xaml.cs` compact-mode layout switching into smaller focused helper methods without changing behavior.
 - Reworked the list context menu into a `CommandMenuFlyout`-based top-level presenter with a native `MenuFlyout` item tree, three separate file/folder/background menu definitions, a direction-aware bottom command bar, dynamic folder/background paste visibility, and a compact-sidebar flyout fix that went back to one-level child probing instead of blocking the UI thread with `GetAwaiter().GetResult()`.

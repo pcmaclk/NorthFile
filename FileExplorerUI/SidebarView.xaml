@@ -50,10 +50,10 @@
                             Glyph="&#xE734;" />
                         <TextBlock
                             x:Name="PinnedGroupTextBlock"
+                            x:Uid="PinnedGroupTextBlock"
                             Grid.Column="2"
                             Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Text="固定" />
+                            VerticalAlignment="Center" />
                         <FontIcon
                             x:Name="PinnedChevron"
                             Grid.Column="3"
@@ -98,10 +98,10 @@
                                 Glyph="&#xE80F;" />
                             <TextBlock
                                 x:Name="DesktopTextBlock"
+                                x:Uid="DesktopTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                VerticalAlignment="Center"
-                                Text="桌面" />
+                                VerticalAlignment="Center" />
                         </Grid>
                     </Border>
 
@@ -135,10 +135,10 @@
                                 Glyph="&#xE8A5;" />
                             <TextBlock
                                 x:Name="DocumentsTextBlock"
+                                x:Uid="DocumentsTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                VerticalAlignment="Center"
-                                Text="文档" />
+                                VerticalAlignment="Center" />
                         </Grid>
                     </Border>
 
@@ -172,10 +172,10 @@
                                 Glyph="&#xE896;" />
                             <TextBlock
                                 x:Name="DownloadsTextBlock"
+                                x:Uid="DownloadsTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                VerticalAlignment="Center"
-                                Text="下载" />
+                                VerticalAlignment="Center" />
                         </Grid>
                     </Border>
 
@@ -209,10 +209,10 @@
                                 Glyph="&#xE91B;" />
                             <TextBlock
                                 x:Name="PicturesTextBlock"
+                                x:Uid="PicturesTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                VerticalAlignment="Center"
-                                Text="图片" />
+                                VerticalAlignment="Center" />
                         </Grid>
                     </Border>
                 </StackPanel>
@@ -284,10 +284,10 @@
                             Glyph="&#xE753;" />
                         <TextBlock
                             x:Name="CloudHeaderTextBlock"
+                            x:Uid="CloudHeaderTextBlock"
                             Grid.Column="2"
                             Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Text="云盘" />
+                            VerticalAlignment="Center" />
                         <FontIcon
                             x:Name="CloudChevron"
                             Grid.Column="3"
@@ -330,10 +330,10 @@
                                 Glyph="&#xE753;" />
                             <TextBlock
                                 x:Name="OneDriveTextBlock"
+                                x:Uid="OneDriveTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                VerticalAlignment="Center"
-                                Text="OneDrive" />
+                                VerticalAlignment="Center" />
                         </Grid>
                     </Border>
                 </StackPanel>
@@ -367,10 +367,10 @@
                             Glyph="&#xE774;" />
                         <TextBlock
                             x:Name="NetworkHeaderTextBlock"
+                            x:Uid="NetworkHeaderTextBlock"
                             Grid.Column="2"
                             Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Text="网络" />
+                            VerticalAlignment="Center" />
                         <FontIcon
                             x:Name="NetworkChevron"
                             Grid.Column="3"
@@ -414,10 +414,10 @@
                             Glyph="&#xE8EC;" />
                         <TextBlock
                             x:Name="TagsHeaderTextBlock"
+                            x:Uid="TagsHeaderTextBlock"
                             Grid.Column="2"
                             Margin="14,0,0,0"
-                            VerticalAlignment="Center"
-                            Text="标签" />
+                            VerticalAlignment="Center" />
                         <FontIcon
                             x:Name="TagsChevron"
                             Grid.Column="3"
@@ -460,10 +460,10 @@
                                 Glyph="&#xE8EC;" />
                             <TextBlock
                                 x:Name="TagWorkTextBlock"
+                                x:Uid="TagWorkTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                VerticalAlignment="Center"
-                                Text="工作" />
+                                VerticalAlignment="Center" />
                         </Grid>
                     </Border>
 
@@ -496,10 +496,10 @@
                                 Glyph="&#xE8EC;" />
                             <TextBlock
                                 x:Name="TagFocusTextBlock"
+                                x:Uid="TagFocusTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                VerticalAlignment="Center"
-                                Text="重点" />
+                                VerticalAlignment="Center" />
                         </Grid>
                     </Border>
 
@@ -532,10 +532,10 @@
                                 Glyph="&#xE8EC;" />
                             <TextBlock
                                 x:Name="TagArchiveTextBlock"
+                                x:Uid="TagArchiveTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                VerticalAlignment="Center"
-                                Text="归档" />
+                                VerticalAlignment="Center" />
                         </Grid>
                     </Border>
                 </StackPanel>
@@ -551,8 +551,10 @@
                 Padding="0"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Center"
-                Style="{ThemeResource SubtleButtonStyle}"
-                ToolTipService.ToolTip="设置">
+                Style="{ThemeResource SubtleButtonStyle}">
+                <ToolTipService.ToolTip>
+                    <ToolTip x:Uid="SidebarSettingsButtonToolTip" />
+                </ToolTipService.ToolTip>
                 <FontIcon
                     FontFamily="Segoe Fluent Icons"
                     FontSize="12"

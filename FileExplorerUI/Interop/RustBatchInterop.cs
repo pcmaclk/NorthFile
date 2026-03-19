@@ -62,6 +62,8 @@ public sealed record FileBatchPage(
 public static partial class RustBatchInterop
 {
     private static readonly object NativeCallGate = new();
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
+    private static string SF(string key, params object[] args) => string.Format(S(key), args);
 
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_get_demo_batch")]
     private static partial RustBatchResult GetDemoBatch(uint limit);
@@ -111,7 +113,7 @@ public static partial class RustBatchInterop
     public static string GetEngineVersion()
     {
         IntPtr p = GetEngineVersionNative();
-        return Marshal.PtrToStringUTF8(p) ?? "unknown";
+        return Marshal.PtrToStringUTF8(p) ?? S("InteropUnknown");
     }
 
     public static RustNtfsVolumeMeta ProbeNtfsVolume(string path)
@@ -123,7 +125,7 @@ public static partial class RustBatchInterop
         }
         if (meta.error_code != 0)
         {
-            throw new InvalidOperationException($"NTFS probe failed ({meta.error_code})");
+            throw new InvalidOperationException(SF("InteropNtfsProbeFailed", meta.error_code));
         }
 
         return meta;
@@ -245,7 +247,7 @@ public static partial class RustBatchInterop
         }
         if (code != 0)
         {
-            throw new InvalidOperationException($"Memory invalidate dir failed: {code}");
+            throw new InvalidOperationException(SF("InteropMemoryInvalidateDirFailed", code));
         }
     }
 
@@ -258,7 +260,7 @@ public static partial class RustBatchInterop
         }
         if (code != 0)
         {
-            throw new InvalidOperationException($"Memory clear cache failed: {code}");
+            throw new InvalidOperationException(SF("InteropMemoryClearCacheFailed", code));
         }
     }
 
@@ -271,7 +273,7 @@ public static partial class RustBatchInterop
         }
         if (code != 0)
         {
-            throw new InvalidOperationException($"Delete path failed ({code}): {DescribeOperationError(code)}");
+            throw new InvalidOperationException(SF("InteropDeletePathFailed", code, DescribeOperationError(code)));
         }
     }
 
@@ -284,7 +286,7 @@ public static partial class RustBatchInterop
         }
         if (code != 0)
         {
-            throw new InvalidOperationException($"Rename path failed ({code}): {DescribeOperationError(code)}");
+            throw new InvalidOperationException(SF("InteropRenamePathFailed", code, DescribeOperationError(code)));
         }
     }
 
@@ -294,8 +296,8 @@ public static partial class RustBatchInterop
         {
             if (batch.error_code != 0)
             {
-                string message = Marshal.PtrToStringUTF8(batch.error_message) ?? "unknown rust ffi error";
-                throw new InvalidOperationException($"Rust error {batch.error_code}: {message}");
+                string message = Marshal.PtrToStringUTF8(batch.error_message) ?? S("InteropUnknownRustFfiError");
+                throw new InvalidOperationException(SF("InteropRustErrorWithCode", batch.error_code, message));
             }
 
             ReadOnlySpan<RustFileEntry> entries = new(batch.entries.ToPointer(), checked((int)batch.entries_len));
@@ -341,7 +343,7 @@ public static partial class RustBatchInterop
             if (batch.error_code != 0)
             {
                 errorCode = batch.error_code;
-                errorMessage = Marshal.PtrToStringUTF8(batch.error_message) ?? "unknown rust ffi error";
+                errorMessage = Marshal.PtrToStringUTF8(batch.error_message) ?? S("InteropUnknownRustFfiError");
                 page = EmptyPage;
                 return false;
             }
@@ -404,15 +406,15 @@ public static partial class RustBatchInterop
     private static string DescribeOperationError(int code) =>
         code switch
         {
-            1001 => "invalid parameter",
-            2101 => "path not found",
-            2102 => "permission denied",
-            2103 => "target already exists",
-            2104 => "directory is not empty",
-            2105 => "resource is busy or timed out",
-            2106 => "invalid path or input",
-            2107 => "operation is not supported",
-            2199 => "generic I/O failure",
-            _ => "unknown error",
+            1001 => S("InteropOperationInvalidParameter"),
+            2101 => S("InteropOperationPathNotFound"),
+            2102 => S("InteropOperationPermissionDenied"),
+            2103 => S("InteropOperationTargetAlreadyExists"),
+            2104 => S("InteropOperationDirectoryNotEmpty"),
+            2105 => S("InteropOperationResourceBusyOrTimedOut"),
+            2106 => S("InteropOperationInvalidPathOrInput"),
+            2107 => S("InteropOperationNotSupported"),
+            2199 => S("InteropOperationGenericIoFailure"),
+            _ => S("InteropOperationUnknownError"),
         };
 }

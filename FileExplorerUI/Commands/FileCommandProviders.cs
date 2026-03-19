@@ -11,6 +11,8 @@ public interface IFileCommandProvider
 
 public sealed class BaseFileCommandProvider : IFileCommandProvider
 {
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
+
     public bool CanHandle(FileCommandTarget target)
     {
         return target.Kind != FileCommandTargetKind.None;
@@ -20,15 +22,15 @@ public sealed class BaseFileCommandProvider : IFileCommandProvider
     {
         var commands = new List<FileCommandDescriptor>();
 
-        AddIfSupported(commands, target, FileCommandIds.Open, "Open", FileCommandCapabilities.Open);
-        AddIfSupported(commands, target, FileCommandIds.Copy, "Copy", FileCommandCapabilities.Copy);
-        AddIfSupported(commands, target, FileCommandIds.Cut, "Cut", FileCommandCapabilities.Cut);
-        AddIfSupported(commands, target, FileCommandIds.Paste, "Paste", FileCommandCapabilities.PasteInto);
-        AddIfSupported(commands, target, FileCommandIds.NewFile, "New File", FileCommandCapabilities.CreateFile);
-        AddIfSupported(commands, target, FileCommandIds.NewFolder, "New Folder", FileCommandCapabilities.CreateFolder);
-        AddIfSupported(commands, target, FileCommandIds.Rename, "Rename", FileCommandCapabilities.Rename);
-        AddIfSupported(commands, target, FileCommandIds.Delete, "Delete", FileCommandCapabilities.Delete);
-        AddIfSupported(commands, target, FileCommandIds.Properties, "Properties", FileCommandCapabilities.ShowProperties);
+        AddIfSupported(commands, target, FileCommandIds.Open, S("CommonOpen"), FileCommandCapabilities.Open);
+        AddIfSupported(commands, target, FileCommandIds.Copy, S("CommonCopy"), FileCommandCapabilities.Copy);
+        AddIfSupported(commands, target, FileCommandIds.Cut, S("CommonCut"), FileCommandCapabilities.Cut);
+        AddIfSupported(commands, target, FileCommandIds.Paste, S("CommonPaste"), FileCommandCapabilities.PasteInto);
+        AddIfSupported(commands, target, FileCommandIds.NewFile, S("CommonNewFile"), FileCommandCapabilities.CreateFile);
+        AddIfSupported(commands, target, FileCommandIds.NewFolder, S("CommonNewFolder"), FileCommandCapabilities.CreateFolder);
+        AddIfSupported(commands, target, FileCommandIds.Rename, S("CommonRename"), FileCommandCapabilities.Rename);
+        AddIfSupported(commands, target, FileCommandIds.Delete, S("CommonDelete"), FileCommandCapabilities.Delete);
+        AddIfSupported(commands, target, FileCommandIds.Properties, S("CommonProperties"), FileCommandCapabilities.ShowProperties);
 
         return commands;
     }
@@ -49,6 +51,8 @@ public sealed class BaseFileCommandProvider : IFileCommandProvider
 
 public sealed class FileEntryMenuCommandProvider : IFileCommandProvider
 {
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
+
     public bool CanHandle(FileCommandTarget target)
     {
         return target.Kind == FileCommandTargetKind.FileEntry;
@@ -58,12 +62,12 @@ public sealed class FileEntryMenuCommandProvider : IFileCommandProvider
     {
         return new[]
         {
-            new FileCommandDescriptor(FileCommandIds.OpenWith, "Open with", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.Share, "Share", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.Compress, "Compress", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.CreateShortcut, "Create shortcut", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.CopyPath, "Copy file path", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.SetTag, "Set tag", FileCommandCapabilities.None)
+            new FileCommandDescriptor(FileCommandIds.OpenWith, S("CommonOpenWith"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.Share, S("CommonShare"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.Compress, S("CommonCompress"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.CreateShortcut, S("CommonCreateShortcut"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.CopyPath, S("CommonCopyFilePath"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.SetTag, S("CommonSetTag"), FileCommandCapabilities.None)
         };
     }
 }
@@ -78,22 +82,24 @@ public sealed class DirectoryMenuCommandProvider : IFileCommandProvider
     public IReadOnlyList<FileCommandDescriptor> GetCommands(FileCommandTarget target)
     {
         string pinCommandId = FileCommandIds.PinToSidebar;
-        string pinText = "Pin to sidebar";
+        string pinText = LocalizedStrings.Instance.Get("CommonPinToSidebar");
 
         return new[]
         {
-            new FileCommandDescriptor(FileCommandIds.OpenInNewWindow, "Open in new window", FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.OpenInNewWindow, LocalizedStrings.Instance.Get("CommonOpenInNewWindow"), FileCommandCapabilities.None),
             new FileCommandDescriptor(pinCommandId, pinText, FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.Compress, "Compress", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.CopyPath, "Copy folder path", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.SetTag, "Set tag", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.OpenInTerminal, "Open in terminal", FileCommandCapabilities.None)
+            new FileCommandDescriptor(FileCommandIds.Compress, LocalizedStrings.Instance.Get("CommonCompress"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.CopyPath, LocalizedStrings.Instance.Get("CommonCopyFolderPath"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.SetTag, LocalizedStrings.Instance.Get("CommonSetTag"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.OpenInTerminal, LocalizedStrings.Instance.Get("CommonOpenInTerminal"), FileCommandCapabilities.None)
         };
     }
 }
 
 public sealed class BackgroundMenuCommandProvider : IFileCommandProvider
 {
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
+
     public bool CanHandle(FileCommandTarget target)
     {
         return target.Kind is FileCommandTargetKind.ListBackground or FileCommandTargetKind.CurrentDirectory;
@@ -103,17 +109,19 @@ public sealed class BackgroundMenuCommandProvider : IFileCommandProvider
     {
         return new[]
         {
-            new FileCommandDescriptor(FileCommandIds.View, "View", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.SortBy, "Sort by", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.GroupBy, "Group by", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.OpenInTerminal, "Open in terminal", FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.Refresh, "Refresh", FileCommandCapabilities.None)
+            new FileCommandDescriptor(FileCommandIds.View, S("CommonView"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.SortBy, S("CommonSortBy"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.GroupBy, S("CommonGroupBy"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.OpenInTerminal, S("CommonOpenInTerminal"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.Refresh, S("CommonRefresh"), FileCommandCapabilities.None)
         };
     }
 }
 
 public sealed class ShortcutFileCommandProvider : IFileCommandProvider
 {
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
+
     public bool CanHandle(FileCommandTarget target)
     {
         return (target.Traits & FileEntryTraits.Shortcut) != 0;
@@ -128,13 +136,15 @@ public sealed class ShortcutFileCommandProvider : IFileCommandProvider
 
         return new[]
         {
-            new FileCommandDescriptor(FileCommandIds.OpenTarget, "Open Target", FileCommandCapabilities.OpenTarget)
+            new FileCommandDescriptor(FileCommandIds.OpenTarget, S("CommonOpenTarget"), FileCommandCapabilities.OpenTarget)
         };
     }
 }
 
 public sealed class ExecutableFileCommandProvider : IFileCommandProvider
 {
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
+
     public bool CanHandle(FileCommandTarget target)
     {
         return (target.Traits & FileEntryTraits.Executable) != 0;
@@ -149,13 +159,15 @@ public sealed class ExecutableFileCommandProvider : IFileCommandProvider
 
         return new[]
         {
-            new FileCommandDescriptor(FileCommandIds.RunAsAdministrator, "Run as Administrator", FileCommandCapabilities.RunAsAdministrator)
+            new FileCommandDescriptor(FileCommandIds.RunAsAdministrator, S("CommonRunAsAdministrator"), FileCommandCapabilities.RunAsAdministrator)
         };
     }
 }
 
 public sealed class ArchiveFileCommandProvider : IFileCommandProvider
 {
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
+
     public bool CanHandle(FileCommandTarget target)
     {
         return (target.Traits & FileEntryTraits.Archive) != 0;
@@ -166,12 +178,12 @@ public sealed class ArchiveFileCommandProvider : IFileCommandProvider
         var commands = new List<FileCommandDescriptor>();
         if ((target.Capabilities & FileCommandCapabilities.ExtractHere) != 0)
         {
-            commands.Add(new FileCommandDescriptor(FileCommandIds.ExtractHere, "Extract Here", FileCommandCapabilities.ExtractHere));
+            commands.Add(new FileCommandDescriptor(FileCommandIds.ExtractHere, S("CommonExtractHere"), FileCommandCapabilities.ExtractHere));
         }
 
         if ((target.Capabilities & FileCommandCapabilities.ExtractToFolder) != 0)
         {
-            commands.Add(new FileCommandDescriptor(FileCommandIds.ExtractToFolder, "Extract to Folder", FileCommandCapabilities.ExtractToFolder));
+            commands.Add(new FileCommandDescriptor(FileCommandIds.ExtractToFolder, S("CommonExtractToFolder"), FileCommandCapabilities.ExtractToFolder));
         }
 
         return commands;
@@ -180,6 +192,8 @@ public sealed class ArchiveFileCommandProvider : IFileCommandProvider
 
 public sealed class PreviewFileCommandProvider : IFileCommandProvider
 {
+    private static string S(string key) => LocalizedStrings.Instance.Get(key);
+
     public bool CanHandle(FileCommandTarget target)
     {
         return (target.Traits & (FileEntryTraits.Image | FileEntryTraits.Video | FileEntryTraits.Audio)) != 0;
@@ -194,7 +208,7 @@ public sealed class PreviewFileCommandProvider : IFileCommandProvider
 
         return new[]
         {
-            new FileCommandDescriptor(FileCommandIds.Preview, "Preview", FileCommandCapabilities.Preview)
+            new FileCommandDescriptor(FileCommandIds.Preview, S("CommonPreview"), FileCommandCapabilities.Preview)
         };
     }
 }

@@ -11,7 +11,7 @@ public sealed class ExplorerService
 {
     public string GenerateUniqueNewFileName(string directoryPath)
     {
-        const string baseName = "New File";
+        string baseName = LocalizedStrings.Instance.Get("DefaultNewFileBaseName");
         const string extension = ".txt";
         string candidate = baseName + extension;
         int suffix = 2;
@@ -27,7 +27,7 @@ public sealed class ExplorerService
 
     public string GenerateUniqueNewFolderName(string directoryPath)
     {
-        const string baseName = "New Folder";
+        string baseName = LocalizedStrings.Instance.Get("DefaultNewFolderBaseName");
         string candidate = baseName;
         int suffix = 2;
 
