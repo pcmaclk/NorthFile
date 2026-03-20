@@ -66,6 +66,9 @@
   <data name="StatusCurrentFolderItems" xml:space="preserve"><value>{0} item(s) in the current folder</value></data>
   <data name="StatusDriveCount" xml:space="preserve"><value>{0} drive(s) in This PC</value></data>
   <data name="StatusLanguageSwitched" xml:space="preserve"><value>Language switched: {0}</value></data>
+  <data name="StatusViewChanged" xml:space="preserve"><value>View changed: {0}</value></data>
+  <data name="StatusSortChanged" xml:space="preserve"><value>Sort changed: {0}, {1}</value></data>
+  <data name="StatusGroupChanged" xml:space="preserve"><value>Group changed: {0}</value></data>
   <data name="CreateKindFile" xml:space="preserve"><value>file</value></data>
   <data name="CreateKindFolder" xml:space="preserve"><value>folder</value></data>
   <data name="ErrorOpenFolderFirst" xml:space="preserve"><value>Open a folder first.</value></data>
@@ -171,10 +174,14 @@
   <data name="CommonSortByType" xml:space="preserve"><value>Type</value></data>
   <data name="CommonSortBySize" xml:space="preserve"><value>Size</value></data>
   <data name="CommonSortByModifiedDate" xml:space="preserve"><value>Modified Date</value></data>
+  <data name="CommonSortAscending" xml:space="preserve"><value>Ascending</value></data>
+  <data name="CommonSortDescending" xml:space="preserve"><value>Descending</value></data>
   <data name="CommonGroupBy" xml:space="preserve"><value>Group by</value></data>
   <data name="CommonGroupByNone" xml:space="preserve"><value>None</value></data>
+  <data name="CommonGroupByName" xml:space="preserve"><value>Name</value></data>
   <data name="CommonGroupByType" xml:space="preserve"><value>Type</value></data>
   <data name="CommonGroupByModifiedDate" xml:space="preserve"><value>Modified Date</value></data>
+  <data name="CommonUnknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="CommonNew" xml:space="preserve"><value>New</value></data>
   <data name="CommonNewFile" xml:space="preserve"><value>File</value></data>
   <data name="CommonNewFolder" xml:space="preserve"><value>Folder</value></data>
@@ -192,6 +199,21 @@
   <data name="CommonExtractToFolder" xml:space="preserve"><value>Extract to folder</value></data>
   <data name="CommonPreview" xml:space="preserve"><value>Preview</value></data>
   <data name="CommonEmpty" xml:space="preserve"><value>(empty)</value></data>
+  <data name="GroupTypeFolder" xml:space="preserve"><value>Folders</value></data>
+  <data name="GroupTypeDocument" xml:space="preserve"><value>Documents</value></data>
+  <data name="GroupTypeImage" xml:space="preserve"><value>Images</value></data>
+  <data name="GroupTypeAudio" xml:space="preserve"><value>Audio</value></data>
+  <data name="GroupTypeVideo" xml:space="preserve"><value>Videos</value></data>
+  <data name="GroupTypeArchive" xml:space="preserve"><value>Archives</value></data>
+  <data name="GroupTypeProgram" xml:space="preserve"><value>Programs</value></data>
+  <data name="GroupTypeOther" xml:space="preserve"><value>Other</value></data>
+  <data name="GroupTypeUnknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="GroupDateToday" xml:space="preserve"><value>Today</value></data>
+  <data name="GroupDateYesterday" xml:space="preserve"><value>Yesterday</value></data>
+  <data name="GroupDatePast7Days" xml:space="preserve"><value>Past 7 days</value></data>
+  <data name="GroupDateEarlierThisMonth" xml:space="preserve"><value>Earlier this month</value></data>
+  <data name="GroupDateOlder" xml:space="preserve"><value>Older</value></data>
+  <data name="GroupDateUnknown" xml:space="preserve"><value>Unknown date</value></data>
   <data name="SidebarPinned" xml:space="preserve"><value>Favorites</value></data>
   <data name="SidebarMyComputer" xml:space="preserve"><value>This PC</value></data>
   <data name="SidebarCloud" xml:space="preserve"><value>Cloud</value></data>

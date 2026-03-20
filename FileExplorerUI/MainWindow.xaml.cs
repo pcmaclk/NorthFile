@@ -2,6 +2,7 @@ using FileExplorerUI.Commands;
 using FileExplorerUI.Controls;
 using FileExplorerUI.Interop;
 using FileExplorerUI.Services;
+using FileExplorerUI.Workspace;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -238,6 +239,7 @@ namespace FileExplorerUI
         private readonly Dictionary<string, NavigationViewItem> _sidebarPathButtons = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _sidebarQuickAccessPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _sidebarDrivePaths = new(StringComparer.OrdinalIgnoreCase);
+        private readonly WorkspaceShellState _workspaceShellState = new();
         private IntPtr _windowHandle;
         private IntPtr _originalWndProc;
         private WndProcDelegate? _wndProcDelegate;
@@ -357,6 +359,7 @@ namespace FileExplorerUI
             _pathDefaultBorderBrush = PathTextBox.BorderBrush;
             _engineVersion = _explorerService.GetEngineVersion();
             LocalizedStrings.Instance.PropertyChanged += LocalizedStrings_PropertyChanged;
+            InitializeWorkspaceShellState();
 #if !DEBUG
             LanguageToggleButton.Visibility = Visibility.Collapsed;
 #endif
@@ -369,6 +372,15 @@ namespace FileExplorerUI
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
             _ = LoadFirstPageAsync();
+        }
+
+        private void InitializeWorkspaceShellState()
+        {
+            _workspaceShellState.LayoutMode = WorkspaceLayoutMode.Single;
+            _workspaceShellState.ActivePanel = WorkspacePanelId.Primary;
+            _workspaceShellState.Primary.CurrentPath = _currentPath;
+            _workspaceShellState.Primary.QueryText = _currentQuery;
+            _workspaceShellState.Primary.SelectedEntryPath = _selectedEntryPath;
         }
 
         private void LocalizedStrings_PropertyChanged(object? sender, PropertyChangedEventArgs e)
