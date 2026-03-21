@@ -1,5 +1,6 @@
-using System;
 using System.Collections.Generic;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 
 namespace FileExplorerUI.Workspace;
 
@@ -9,9 +10,9 @@ public interface IEntriesViewHost
 
     void SetSelectedEntry(string? fullPath);
 
-    event EventHandler<EntryViewModel>? EntryInvoked;
+    EntryViewModel? ResolveDoubleTappedEntry(DoubleTappedRoutedEventArgs e);
 
-    event EventHandler<EntryViewModel>? EntryContextRequested;
+    EntriesViewHitResult ResolveRightTappedHit(RightTappedRoutedEventArgs e);
 
-    event EventHandler? BackgroundContextRequested;
+    EntryViewModel? ResolvePressedEntry(PointerRoutedEventArgs e);
 }
