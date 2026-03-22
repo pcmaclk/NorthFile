@@ -29,6 +29,7 @@ namespace FileExplorerUI
         private bool _isTagsExpanded = true;
         private bool _isCompact;
         private string? _selectedPath;
+        private bool _isSelectionActive = true;
         private TreeView? _attachedTreeView;
         private readonly CompactSidebarMenuController _compactMenuController = new();
         private bool _compactButtonsAttached;
@@ -108,6 +109,7 @@ namespace FileExplorerUI
             treeView.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
             treeView.SetValue(ScrollViewer.HorizontalScrollModeProperty, ScrollMode.Disabled);
             treeView.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
+            ApplyTreeSelectionResources();
 
             TreeHostGrid.Children.Clear();
             TreeHostGrid.Children.Add(treeView);
@@ -300,6 +302,18 @@ namespace FileExplorerUI
             selected.Border.Background = SelectedBackgroundBrush();
         }
 
+        public void SetSelectionActive(bool isActive)
+        {
+            if (_isSelectionActive == isActive)
+            {
+                return;
+            }
+
+            _isSelectionActive = isActive;
+            ApplyTreeSelectionResources();
+            SetSelectedPath(_selectedPath);
+        }
+
         private void RegisterStaticItem(string key, Border border, Border indicator, TextBlock labelBlock, SidebarSection section, bool selectable = true)
         {
             border.PointerEntered += Item_PointerEntered;
@@ -341,7 +355,7 @@ namespace FileExplorerUI
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 CornerRadius = (CornerRadius)Application.Current.Resources["ListViewItemSelectionIndicatorCornerRadius"],
-                Background = (Brush)Application.Current.Resources["ListViewItemSelectionIndicatorBrush"],
+                Background = SelectionIndicatorBrush(),
                 Visibility = Visibility.Collapsed
             };
 
@@ -521,10 +535,12 @@ namespace FileExplorerUI
         {
             PinnedGroupSelectionIndicator.Visibility = Visibility.Collapsed;
             PinnedGroupBorder.Background = TransparentBrush();
+            PinnedGroupSelectionIndicator.Background = SelectionIndicatorBrush();
 
             foreach (SidebarVisualItem item in _visualItems)
             {
                 item.Indicator.Visibility = Visibility.Collapsed;
+                item.Indicator.Background = SelectionIndicatorBrush();
                 item.Border.Background = TransparentBrush();
             }
         }
@@ -661,6 +677,45 @@ namespace FileExplorerUI
         private static Brush SelectedBackgroundBrush()
         {
             return (Brush)Application.Current.Resources["ListViewItemBackgroundSelected"];
+        }
+
+        private Brush SelectionIndicatorBrush()
+        {
+            string resourceKey = _isSelectionActive ? "ListViewItemSelectionIndicatorBrush" : "TextFillColorDisabledBrush";
+            if (Application.Current.Resources.TryGetValue(resourceKey, out object? value) && value is Brush brush)
+            {
+                return brush;
+            }
+
+            return new SolidColorBrush(_isSelectionActive
+                ? ColorHelper.FromArgb(0xFF, 0x00, 0x78, 0xD4)
+                : ColorHelper.FromArgb(0xFF, 0xC8, 0xC8, 0xC8));
+        }
+
+        private void ApplyTreeSelectionResources()
+        {
+            if (_attachedTreeView is null)
+            {
+                return;
+            }
+
+            Brush selectionBrush = SelectionIndicatorBrush();
+            Brush selectedBackgroundBrush = _isSelectionActive
+                ? (Brush)Application.Current.Resources["ListViewItemBackgroundSelected"]
+                : new SolidColorBrush(ColorHelper.FromArgb(0x20, 0xC8, 0xC8, 0xC8));
+            _attachedTreeView.Resources["ListViewItemSelectionIndicatorBrush"] = selectionBrush;
+            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorBrush"] = selectionBrush;
+            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorForeground"] = selectionBrush;
+            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorForegroundPointerOver"] = selectionBrush;
+            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorForegroundPressed"] = selectionBrush;
+            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorForegroundDisabled"] = selectionBrush;
+            _attachedTreeView.Resources["ListViewItemBackgroundSelected"] = selectedBackgroundBrush;
+            _attachedTreeView.Resources["ListViewItemBackgroundSelectedPointerOver"] = selectedBackgroundBrush;
+            _attachedTreeView.Resources["ListViewItemBackgroundSelectedPressed"] = selectedBackgroundBrush;
+            _attachedTreeView.Resources["TreeViewItemBackgroundSelected"] = selectedBackgroundBrush;
+            _attachedTreeView.Resources["TreeViewItemBackgroundSelectedPointerOver"] = selectedBackgroundBrush;
+            _attachedTreeView.Resources["TreeViewItemBackgroundSelectedPressed"] = selectedBackgroundBrush;
+            _attachedTreeView.Resources["TreeViewItemBackgroundSelectedDisabled"] = selectedBackgroundBrush;
         }
 
         private static Brush HoverBackgroundBrush()

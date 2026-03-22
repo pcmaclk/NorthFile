@@ -173,6 +173,45 @@ namespace FileExplorerUI
             public bool ContainsSource(DependencyObject? source) => _containsSource(source);
         }
 
+        private sealed class SelectionSurfaceCoordinator
+        {
+            private bool _isWindowActive = true;
+
+            public SelectionSurfaceCoordinator(SelectionSurfaceId initialActiveSurface)
+            {
+                ActiveSurface = initialActiveSurface;
+            }
+
+            public SelectionSurfaceId ActiveSurface { get; private set; }
+
+            public bool SetWindowActive(bool isActive)
+            {
+                if (_isWindowActive == isActive)
+                {
+                    return false;
+                }
+
+                _isWindowActive = isActive;
+                return true;
+            }
+
+            public bool SetActiveSurface(SelectionSurfaceId surface)
+            {
+                if (ActiveSurface == surface)
+                {
+                    return false;
+                }
+
+                ActiveSurface = surface;
+                return true;
+            }
+
+            public bool IsSurfaceActive(SelectionSurfaceId surface)
+            {
+                return _isWindowActive && ActiveSurface == surface;
+            }
+        }
+
         private GridLength _nameColumnWidth = new(220);
         private GridLength _typeColumnWidth = new(150);
         private GridLength _sizeColumnWidth = new(120);
@@ -214,6 +253,10 @@ namespace FileExplorerUI
         private ControlTemplate? _renameOverlayTextBoxTemplate;
         private SidebarTreeEntry? _activeSidebarTreeRenameEntry;
         private bool _isCommittingSidebarTreeRename;
+        private bool _isSidebarSelectionActive;
+        private bool _isEntriesSelectionActive = true;
+        private readonly SelectionSurfaceCoordinator _selectionSurfaceCoordinator =
+            new(SelectionSurfaceId.Sidebar);
 
         private const double SidebarExpandedDefaultWidth = 220;
         private const double SidebarExpandedMinWidth = 32;
@@ -501,6 +544,13 @@ namespace FileExplorerUI
 
         private sealed record EntryGroupDescriptor(string BucketKey, string StateKey, string Label, string OrderKey);
 
+        private enum SelectionSurfaceId
+        {
+            Sidebar,
+            PrimaryPane,
+            SecondaryPane
+        }
+
         private sealed class EntryGroupBucket
         {
             public required EntryGroupDescriptor Descriptor { get; init; }
@@ -570,6 +620,7 @@ namespace FileExplorerUI
                     UIElement.PreviewKeyDownEvent,
                     new KeyEventHandler(RootElement_PreviewKeyDown),
                     true);
+                rootElement.GotFocus += RootElement_GotFocus;
             }
             PathTextBox.Text = ShellMyComputerPath;
             RegisterColumnSplitterHandlers(HeaderSplitter1);
@@ -875,12 +926,19 @@ namespace FileExplorerUI
 
         private async void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
+            _selectionSurfaceCoordinator.SetWindowActive(args.WindowActivationState != WindowActivationState.Deactivated);
             if (args.WindowActivationState == WindowActivationState.Deactivated)
             {
                 await _inlineEditCoordinator.CommitActiveSessionAsync();
             }
 
+            UpdateSelectionActivityState();
             TryResetSystemCursorToArrow();
+        }
+
+        private void RootElement_GotFocus(object sender, RoutedEventArgs e)
+        {
+            UpdateSelectionActivityState();
         }
 
         private void RootElement_PointerEnteredOrMoved(object sender, PointerRoutedEventArgs e)
@@ -893,6 +951,18 @@ namespace FileExplorerUI
 
         private async void RootElement_PointerPressedPreview(object sender, PointerRoutedEventArgs e)
         {
+            if (e.OriginalSource is DependencyObject pointerSource)
+            {
+                if (IsDescendantOf(pointerSource, StyledSidebarView))
+                {
+                    SetActiveSelectionSurface(SelectionSurfaceId.Sidebar);
+                }
+                else if (IsDescendantOf(pointerSource, ExplorerBodyGrid))
+                {
+                    SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+                }
+            }
+
             if (!_inlineEditCoordinator.HasActiveSession)
             {
                 return;
@@ -1897,7 +1967,7 @@ namespace FileExplorerUI
             await LoadPageAsync(_currentPath, cursor: 0, append: false, perf);
         }
 
-        private async Task NavigateToPathAsync(string path, bool pushHistory)
+        private async Task NavigateToPathAsync(string path, bool pushHistory, bool focusEntriesAfterNavigation = true)
         {
             HideRenameOverlay();
 
@@ -1922,7 +1992,10 @@ namespace FileExplorerUI
                     _ = SelectSidebarTreePathAsync(_currentPath);
                     await LoadFirstPageAsync();
                     ClearListSelection();
-                    _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                    if (focusEntriesAfterNavigation)
+                    {
+                        _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                    }
                     perf.Mark("navigate.completed");
                     return;
                 }
@@ -1952,7 +2025,10 @@ namespace FileExplorerUI
                 _ = SelectSidebarTreePathAsync(_currentPath);
                 await LoadFirstPageAsync();
                 ClearListSelection();
-                _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                if (focusEntriesAfterNavigation)
+                {
+                    _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                }
                 perf.Mark("navigate.completed");
             }
             finally
@@ -3114,6 +3190,9 @@ namespace FileExplorerUI
 
         private async Task NavigateSidebarTreeEntryAsync(SidebarTreeEntry entry)
         {
+            FocusSidebarSurface();
+            ClearListSelectionAndAnchor();
+
             if (string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 _currentPath = ShellMyComputerPath;
@@ -3142,7 +3221,7 @@ namespace FileExplorerUI
             try
             {
                 Debug.WriteLine($"[Tree] Navigate: {entry.FullPath}");
-                await NavigateToPathAsync(entry.FullPath, pushHistory: true);
+                await NavigateToPathAsync(entry.FullPath, pushHistory: true, focusEntriesAfterNavigation: false);
             }
             catch (Exception ex)
             {
@@ -3226,6 +3305,9 @@ namespace FileExplorerUI
                 return;
             }
 
+            FocusSidebarSurface();
+            ClearListSelectionAndAnchor();
+
             if (IsCurrentPath(target))
             {
                 return;
@@ -3233,7 +3315,7 @@ namespace FileExplorerUI
 
             try
             {
-                await NavigateToPathAsync(target, pushHistory: true);
+                await NavigateToPathAsync(target, pushHistory: true, focusEntriesAfterNavigation: false);
             }
             catch (Exception ex)
             {
@@ -3254,6 +3336,9 @@ namespace FileExplorerUI
                 return;
             }
 
+            FocusSidebarSurface();
+            ClearListSelectionAndAnchor();
+
             if (IsCurrentPath(e.Path))
             {
                 StyledSidebarView.SetSelectedPath(_currentPath);
@@ -3262,7 +3347,7 @@ namespace FileExplorerUI
 
             try
             {
-                await NavigateToPathAsync(e.Path, pushHistory: true);
+                await NavigateToPathAsync(e.Path, pushHistory: true, focusEntriesAfterNavigation: false);
             }
             catch (Exception ex)
             {
@@ -4503,6 +4588,7 @@ namespace FileExplorerUI
                 entry.IsKeyboardAnchor = !entry.IsGroupHeader &&
                     !string.IsNullOrWhiteSpace(_focusedEntryPath) &&
                     string.Equals(entry.FullPath, _focusedEntryPath, StringComparison.OrdinalIgnoreCase);
+                entry.IsSelectionActive = _isEntriesSelectionActive;
             }
         }
 
@@ -5065,6 +5151,15 @@ namespace FileExplorerUI
         private void ClearListSelection()
         {
             _selectedEntryPath = null;
+            SyncActivePanelPresentationState();
+            UpdateEntrySelectionVisuals();
+            UpdateFileCommandStates();
+        }
+
+        private void ClearListSelectionAndAnchor()
+        {
+            _selectedEntryPath = null;
+            _focusedEntryPath = null;
             SyncActivePanelPresentationState();
             UpdateEntrySelectionVisuals();
             UpdateFileCommandStates();
@@ -6050,6 +6145,7 @@ namespace FileExplorerUI
 
         private void FocusEntriesList()
         {
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
             GetVisibleEntriesRoot().Focus(FocusState.Programmatic);
         }
 
@@ -6100,10 +6196,51 @@ namespace FileExplorerUI
 
         private void FocusSidebarSurface()
         {
+            SetActiveSelectionSurface(SelectionSurfaceId.Sidebar);
             if (!StyledSidebarView.Focus(FocusState.Pointer))
             {
                 SidebarNavView?.Focus(FocusState.Pointer);
             }
+        }
+
+        private void SetActiveSelectionSurface(SelectionSurfaceId surface)
+        {
+            _selectionSurfaceCoordinator.SetActiveSurface(surface);
+            UpdateSelectionActivityState();
+        }
+
+        private void UpdateSelectionActivityState()
+        {
+            bool entriesSelectionActive = _selectionSurfaceCoordinator.IsSurfaceActive(SelectionSurfaceId.PrimaryPane);
+            bool sidebarSelectionActive = _selectionSurfaceCoordinator.IsSurfaceActive(SelectionSurfaceId.Sidebar);
+
+            StyledSidebarView.SetSelectionActive(sidebarSelectionActive);
+            if (_isSidebarSelectionActive != sidebarSelectionActive)
+            {
+                _isSidebarSelectionActive = sidebarSelectionActive;
+                RefreshSidebarTreeSelectionVisuals();
+            }
+
+            if (_isEntriesSelectionActive == entriesSelectionActive)
+            {
+                return;
+            }
+
+            _isEntriesSelectionActive = entriesSelectionActive;
+            UpdateEntrySelectionVisuals();
+        }
+
+        private void RefreshSidebarTreeSelectionVisuals()
+        {
+            if (_sidebarTreeView?.SelectedNode is not TreeViewNode selectedNode)
+            {
+                return;
+            }
+
+            _suppressSidebarTreeSelection = true;
+            _sidebarTreeView.SelectedNode = null;
+            _sidebarTreeView.SelectedNode = selectedNode;
+            _suppressSidebarTreeSelection = false;
         }
 
         private async Task BeginSidebarTreeRenameAsync(SidebarTreeEntry entry)
@@ -6530,6 +6667,7 @@ namespace FileExplorerUI
                 return;
             }
 
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
             var point = e.GetCurrentPoint(row);
             if (!IsEntryAlreadySelected(entry))
             {
@@ -7032,6 +7170,7 @@ namespace FileExplorerUI
 
         private void HandleEntriesViewPointerPressedPreview(PointerRoutedEventArgs e)
         {
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
             if (!_entriesFlyoutOpen)
             {
                 if (GetActiveEntriesViewHost()?.ResolvePressedEntry(e) is null &&
@@ -7970,6 +8109,7 @@ namespace FileExplorerUI
         private bool _pendingCreateIsDirectory;
         private bool _isExplicitlySelected;
         private bool _isKeyboardAnchor;
+        private bool _isSelectionActive = true;
         private string _pendingName = string.Empty;
         private bool _isNameEditing;
         private long? _sizeBytes;
@@ -8387,6 +8527,22 @@ namespace FileExplorerUI
             }
         }
 
+        public bool IsSelectionActive
+        {
+            get => _isSelectionActive;
+            set
+            {
+                if (_isSelectionActive == value)
+                {
+                    return;
+                }
+
+                _isSelectionActive = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelectionActive)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectionIndicatorBrush)));
+            }
+        }
+
         public string PendingName
         {
             get => _pendingName;
@@ -8436,11 +8592,24 @@ namespace FileExplorerUI
 
         public string GroupExpandGlyph => _isGroupExpanded ? "\uE70D" : "\uE76C";
 
+        public Brush SelectionIndicatorBrush => ResolveSelectionIndicatorBrush(_isSelectionActive);
+
         public Brush RowBackground => _isExplicitlySelected
             ? new SolidColorBrush(ColorHelper.FromArgb(0x14, 0x80, 0x80, 0x80))
             : new SolidColorBrush(Colors.Transparent);
 
         public Visibility RowSelectionIndicatorVisibility => _isExplicitlySelected ? Visibility.Visible : Visibility.Collapsed;
+
+        private static Brush ResolveSelectionIndicatorBrush(bool isActive)
+        {
+            string resourceKey = isActive ? "ListViewItemSelectionIndicatorBrush" : "TextFillColorDisabledBrush";
+            if (Application.Current.Resources.TryGetValue(resourceKey, out object? value) && value is Brush brush)
+            {
+                return brush;
+            }
+
+            return new SolidColorBrush(isActive ? ColorHelper.FromArgb(0xFF, 0x00, 0x78, 0xD4) : ColorHelper.FromArgb(0xFF, 0xC8, 0xC8, 0xC8));
+        }
     }
 
     public sealed class BreadcrumbItemViewModel : INotifyPropertyChanged

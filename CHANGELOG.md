@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Refined selection-focus semantics across the WinUI shell so sidebar and entries no longer behave like unrelated focus islands:
+  - right-side blank-click now separates explicit selection from keyboard anchor, matching Explorer-style "clear highlight but keep navigation anchor" behavior
+  - the entries anchor outline is now independent from explicit selection and uses the shared selection-indicator color path
+  - sidebar navigation now clears both explicit selection and keyboard anchor on the entries side
+  - startup default selection surface now begins on the sidebar, so the initial `This PC` selection is active instead of gray
+- Added a minimal selection-surface coordination layer to prepare for future dual-pane work without rewriting current single-pane focus logic:
+  - `MainWindow` now routes active-selection state through a small `SelectionSurfaceCoordinator`
+  - current surfaces are `Sidebar` and `PrimaryPane`, with `SecondaryPane` reserved for later split-pane wiring
+  - sidebar/entries active-vs-inactive selection visuals now derive from the same coordinator instead of separate ad hoc focus checks
+- Refined inactive selection visuals so they remain visible but clearly non-active:
+  - sidebar tree and static sidebar items now gray out consistently when the active selection surface moves elsewhere or the window deactivates
+  - inactive sidebar tree selection background was strengthened slightly so it remains legible
+  - sidebar tree selected visuals now refresh immediately when the active surface changes instead of waiting for hover to restate the WinUI presenter state
 - Started consolidating inline-edit focus/session behavior behind a shared coordinator:
   - right-side entries rename and sidebar-tree rename now register into one active inline-edit session flow
   - outside-click and window-deactivation commit paths no longer live as separate per-editor ad hoc handling

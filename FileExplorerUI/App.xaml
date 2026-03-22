@@ -22,7 +22,7 @@
                 <Setter Property="IndicatorBrush" Value="{ThemeResource ListViewItemSelectionIndicatorBrush}" />
                 <Setter Property="IndicatorCornerRadius" Value="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}" />
                 <Setter Property="IndicatorWidth" Value="3" />
-                <Setter Property="AnchorBorderBrush" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+                <Setter Property="AnchorBorderBrush" Value="{ThemeResource ListViewItemSelectionIndicatorBrush}" />
                 <Setter Property="AnchorBorderThickness" Value="1" />
                 <Setter Property="Template">
                     <Setter.Value>
