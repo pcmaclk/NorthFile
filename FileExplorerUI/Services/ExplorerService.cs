@@ -1,7 +1,14 @@
 using FileExplorerUI.Interop;
+using FileSystem = Microsoft.VisualBasic.FileIO.FileSystem;
+using UIOption = Microsoft.VisualBasic.FileIO.UIOption;
+using RecycleOption = Microsoft.VisualBasic.FileIO.RecycleOption;
+using UICancelOption = Microsoft.VisualBasic.FileIO.UICancelOption;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,6 +16,9 @@ namespace FileExplorerUI.Services;
 
 public sealed class ExplorerService
 {
+    private const uint SeeMaskInvokeIdList = 0x0000000C;
+    private const int ShowNormal = 1;
+
     public string GenerateUniqueNewFileName(string directoryPath)
     {
         string baseName = LocalizedStrings.Instance.Get("DefaultNewFileBaseName");
@@ -211,7 +221,24 @@ public sealed class ExplorerService
 
     public Task DeletePathAsync(string path, bool recursive)
     {
-        return Task.Run(() => RustBatchInterop.DeletePath(path, recursive));
+        return Task.Run(() =>
+        {
+            if (Directory.Exists(path))
+            {
+                FileSystem.DeleteDirectory(
+                    path,
+                    UIOption.OnlyErrorDialogs,
+                    RecycleOption.SendToRecycleBin,
+                    UICancelOption.ThrowException);
+                return;
+            }
+
+            FileSystem.DeleteFile(
+                path,
+                UIOption.OnlyErrorDialogs,
+                RecycleOption.SendToRecycleBin,
+                UICancelOption.ThrowException);
+        });
     }
 
     public Task CopyPathAsync(string sourcePath, string targetPath)
@@ -252,6 +279,57 @@ public sealed class ExplorerService
 
             File.Move(sourcePath, targetPath);
         });
+    }
+
+    public void OpenPathInTerminal(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Path is required.", nameof(path));
+        }
+
+        try
+        {
+            _ = Process.Start(new ProcessStartInfo
+            {
+                FileName = "wt.exe",
+                Arguments = $"-d \"{path}\"",
+                UseShellExecute = true
+            });
+            return;
+        }
+        catch
+        {
+        }
+
+        _ = Process.Start(new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            WorkingDirectory = path,
+            UseShellExecute = true
+        });
+    }
+
+    public void ShowProperties(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Path is required.", nameof(path));
+        }
+
+        var info = new ShellExecuteInfo
+        {
+            cbSize = Marshal.SizeOf<ShellExecuteInfo>(),
+            fMask = SeeMaskInvokeIdList,
+            lpVerb = "properties",
+            lpFile = path,
+            nShow = ShowNormal
+        };
+
+        if (!ShellExecuteEx(ref info))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
     }
 
     public Task CreateEmptyFileAsync(string path)
@@ -310,4 +388,28 @@ public sealed class ExplorerService
             Directory.Delete(sourcePath, recursive: true);
         }
     }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ShellExecuteInfo
+    {
+        public int cbSize;
+        public uint fMask;
+        public IntPtr hwnd;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? lpVerb;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? lpFile;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? lpParameters;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? lpDirectory;
+        public int nShow;
+        public IntPtr hInstApp;
+        public IntPtr lpIDList;
+        [MarshalAs(UnmanagedType.LPWStr)] public string? lpClass;
+        public IntPtr hkeyClass;
+        public uint dwHotKey;
+        public IntPtr hIconOrMonitor;
+        public IntPtr hProcess;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShellExecuteEx(ref ShellExecuteInfo lpExecInfo);
 }

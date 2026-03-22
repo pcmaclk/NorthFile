@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Started consolidating inline-edit focus/session behavior behind a shared coordinator:
+  - right-side entries rename and sidebar-tree rename now register into one active inline-edit session flow
+  - outside-click and window-deactivation commit paths no longer live as separate per-editor ad hoc handling
+  - address-bar edit mode now also participates in the same session boundary handling
+  - future inline editors can reuse the same session boundary rules instead of duplicating focus logic in `MainWindow`
+- Consolidated file-operation shortcut handling into one window-level dispatcher:
+  - `F2 / Delete / F5 / Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+L` now route through a shared shortcut path instead of being split between individual surfaces
+  - text-input surfaces such as rename editors, the address bar, and search box explicitly suppress those window-level shortcuts so typing behavior stays intact
+  - `F2` now follows focus context, preferring sidebar-tree rename when the tree owns focus and entries rename otherwise
+- Wired the remaining high-impact WinUI context-menu actions onto the shared command path instead of leaving them as placeholders:
+  - file/folder/background flyout bottom command bar buttons now execute through one shared entries-context dispatcher
+  - `Open`, `Copy path`, `Open in terminal`, and `Properties` now run real logic where supported
+  - background `New -> File / Folder` now creates real entries from the context menu again
+  - folder-target `Paste` now pastes into the right-clicked directory instead of only supporting current-folder paste from the toolbar/background menu
+  - menu-item enabled/visible state is now derived from the existing `FileCommandCatalog` target resolution so details/list/grouped-list stay aligned
 - Unified sort-field default directions when switching fields:
   - `Name / Type` reset to ascending
   - `Size / Modified Date` reset to descending

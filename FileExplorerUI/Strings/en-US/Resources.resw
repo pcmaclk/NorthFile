@@ -116,6 +116,12 @@
   <data name="StatusRenameFailedTreeTextAnchorUnavailable" xml:space="preserve"><value>Rename failed: tree text anchor is not available.</value></data>
   <data name="StatusOpened" xml:space="preserve"><value>Opened: {0}</value></data>
   <data name="StatusOpenFailed" xml:space="preserve"><value>Open failed: {0}</value></data>
+  <data name="StatusCopyPathReady" xml:space="preserve"><value>Copied path: {0}</value></data>
+  <data name="StatusCopyPathFailed" xml:space="preserve"><value>Copy path failed: {0}</value></data>
+  <data name="StatusOpenTerminalSuccess" xml:space="preserve"><value>Opened terminal: {0}</value></data>
+  <data name="StatusOpenTerminalFailed" xml:space="preserve"><value>Open terminal failed: {0}</value></data>
+  <data name="StatusPropertiesOpened" xml:space="preserve"><value>Opened properties: {0}</value></data>
+  <data name="StatusPropertiesFailed" xml:space="preserve"><value>Open properties failed: {0}</value></data>
   <data name="StatusAlreadyAtRoot" xml:space="preserve"><value>Already at root.</value></data>
   <data name="StatusRenameSuccess" xml:space="preserve"><value>Rename success: {0} -> {1}</value></data>
   <data name="StatusRenameFailedWithReason" xml:space="preserve"><value>Rename failed: {0}</value></data>

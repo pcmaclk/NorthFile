@@ -627,6 +627,24 @@
   <data name="StatusOpenFailed" xml:space="preserve">
     <value>打开失败：{0}</value>
   </data>
+  <data name="StatusCopyPathReady" xml:space="preserve">
+    <value>已复制路径：{0}</value>
+  </data>
+  <data name="StatusCopyPathFailed" xml:space="preserve">
+    <value>复制路径失败：{0}</value>
+  </data>
+  <data name="StatusOpenTerminalSuccess" xml:space="preserve">
+    <value>已打开终端：{0}</value>
+  </data>
+  <data name="StatusOpenTerminalFailed" xml:space="preserve">
+    <value>打开终端失败：{0}</value>
+  </data>
+  <data name="StatusPropertiesOpened" xml:space="preserve">
+    <value>已打开属性：{0}</value>
+  </data>
+  <data name="StatusPropertiesFailed" xml:space="preserve">
+    <value>打开属性失败：{0}</value>
+  </data>
   <data name="StatusAlreadyAtRoot" xml:space="preserve">
     <value>已经在根位置。</value>
   </data>

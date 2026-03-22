@@ -24,7 +24,9 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Globalization;
 using System.Text;
+using System.Windows.Input;
 using Windows.Foundation;
+using Windows.ApplicationModel.DataTransfer;
 using WinRT.Interop;
 
 namespace FileExplorerUI
@@ -86,6 +88,91 @@ namespace FileExplorerUI
             EntryViewModel? Entry,
             bool IsItemTarget);
 
+        private sealed record PendingEntriesContextCommand(
+            string CommandId,
+            FileCommandTarget Target);
+
+        private sealed class DelegateCommand : ICommand
+        {
+            private readonly Action<object?> _execute;
+
+            public DelegateCommand(Action<object?> execute)
+            {
+                _execute = execute;
+            }
+
+            public event EventHandler? CanExecuteChanged;
+
+            public bool CanExecute(object? parameter) => true;
+
+            public void Execute(object? parameter) => _execute(parameter);
+
+            public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private sealed class InlineEditCoordinator
+        {
+            private InlineEditSession? _activeSession;
+
+            public bool HasActiveSession => _activeSession is not null;
+
+            public void BeginSession(InlineEditSession session)
+            {
+                if (_activeSession is not null && !ReferenceEquals(_activeSession, session))
+                {
+                    _activeSession.Cancel();
+                }
+
+                _activeSession = session;
+            }
+
+            public void ClearSession(InlineEditSession session)
+            {
+                if (ReferenceEquals(_activeSession, session))
+                {
+                    _activeSession = null;
+                }
+            }
+
+            public bool IsSourceWithinActiveSession(DependencyObject? source)
+            {
+                return _activeSession?.ContainsSource(source) == true;
+            }
+
+            public Task CommitActiveSessionAsync()
+            {
+                return _activeSession?.CommitAsync() ?? Task.CompletedTask;
+            }
+
+            public void CancelActiveSession()
+            {
+                _activeSession?.Cancel();
+            }
+        }
+
+        private sealed class InlineEditSession
+        {
+            private readonly Func<Task> _commitAsync;
+            private readonly Action _cancel;
+            private readonly Func<DependencyObject?, bool> _containsSource;
+
+            public InlineEditSession(
+                Func<Task> commitAsync,
+                Action cancel,
+                Func<DependencyObject?, bool> containsSource)
+            {
+                _commitAsync = commitAsync;
+                _cancel = cancel;
+                _containsSource = containsSource;
+            }
+
+            public Task CommitAsync() => _commitAsync();
+
+            public void Cancel() => _cancel();
+
+            public bool ContainsSource(DependencyObject? source) => _containsSource(source);
+        }
+
         private GridLength _nameColumnWidth = new(220);
         private GridLength _typeColumnWidth = new(150);
         private GridLength _sizeColumnWidth = new(120);
@@ -112,7 +199,13 @@ namespace FileExplorerUI
         private EntriesContextRequest? _entriesContextRequest;
         private EntryViewModel? _lastEntriesContextItem;
         private EntriesContextRequest? _pendingEntriesContextRequest;
+        private PendingEntriesContextCommand? _pendingEntriesContextCommand;
         private readonly FileCommandCatalog _fileCommandCatalog = new();
+        private readonly InlineEditCoordinator _inlineEditCoordinator = new();
+        private readonly DelegateCommand _entriesContextCommand;
+        private InlineEditSession? _entriesRenameInlineSession;
+        private InlineEditSession? _sidebarTreeRenameInlineSession;
+        private InlineEditSession? _addressInlineSession;
         private MenuFlyout? _sidebarTreeContextFlyout;
         private SidebarTreeEntry? _pendingSidebarTreeContextEntry;
         private Canvas? _sidebarTreeRenameOverlayCanvas;
@@ -462,6 +555,7 @@ namespace FileExplorerUI
             InitializeComponent();
             _workspaceLayoutHost = new WorkspaceLayoutHost(_workspaceShellState);
             _fileManagementCoordinator = new FileManagementCoordinator(_explorerService);
+            _entriesContextCommand = new DelegateCommand(ExecuteEntriesContextCommand);
             if (Content is FrameworkElement rootElement)
             {
                 rootElement.ActualThemeChanged += MainWindowRoot_ActualThemeChanged;
@@ -470,6 +564,10 @@ namespace FileExplorerUI
                 rootElement.AddHandler(
                     UIElement.PointerPressedEvent,
                     new PointerEventHandler(RootElement_PointerPressedPreview),
+                    true);
+                rootElement.AddHandler(
+                    UIElement.PreviewKeyDownEvent,
+                    new KeyEventHandler(RootElement_PreviewKeyDown),
                     true);
             }
             PathTextBox.Text = ShellMyComputerPath;
@@ -774,11 +872,11 @@ namespace FileExplorerUI
             ApplyTitleBarTheme();
         }
 
-        private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
+        private async void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
             if (args.WindowActivationState == WindowActivationState.Deactivated)
             {
-                HideRenameOverlay();
+                await _inlineEditCoordinator.CommitActiveSessionAsync();
             }
 
             TryResetSystemCursorToArrow();
@@ -792,20 +890,35 @@ namespace FileExplorerUI
             }
         }
 
-        private void RootElement_PointerPressedPreview(object sender, PointerRoutedEventArgs e)
+        private async void RootElement_PointerPressedPreview(object sender, PointerRoutedEventArgs e)
         {
-            if (RenameOverlayBorder.Visibility != Visibility.Visible)
+            if (!_inlineEditCoordinator.HasActiveSession)
             {
                 return;
             }
 
             if (e.OriginalSource is DependencyObject source &&
-                IsDescendantOf(source, RenameOverlayBorder))
+                _inlineEditCoordinator.IsSourceWithinActiveSession(source))
             {
                 return;
             }
 
-            HideRenameOverlay();
+            await _inlineEditCoordinator.CommitActiveSessionAsync();
+        }
+
+        private void RootElement_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Handled || _inlineEditCoordinator.HasActiveSession)
+            {
+                return;
+            }
+
+            if (IsTextInputSource(e.OriginalSource as DependencyObject))
+            {
+                return;
+            }
+
+            e.Handled = HandleGlobalShortcutKey(e.Key);
         }
 
         private void ApplyTitleBarTheme()
@@ -1025,7 +1138,7 @@ namespace FileExplorerUI
             if (e.Key == Windows.System.VirtualKey.Escape)
             {
                 e.Handled = true;
-                ExitAddressEditMode(commit: false);
+                CancelAddressEdit();
                 return;
             }
 
@@ -1035,13 +1148,17 @@ namespace FileExplorerUI
             }
 
             e.Handled = true;
-            await NavigateToPathAsync(PathTextBox.Text.Trim(), pushHistory: true);
-            ExitAddressEditMode(commit: true);
+            await CommitAddressEditIfActiveAsync();
         }
 
-        private void PathTextBox_LostFocus(object sender, RoutedEventArgs e)
+        private async void PathTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            ExitAddressEditMode(commit: false);
+            if (IsFocusedElementWithinAddressEdit())
+            {
+                return;
+            }
+
+            await _inlineEditCoordinator.CommitActiveSessionAsync();
         }
 
         private void AddressBreadcrumbBorder_Tapped(object sender, TappedRoutedEventArgs e)
@@ -1380,14 +1497,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            bool recursive = RecursiveDeleteCheckBox.IsChecked == true;
-            bool confirmed = await ConfirmDeleteAsync(entry.Name, recursive);
-            if (!confirmed)
-            {
-                UpdateStatusKey("StatusDeleteCanceled");
-                return;
-            }
-
+            bool recursive = entry.IsDirectory;
             string target = Path.Combine(_currentPath, entry.Name);
             await DeleteEntryAsync(entry, selectedIndex, target, recursive);
         }
@@ -1416,7 +1526,7 @@ namespace FileExplorerUI
 
         private Task ExecutePasteAsync()
         {
-            return PasteIntoCurrentDirectoryAsync();
+            return PasteIntoDirectoryAsync(_currentPath, selectPastedEntry: true);
         }
 
         private void CopySelectedEntry()
@@ -1457,17 +1567,23 @@ namespace FileExplorerUI
             UpdateStatusKey("StatusCutReady", entry.Name);
         }
 
-        private async Task PasteIntoCurrentDirectoryAsync()
+        private Task PasteIntoCurrentDirectoryAsync()
         {
-            if (!CanPasteIntoCurrentDirectory())
+            return PasteIntoDirectoryAsync(_currentPath, selectPastedEntry: true);
+        }
+
+        private async Task PasteIntoDirectoryAsync(string targetDirectoryPath, bool selectPastedEntry)
+        {
+            if (string.IsNullOrWhiteSpace(targetDirectoryPath) ||
+                string.Equals(targetDirectoryPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 UpdateStatusKey("StatusPasteFailedOpenFolderFirst");
                 return;
             }
 
-            if (!TryEnsureCurrentDirectoryAvailable(out string pasteError))
+            if (!_explorerService.DirectoryExists(targetDirectoryPath))
             {
-                UpdateStatusKey("StatusPasteFailedWithReason", pasteError);
+                UpdateStatusKey("StatusPasteFailedWithReason", S("ErrorCurrentFolderUnavailable"));
                 return;
             }
 
@@ -1479,7 +1595,7 @@ namespace FileExplorerUI
 
             try
             {
-                FilePasteResult result = await _fileManagementCoordinator.PasteAsync(_currentPath);
+                FilePasteResult result = await _fileManagementCoordinator.PasteAsync(targetDirectoryPath);
                 int appliedCount = 0;
                 int conflictCount = 0;
                 int samePathCount = 0;
@@ -1536,19 +1652,21 @@ namespace FileExplorerUI
 
                 if (!result.TargetChanged)
                 {
-                    EnsureRefreshFallbackInvalidation(_currentPath, result.Mode == FileTransferMode.Cut ? "cut-paste" : "copy-paste");
+                    EnsureRefreshFallbackInvalidation(targetDirectoryPath, result.Mode == FileTransferMode.Cut ? "cut-paste" : "copy-paste");
                 }
 
-                if (appliedCount == 1 && !string.IsNullOrWhiteSpace(firstAppliedPath))
+                if (selectPastedEntry && appliedCount == 1 && !string.IsNullOrWhiteSpace(firstAppliedPath))
                 {
                     _selectedEntryPath = firstAppliedPath;
                 }
 
                 await LoadFirstPageAsync();
 
-                if (appliedDirectory && FindSidebarTreeNodeByPath(_currentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
+                if (appliedDirectory &&
+                    FindSidebarTreeNodeByPath(targetDirectoryPath) is TreeViewNode parentNode &&
+                    parentNode.IsExpanded)
                 {
-                    await PopulateSidebarTreeChildrenAsync(parentNode, _currentPath, CancellationToken.None, expandAfterLoad: true);
+                    await PopulateSidebarTreeChildrenAsync(parentNode, targetDirectoryPath, CancellationToken.None, expandAfterLoad: true);
                 }
 
                 _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
@@ -1613,7 +1731,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            await CommitRenameOverlayAsync();
+            await _inlineEditCoordinator.CommitActiveSessionAsync();
         }
 
         private async void RenameOverlayTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -2958,6 +3076,12 @@ namespace FileExplorerUI
             }
 
             _pendingSidebarTreeContextEntry = entry;
+            if (!ReferenceEquals(_sidebarTreeView.SelectedNode, node))
+            {
+                _suppressSidebarTreeSelection = true;
+                _sidebarTreeView.SelectedNode = node;
+                _suppressSidebarTreeSelection = false;
+            }
 
             if (e.TryGetPosition(_sidebarTreeView, out Point point))
             {
@@ -4971,6 +5095,7 @@ namespace FileExplorerUI
 
         private async Task<bool> BeginRenameOverlayAsync(EntryViewModel entry, bool ensureVisible = true, bool updateSelection = true)
         {
+            _inlineEditCoordinator.CancelActiveSession();
             HideRenameOverlay();
             bool alreadySelected =
                 string.Equals(_selectedEntryPath, entry.FullPath, StringComparison.OrdinalIgnoreCase);
@@ -4998,6 +5123,15 @@ namespace FileExplorerUI
                 _activeRenameOverlayEntry = entry;
                 RenameOverlayTextBox.Text = entry.Name;
                 RenameOverlayBorder.Visibility = Visibility.Visible;
+                _entriesRenameInlineSession ??= new InlineEditSession(
+                    () => CommitRenameOverlayIfActiveAsync(),
+                    () =>
+                    {
+                        HideRenameOverlay();
+                        FocusEntriesList();
+                    },
+                    source => IsDescendantOf(source, RenameOverlayBorder));
+                _inlineEditCoordinator.BeginSession(_entriesRenameInlineSession);
                 RenameOverlayTextBox.Focus(FocusState.Programmatic);
                 SelectRenameTargetText(RenameOverlayTextBox, entry);
                 return true;
@@ -5101,12 +5235,145 @@ namespace FileExplorerUI
 
         private void EntriesView_KeyDown(object sender, KeyRoutedEventArgs e)
         {
-            if (IsFocusedElementWithinRenameOverlay())
+            if (_inlineEditCoordinator.HasActiveSession)
             {
                 return;
             }
 
             e.Handled = HandleEntriesNavigationKey(e.Key);
+        }
+
+        private bool HandleGlobalShortcutKey(Windows.System.VirtualKey key)
+        {
+            bool controlPressed = IsControlPressed();
+
+            if (controlPressed)
+            {
+                switch (key)
+                {
+                    case Windows.System.VirtualKey.C:
+                        if (CanCopySelectedEntry())
+                        {
+                            ExecuteCopy();
+                            return true;
+                        }
+                        break;
+                    case Windows.System.VirtualKey.X:
+                        if (CanCutSelectedEntry())
+                        {
+                            ExecuteCut();
+                            return true;
+                        }
+                        break;
+                    case Windows.System.VirtualKey.V:
+                        if (CanPasteIntoCurrentDirectory() && _fileManagementCoordinator.HasAvailablePasteItems())
+                        {
+                            _ = ExecutePasteAsync();
+                            return true;
+                        }
+                        break;
+                    case Windows.System.VirtualKey.L:
+                        EnterAddressEditMode(selectAll: true);
+                        return true;
+                }
+            }
+
+            switch (key)
+            {
+                case Windows.System.VirtualKey.Delete:
+                    if (CanDeleteSelectedEntry())
+                    {
+                        _ = ExecuteDeleteSelectedAsync();
+                        return true;
+                    }
+                    break;
+                case Windows.System.VirtualKey.F2:
+                    if (TryHandleRenameShortcut())
+                    {
+                        return true;
+                    }
+                    break;
+                case Windows.System.VirtualKey.F5:
+                    if (!string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _ = RefreshCurrentDirectoryInBackgroundAsync();
+                        return true;
+                    }
+                    break;
+            }
+
+            return false;
+        }
+
+        private bool TryHandleRenameShortcut()
+        {
+            if (IsSidebarTreeFocused() && TryGetSelectedSidebarTreeEntry(out SidebarTreeEntry? treeEntry))
+            {
+                _ = BeginSidebarTreeRenameAsync(treeEntry);
+                return true;
+            }
+
+            if (CanRenameSelectedEntry())
+            {
+                _ = ExecuteRenameSelectedAsync();
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsControlPressed()
+        {
+            Windows.UI.Core.CoreVirtualKeyStates state =
+                Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+            return (state & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+        }
+
+        private bool IsSidebarTreeFocused()
+        {
+            if (_sidebarTreeView is null || Content is not FrameworkElement root || root.XamlRoot is null)
+            {
+                return false;
+            }
+
+            DependencyObject? focused = FocusManager.GetFocusedElement(root.XamlRoot) as DependencyObject;
+            return IsDescendantOf(focused, _sidebarTreeView);
+        }
+
+        private bool TryGetSelectedSidebarTreeEntry([NotNullWhen(true)] out SidebarTreeEntry? entry)
+        {
+            entry = _sidebarTreeView?.SelectedNode?.Content as SidebarTreeEntry;
+            if (entry is null || string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                entry = null;
+                return false;
+            }
+
+            string root = Path.GetPathRoot(entry.FullPath) ?? string.Empty;
+            if (!string.IsNullOrEmpty(root) &&
+                string.Equals(root.TrimEnd('\\'), entry.FullPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+            {
+                entry = null;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsTextInputSource(DependencyObject? source)
+        {
+            DependencyObject? current = source;
+            while (current is not null)
+            {
+                if (current is TextBox or AutoSuggestBox or PasswordBox or RichEditBox)
+                {
+                    return true;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return false;
         }
 
         private bool HandleEntriesNavigationKey(Windows.System.VirtualKey key)
@@ -5168,13 +5435,6 @@ namespace FileExplorerUI
                 case Windows.System.VirtualKey.Enter:
                     TryActivateSelectedEntry();
                     return true;
-                case Windows.System.VirtualKey.F2:
-                    if (CanRenameSelectedEntry())
-                    {
-                        _ = ExecuteRenameSelectedAsync();
-                        return true;
-                    }
-                    return false;
                 default:
                     return false;
             }
@@ -5635,6 +5895,21 @@ namespace FileExplorerUI
             }
         }
 
+        private async Task CommitRenameOverlayIfActiveAsync(bool focusEntriesList = true)
+        {
+            if (RenameOverlayBorder.Visibility != Visibility.Visible || _activeRenameOverlayEntry is null)
+            {
+                return;
+            }
+
+            await CommitRenameOverlayAsync();
+
+            if (focusEntriesList && RenameOverlayBorder.Visibility != Visibility.Visible)
+            {
+                FocusEntriesList();
+            }
+        }
+
         private async Task CommitPendingCreateAsync(EntryViewModel entry, int index, string proposedName)
         {
             string targetPath = Path.Combine(_currentPath, proposedName);
@@ -5712,6 +5987,10 @@ namespace FileExplorerUI
 
         private void HideRenameOverlay()
         {
+            if (_entriesRenameInlineSession is not null)
+            {
+                _inlineEditCoordinator.ClearSession(_entriesRenameInlineSession);
+            }
             _activeRenameOverlayEntry = null;
             RenameOverlayBorder.Visibility = Visibility.Collapsed;
         }
@@ -5818,6 +6097,8 @@ namespace FileExplorerUI
                 return;
             }
 
+            _inlineEditCoordinator.CancelActiveSession();
+
             TreeViewNode? node = FindSidebarTreeNodeByPath(entry.FullPath);
             TreeViewItem? item = node is not null ? FindTreeViewItemForNode(node) : null;
             if (item is null)
@@ -5875,6 +6156,12 @@ namespace FileExplorerUI
                 Canvas.SetTop(_sidebarTreeRenameOverlayBorder, Math.Max(0, bounds.Y + ((bounds.Height - overlayHeight) / 2) + SidebarTreeRenameOffsetY));
                 _sidebarTreeRenameOverlayBorder.Width = targetWidth;
                 _sidebarTreeRenameOverlayBorder.Visibility = Visibility.Visible;
+                _sidebarTreeRenameInlineSession ??= new InlineEditSession(
+                    CommitSidebarTreeRenameIfActiveAsync,
+                    CancelSidebarTreeRename,
+                    source => _sidebarTreeRenameOverlayBorder is not null &&
+                        IsDescendantOf(source, _sidebarTreeRenameOverlayBorder));
+                _inlineEditCoordinator.BeginSession(_sidebarTreeRenameInlineSession);
                 _sidebarTreeRenameTextBox.Focus(FocusState.Programmatic);
                 _sidebarTreeRenameTextBox.SelectAll();
                 return;
@@ -5970,7 +6257,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            await CommitSidebarTreeRenameAsync();
+            await _inlineEditCoordinator.CommitActiveSessionAsync();
         }
 
         private bool IsFocusedElementWithinSidebarTreeRenameFlyout()
@@ -6030,8 +6317,22 @@ namespace FileExplorerUI
             }
         }
 
+        private Task CommitSidebarTreeRenameIfActiveAsync()
+        {
+            if (_activeSidebarTreeRenameEntry is null || _sidebarTreeRenameOverlayBorder?.Visibility != Visibility.Visible)
+            {
+                return Task.CompletedTask;
+            }
+
+            return CommitSidebarTreeRenameAsync();
+        }
+
         private void CancelSidebarTreeRename()
         {
+            if (_sidebarTreeRenameInlineSession is not null)
+            {
+                _inlineEditCoordinator.ClearSession(_sidebarTreeRenameInlineSession);
+            }
             _activeSidebarTreeRenameEntry = null;
             if (_sidebarTreeRenameOverlayBorder is not null)
             {
@@ -6376,7 +6677,212 @@ namespace FileExplorerUI
             }
         }
 
-        private void UpdateConditionalCommandVisibility(CommandMenuFlyout flyout, string label, int insertIndex, bool shouldShow)
+        private void EntriesContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuFlyoutItem item || item.Tag is not string commandId)
+            {
+                return;
+            }
+
+            ExecuteEntriesContextCommand(commandId);
+        }
+
+        private void ExecuteEntriesContextCommand(object? parameter)
+        {
+            if (parameter is not string commandId || !TryBuildActiveEntriesContextTarget(out FileCommandTarget target))
+            {
+                return;
+            }
+
+            if (!CanExecuteEntriesContextCommand(commandId, target))
+            {
+                return;
+            }
+
+            bool flyoutActive = _entriesFlyoutOpen || (_activeEntriesContextFlyout?.IsOpen ?? false);
+            if (flyoutActive)
+            {
+                _pendingEntriesContextCommand = new PendingEntriesContextCommand(commandId, target);
+                HideActiveEntriesContextFlyout();
+                return;
+            }
+
+            _ = ExecuteEntriesContextCommandAsync(commandId, target);
+        }
+
+        private async Task ExecuteEntriesContextCommandAsync(string commandId, FileCommandTarget target)
+        {
+            switch (commandId)
+            {
+                case FileCommandIds.Open:
+                    await ExecuteOpenEntriesContextTargetAsync(target);
+                    break;
+                case FileCommandIds.Copy:
+                    ExecuteCopy();
+                    break;
+                case FileCommandIds.Cut:
+                    ExecuteCut();
+                    break;
+                case FileCommandIds.Paste:
+                    await ExecutePasteForTargetAsync(target);
+                    break;
+                case FileCommandIds.Rename:
+                    await ExecuteRenameSelectedAsync();
+                    break;
+                case FileCommandIds.Delete:
+                    await ExecuteDeleteSelectedAsync();
+                    break;
+                case FileCommandIds.NewFile:
+                    await ExecuteNewFileAsync();
+                    break;
+                case FileCommandIds.NewFolder:
+                    await ExecuteNewFolderAsync();
+                    break;
+                case FileCommandIds.Refresh:
+                    await RefreshCurrentDirectoryInBackgroundAsync();
+                    break;
+                case FileCommandIds.CopyPath:
+                    ExecuteCopyPathCommand(target);
+                    break;
+                case FileCommandIds.OpenInTerminal:
+                    ExecuteOpenInTerminalCommand(target);
+                    break;
+                case FileCommandIds.Properties:
+                    ExecuteShowPropertiesCommand(target);
+                    break;
+            }
+        }
+
+        private bool TryBuildActiveEntriesContextTarget(out FileCommandTarget target)
+        {
+            EntryViewModel? contextEntry = _entriesContextRequest?.Entry ?? _lastEntriesContextItem;
+            target = ResolveEntriesContextTarget(contextEntry);
+            return target.Kind != FileCommandTargetKind.None;
+        }
+
+        private bool CanExecuteEntriesContextCommand(string commandId, FileCommandTarget target)
+        {
+            IReadOnlyList<FileCommandDescriptor> descriptors = _fileCommandCatalog.BuildCommands(target);
+            bool supported = descriptors.Any(descriptor => string.Equals(descriptor.Id, commandId, StringComparison.Ordinal));
+            if (!supported)
+            {
+                return false;
+            }
+
+            return commandId switch
+            {
+                FileCommandIds.Open => !string.IsNullOrWhiteSpace(target.Path),
+                FileCommandIds.Copy => CanCopySelectedEntry(),
+                FileCommandIds.Cut => CanCutSelectedEntry(),
+                FileCommandIds.Paste => !string.IsNullOrWhiteSpace(target.Path) &&
+                    !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
+                    _fileManagementCoordinator.HasAvailablePasteItems(),
+                FileCommandIds.Rename => CanRenameSelectedEntry(),
+                FileCommandIds.Delete => CanDeleteSelectedEntry(),
+                FileCommandIds.NewFile or FileCommandIds.NewFolder =>
+                    !string.IsNullOrWhiteSpace(target.Path) &&
+                    string.Equals(target.Path, _currentPath, StringComparison.OrdinalIgnoreCase) &&
+                    CanCreateInCurrentDirectory(),
+                FileCommandIds.Refresh =>
+                    string.Equals(target.Path, _currentPath, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
+                FileCommandIds.CopyPath => !string.IsNullOrWhiteSpace(target.Path),
+                FileCommandIds.OpenInTerminal => !string.IsNullOrWhiteSpace(target.Path) &&
+                    !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
+                FileCommandIds.Properties => !string.IsNullOrWhiteSpace(target.Path) &&
+                    !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
+                _ => false
+            };
+        }
+
+        private async Task ExecuteOpenEntriesContextTargetAsync(FileCommandTarget target)
+        {
+            if (target.IsDirectory)
+            {
+                await NavigateToPathAsync(target.Path ?? ShellMyComputerPath, pushHistory: true);
+                return;
+            }
+
+            try
+            {
+                _ = Process.Start(new ProcessStartInfo
+                {
+                    FileName = target.Path,
+                    UseShellExecute = true
+                });
+                UpdateStatusKey("StatusOpened", target.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusOpenFailed", ex.Message);
+            }
+        }
+
+        private Task ExecutePasteForTargetAsync(FileCommandTarget target)
+        {
+            string targetPath = target.Path ?? string.Empty;
+            bool selectPastedEntry = string.Equals(targetPath, _currentPath, StringComparison.OrdinalIgnoreCase);
+            return PasteIntoDirectoryAsync(targetPath, selectPastedEntry);
+        }
+
+        private void ExecuteCopyPathCommand(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                var package = new DataPackage();
+                package.SetText(target.Path);
+                Clipboard.SetContent(package);
+                Clipboard.Flush();
+                UpdateStatusKey("StatusCopyPathReady", target.Path);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusCopyPathFailed", ex.Message);
+            }
+        }
+
+        private void ExecuteOpenInTerminalCommand(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                _explorerService.OpenPathInTerminal(target.Path);
+                UpdateStatusKey("StatusOpenTerminalSuccess", target.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusOpenTerminalFailed", ex.Message);
+            }
+        }
+
+        private void ExecuteShowPropertiesCommand(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                _explorerService.ShowProperties(target.Path);
+                UpdateStatusKey("StatusPropertiesOpened", target.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusPropertiesFailed", ex.Message);
+            }
+        }
+
+        private void UpdateConditionalCommandVisibility(CommandMenuFlyout flyout, string commandId, string label, int insertIndex, bool shouldShow)
         {
             int existingIndex = -1;
             for (int i = 0; i < flyout.Commands.Count; i++)
@@ -6395,7 +6901,7 @@ namespace FileExplorerUI
                     return;
                 }
 
-                flyout.Commands.Insert(insertIndex, CreateCommandBarItem(label));
+                flyout.Commands.Insert(insertIndex, CreateCommandBarItem(commandId, label));
                 return;
             }
 
@@ -6405,7 +6911,72 @@ namespace FileExplorerUI
             }
         }
 
-        private static CommandMenuFlyoutItem CreateCommandBarItem(string label)
+        private void UpdateEntriesContextFlyoutState(CommandMenuFlyout flyout)
+        {
+            if (!TryBuildActiveEntriesContextTarget(out FileCommandTarget target))
+            {
+                return;
+            }
+
+            var availableCommandIds = _fileCommandCatalog.BuildCommands(target)
+                .Select(descriptor => descriptor.Id)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (MenuFlyoutItemBase item in flyout.Items)
+            {
+                UpdateEntriesContextMenuItemState(item, target, availableCommandIds);
+            }
+
+            foreach (CommandMenuFlyoutItem item in flyout.Commands)
+            {
+                string commandId = item.CommandId;
+                bool enabled = !string.IsNullOrWhiteSpace(commandId) &&
+                    availableCommandIds.Contains(commandId) &&
+                    CanExecuteEntriesContextCommand(commandId, target);
+                item.Command = enabled ? _entriesContextCommand : null;
+                item.CommandParameter = enabled ? commandId : null;
+                item.IsEnabled = enabled;
+            }
+
+            _entriesContextCommand.RaiseCanExecuteChanged();
+        }
+
+        private void UpdateEntriesContextMenuItemState(
+            MenuFlyoutItemBase item,
+            FileCommandTarget target,
+            HashSet<string> availableCommandIds)
+        {
+            switch (item)
+            {
+                case MenuFlyoutItem menuItem when menuItem.Tag is string commandId:
+                    bool visible = availableCommandIds.Contains(commandId);
+                    menuItem.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                    menuItem.IsEnabled = visible && CanExecuteEntriesContextCommand(commandId, target);
+                    break;
+
+                case MenuFlyoutSubItem subItem:
+                    bool hasTaggedChildren = false;
+                    bool anyVisibleChild = false;
+                    foreach (MenuFlyoutItemBase child in subItem.Items)
+                    {
+                        if (child is MenuFlyoutItem childMenuItem && childMenuItem.Tag is string)
+                        {
+                            hasTaggedChildren = true;
+                        }
+
+                        UpdateEntriesContextMenuItemState(child, target, availableCommandIds);
+                        anyVisibleChild |= child.Visibility == Visibility.Visible;
+                    }
+
+                    if (hasTaggedChildren)
+                    {
+                        subItem.Visibility = anyVisibleChild ? Visibility.Visible : Visibility.Collapsed;
+                    }
+                    break;
+            }
+        }
+
+        private CommandMenuFlyoutItem CreateCommandBarItem(string commandId, string label)
         {
             string glyph = label switch
             {
@@ -6422,6 +6993,9 @@ namespace FileExplorerUI
 
             return new CommandMenuFlyoutItem
             {
+                CommandId = commandId,
+                Command = _entriesContextCommand,
+                CommandParameter = commandId,
                 Label = label,
                 Icon = new FontIcon
                 {
@@ -6478,17 +7052,46 @@ namespace FileExplorerUI
 
             if (ReferenceEquals(sender, FolderEntriesContextFlyout))
             {
-                UpdateConditionalCommandVisibility(FolderEntriesContextFlyout, S("CommonPaste"), 2, _fileManagementCoordinator.HasAvailablePasteItems());
+                UpdateConditionalCommandVisibility(FolderEntriesContextFlyout, FileCommandIds.Paste, S("CommonPaste"), 2, _fileManagementCoordinator.HasAvailablePasteItems());
             }
             else if (ReferenceEquals(sender, BackgroundEntriesContextFlyout))
             {
-                UpdateConditionalCommandVisibility(BackgroundEntriesContextFlyout, S("CommonPaste"), 0, _fileManagementCoordinator.HasAvailablePasteItems());
+                UpdateConditionalCommandVisibility(BackgroundEntriesContextFlyout, FileCommandIds.Paste, S("CommonPaste"), 0, _fileManagementCoordinator.HasAvailablePasteItems());
+            }
+
+            if (sender is CommandMenuFlyout flyout)
+            {
+                UpdateEntriesContextFlyoutState(flyout);
             }
         }
 
         private void StaticEntriesContextFlyout_Closed(object sender, object e)
         {
             _entriesFlyoutOpen = false;
+
+            if (_pendingEntriesContextCommand is not null)
+            {
+                PendingEntriesContextCommand pendingCommand = _pendingEntriesContextCommand;
+                _pendingEntriesContextCommand = null;
+                _pendingEntriesContextRequest = null;
+                _entriesContextRequest = null;
+                _lastEntriesContextItem = null;
+                _activeEntriesContextFlyout = null;
+                _ = ExecuteEntriesContextCommandAsync(pendingCommand.CommandId, pendingCommand.Target);
+                return;
+            }
+
+            if (_pendingContextRenameEntry is not null)
+            {
+                EntryViewModel pendingRenameEntry = _pendingContextRenameEntry;
+                _pendingContextRenameEntry = null;
+                _pendingEntriesContextRequest = null;
+                _entriesContextRequest = null;
+                _lastEntriesContextItem = null;
+                _activeEntriesContextFlyout = null;
+                _ = BeginRenameOverlayAsync(pendingRenameEntry);
+                return;
+            }
 
             if (_pendingEntriesContextRequest is not null)
             {
@@ -6509,6 +7112,7 @@ namespace FileExplorerUI
             _entriesContextRequest = null;
             _lastEntriesContextItem = null;
             _activeEntriesContextFlyout = null;
+            _pendingContextRenameEntry = null;
         }
 
         private void ResetColumnSplitterCursorState()
@@ -7242,6 +7846,13 @@ namespace FileExplorerUI
 
         private void EnterAddressEditMode(bool selectAll)
         {
+            _addressInlineSession ??= new InlineEditSession(
+                CommitAddressEditIfActiveAsync,
+                CancelAddressEdit,
+                source => ReferenceEquals(source, PathTextBox) || IsDescendantOf(source, PathTextBox));
+
+            _inlineEditCoordinator.CancelActiveSession();
+            _inlineEditCoordinator.BeginSession(_addressInlineSession);
             AddressBreadcrumbBorder.Visibility = Visibility.Collapsed;
             PathTextBox.Visibility = Visibility.Visible;
             PathTextBox.Text = _currentPath;
@@ -7258,6 +7869,11 @@ namespace FileExplorerUI
 
         private void ExitAddressEditMode(bool commit)
         {
+            if (_addressInlineSession is not null)
+            {
+                _inlineEditCoordinator.ClearSession(_addressInlineSession);
+            }
+
             if (!commit)
             {
                 PathTextBox.Text = _currentPath;
@@ -7265,6 +7881,34 @@ namespace FileExplorerUI
 
             PathTextBox.Visibility = Visibility.Collapsed;
             AddressBreadcrumbBorder.Visibility = Visibility.Visible;
+        }
+
+        private async Task CommitAddressEditIfActiveAsync()
+        {
+            if (PathTextBox.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            string targetPath = PathTextBox.Text.Trim();
+            await NavigateToPathAsync(targetPath, pushHistory: true);
+            ExitAddressEditMode(commit: true);
+        }
+
+        private void CancelAddressEdit()
+        {
+            ExitAddressEditMode(commit: false);
+        }
+
+        private bool IsFocusedElementWithinAddressEdit()
+        {
+            if (Content is not FrameworkElement root || root.XamlRoot is null)
+            {
+                return false;
+            }
+
+            DependencyObject? focused = FocusManager.GetFocusedElement(root.XamlRoot) as DependencyObject;
+            return ReferenceEquals(focused, PathTextBox) || IsDescendantOf(focused, PathTextBox);
         }
 
         private void UpdateNavButtonsState()

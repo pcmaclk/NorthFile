@@ -22,6 +22,13 @@ namespace FileExplorerUI.Controls
                 typeof(CommandMenuFlyoutItem),
                 new PropertyMetadata(string.Empty));
 
+        public static readonly DependencyProperty CommandIdProperty =
+            DependencyProperty.Register(
+                nameof(CommandId),
+                typeof(string),
+                typeof(CommandMenuFlyoutItem),
+                new PropertyMetadata(string.Empty));
+
         public static readonly DependencyProperty CommandProperty =
             DependencyProperty.Register(
                 nameof(Command),
@@ -60,6 +67,12 @@ namespace FileExplorerUI.Controls
         {
             get => (string)GetValue(LabelProperty);
             set => SetValue(LabelProperty, value);
+        }
+
+        public string CommandId
+        {
+            get => (string)GetValue(CommandIdProperty);
+            set => SetValue(CommandIdProperty, value);
         }
 
         public Visibility SeparatorVisibility
