@@ -464,6 +464,8 @@
                         <ScrollViewer
                             x:Name="DetailsEntriesScrollViewer"
                             Grid.Row="1"
+                            IsTabStop="True"
+                            UseSystemFocusVisuals="False"
                             Margin="0"
                             HorizontalAlignment="Stretch"
                             Padding="10,4"
@@ -555,9 +557,11 @@
                         <ScrollViewer
                             x:Name="GroupedEntriesScrollViewer"
                             Grid.Row="1"
+                            IsTabStop="True"
+                            UseSystemFocusVisuals="False"
                             Margin="0"
                             HorizontalAlignment="Stretch"
-                            Padding="0"
+                            Padding="10,4"
                             HorizontalScrollBarVisibility="Auto"
                             HorizontalScrollMode="Enabled"
                             SizeChanged="GroupedEntriesScrollViewer_SizeChanged"
@@ -577,12 +581,16 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Spacing="0">
-                                            <Border Background="Transparent">
+                                            <Border
+                                                Background="Transparent"
+                                                DoubleTapped="GroupedListHeader_DoubleTapped"
+                                                PointerPressed="GroupedListHeader_PointerPressed"
+                                                RightTapped="GroupedListHeader_RightTapped">
                                                 <Border.Visibility>
                                                     <Binding Path="HeaderVisibility" />
                                                 </Border.Visibility>
                                                 <controls:EntryGroupHeader
-                                                    ContentPadding="8,0,8,0"
+                                                    ContentPadding="6,0,6,0"
                                                     CountText="{Binding CountText}"
                                                     HeaderOpacity="0.72"
                                                     HeaderText="{Binding HeaderText}"
@@ -601,9 +609,9 @@
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <controls:EntryItemHost
-                                                                        Margin="0,2"
+                                                                        Margin="0,2,0,2"
                                                                         MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
-                                                                        Padding="8,3,8,3"
+                                                                        Padding="0,3,0,3"
                                                                         Background="Transparent"
                                                                         IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
                                                                         HorizontalAlignment="Stretch"
@@ -612,7 +620,7 @@
                                                                         SelectedPointerOverBackground="{Binding RowBackground}"
                                                                         SelectedPressedBackground="{Binding RowBackground}">
                                                                         <controls:EntryNameCell
-                                                                            ContentMargin="0"
+                                                                            ContentMargin="12,0,0,0"
                                                                             Entry="{Binding}"
                                                                             Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}" />
                                                                     </controls:EntryItemHost>
@@ -628,41 +636,8 @@
                             </ItemsControl>
                         </ScrollViewer>
 
-                        <ListView
-                            x:Name="EntriesListView"
-                            Grid.Row="1"
-                            Margin="0"
-                            HorizontalAlignment="Stretch"
-                            Background="Transparent"
-                            ContainerContentChanging="EntriesListView_ContainerContentChanging"
-                            DoubleTapped="EntriesListView_DoubleTapped"
-                            RightTapped="EntriesListView_RightTapped"
-                            ItemContainerTransitions="{x:Null}"
-                            IsItemClickEnabled="False"
-                            Loaded="EntriesListView_Loaded"
-                            Padding="0"
-                            ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                            ScrollViewer.HorizontalScrollMode="Disabled"
-                            ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                            ScrollViewer.VerticalScrollMode="Disabled"
-                            SelectionChanged="EntriesListView_SelectionChanged"
-                            SelectionMode="Single"
-                            Visibility="Collapsed">
-                            <ListView.ItemContainerStyle>
-                                <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
-                                    <Setter Property="HorizontalAlignment" Value="Left" />
-                                    <Setter Property="Width" Value="{x:Bind EntryContainerWidth, Mode=OneWay}" />
-                                    <Setter Property="Padding" Value="0" />
-                                    <Setter Property="Margin" Value="0" />
-                                    <Setter Property="Height" Value="30" />
-                                    <Setter Property="MinHeight" Value="30" />
-                                    <Setter Property="CornerRadius" Value="0" />
-                                    <Setter Property="BorderThickness" Value="0" />
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.Resources>
+                        <Grid Grid.Row="1" Visibility="Collapsed">
+                            <Grid.Resources>
                                 <Style BasedOn="{StaticResource ContextMenuFlyoutItemStyle}" TargetType="MenuFlyoutItem" />
                                 <Style BasedOn="{StaticResource ContextMenuFlyoutSubItemStyle}" TargetType="MenuFlyoutSubItem" />
                                 <Style x:Key="ContextMenuNoIconItemStyle" BasedOn="{StaticResource ContextMenuFlyoutItemStyle}" TargetType="MenuFlyoutItem">
@@ -758,86 +733,8 @@
                                     <MenuFlyoutItem IsEnabled="False" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpenInTerminal]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE756;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                     <MenuFlyoutItem IsEnabled="False" Text="{Binding Source={StaticResource Strings}, Path=[CommonProperties]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                 </controls:CommandMenuFlyout>
-                            </ListView.Resources>
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid RowDefinitions="Auto,Auto,Auto">
-                                        <Border
-                                            Grid.Row="0"
-                                            Height="{Binding ElementName=RootWindow, Path=EntryItemMetrics.GroupHeaderHeight}"
-                                            Padding="8,0,8,0"
-                                            HorizontalAlignment="Stretch"
-                                            Visibility="{Binding HeaderRowVisibility}">
-                                            <Border Background="Transparent" PointerPressed="GroupHeaderBorder_PointerPressed">
-                                                <Grid HorizontalAlignment="Stretch">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
-                                                        <ColumnDefinition Width="6" />
-                                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
-                                                        <ColumnDefinition Width="6" />
-                                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
-                                                        <ColumnDefinition Width="6" />
-                                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
-                                                        <ColumnDefinition Width="6" />
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <controls:EntryGroupHeader
-                                                        Grid.Column="0"
-                                                        ContentPadding="6,0,0,0"
-                                                        CountText="{Binding GroupCountText}"
-                                                        ExpandGlyph="{Binding GroupExpandGlyph}"
-                                                        HeaderText="{Binding GroupHeaderText}"
-                                                        Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
-                                                        ShowExpandGlyph="True" />
-                                                </Grid>
-                                            </Border>
-                                        </Border>
-                                        <Border
-                                            Grid.Row="1"
-                                            Height="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
-                                            Padding="6,0,8,0"
-                                            HorizontalAlignment="Stretch"
-                                            PointerPressed="EntryRow_PointerPressed"
-                                            Visibility="{Binding DetailsRowVisibility}">
-                                            <Grid HorizontalAlignment="Stretch">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
-                                                    <ColumnDefinition Width="6" />
-                                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
-                                                    <ColumnDefinition Width="6" />
-                                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
-                                                    <ColumnDefinition Width="6" />
-                                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
-                                                    <ColumnDefinition Width="6" />
-                                                </Grid.ColumnDefinitions>
-
-                                                <controls:EntryNameCell
-                                                    Grid.Column="0"
-                                                    ContentMargin="{Binding ElementName=RootWindow, Path=DetailsNameCellMargin}"
-                                                    Entry="{Binding}"
-                                                    Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
-                                                    VerticalAlignment="Center" />
-                                                <TextBlock Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding Type}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Grid.Column="4" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SizeText}" />
-                                                <TextBlock Grid.Column="6" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding ModifiedText}" />
-                                            </Grid>
-                                        </Border>
-                                        <Border
-                                            Grid.Row="2"
-                                            Height="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
-                                            Padding="8,0,8,0"
-                                            HorizontalAlignment="Stretch"
-                                            PointerPressed="EntryRow_PointerPressed"
-                                            Visibility="{Binding ListRowVisibility}">
-                                            <controls:EntryNameCell
-                                                ContentMargin="0"
-                                                Entry="{Binding}"
-                                                Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}" />
-                                        </Border>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                            </Grid.Resources>
+                        </Grid>
 
                         <Canvas x:Name="RenameOverlayCanvas" Grid.Row="1" Margin="0,8,0,0">
                             <Border
@@ -847,7 +744,7 @@
                                 Background="White"
                                 BorderBrush="{ThemeResource ListViewItemSelectionIndicatorBrush}"
                                 BorderThickness="1"
-                                Padding="1,0,0,1"
+                                Padding="1,0,8,1"
                                 CornerRadius="0"
                                 Visibility="Collapsed">
                                 <TextBox
@@ -856,13 +753,16 @@
                                     BorderBrush="Transparent"
                                     BorderThickness="0"
                                     FontSize="14"
+                                    FocusVisualPrimaryThickness="0"
+                                    FocusVisualSecondaryThickness="0"
                                     HorizontalContentAlignment="Left"
                                     KeyDown="RenameOverlayTextBox_KeyDown"
                                     LostFocus="RenameOverlayTextBox_LostFocus"
                                     MinHeight="24"
                                     Padding="0"
                                     TextAlignment="Left"
-                                    Margin="0,-1,0,0"
+                                    Margin="0,-2,0,0"
+                                    UseSystemFocusVisuals="False"
                                     VerticalContentAlignment="Center">
                                     <TextBox.Template>
                                         <ControlTemplate TargetType="TextBox">

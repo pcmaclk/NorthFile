@@ -17,11 +17,13 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Globalization;
+using System.Text;
 using Windows.Foundation;
 using WinRT.Interop;
 
@@ -29,6 +31,55 @@ namespace FileExplorerUI
 {
     public sealed partial class MainWindow : Window, INotifyPropertyChanged
     {
+        private sealed class NavigationPerfSession
+        {
+            private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+            private long _lastElapsedMs;
+
+            public NavigationPerfSession(string targetPath, string trigger)
+            {
+                TargetPath = targetPath;
+                Trigger = trigger;
+                Id = Interlocked.Increment(ref s_navigationPerfSequence);
+                Mark("session.start");
+            }
+
+            public int Id { get; }
+
+            public string TargetPath { get; }
+
+            public string Trigger { get; }
+
+            public void Mark(string stage, string? detail = null)
+            {
+                long totalMs = _stopwatch.ElapsedMilliseconds;
+                long deltaMs = totalMs - _lastElapsedMs;
+                _lastElapsedMs = totalMs;
+
+                string message = $"[NAV-PERF #{Id}] total={totalMs}ms delta={deltaMs}ms stage={stage} trigger={Trigger} path=\"{TargetPath}\"";
+                if (!string.IsNullOrWhiteSpace(detail))
+                {
+                    message += $" detail={detail}";
+                }
+
+                Debug.WriteLine(message);
+                AppendNavigationPerfLog(message);
+            }
+        }
+
+        private enum PresentationReloadReason
+        {
+            ViewModeSwitch,
+            PresentationSettingsChange,
+            DataRefresh
+        }
+
+        private static int s_navigationPerfSequence;
+        private static readonly object s_navigationPerfLogLock = new();
+        private static readonly string s_navigationPerfLogPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "navigation-perf.log");
+
         private sealed record EntriesContextRequest(
             UIElement Anchor,
             Point Position,
@@ -243,10 +294,16 @@ namespace FileExplorerUI
         private readonly ObservableCollection<EntryViewModel> _entries = new();
         private readonly ObservableCollection<GroupedEntryColumnViewModel> _groupedEntryColumns = new();
         private readonly List<EntryViewModel> _presentationSourceEntries = new();
+        private List<GroupedEntryColumnViewModel>? _groupedColumnsProjectionCache;
+        private int _presentationSourceVersion;
+        private int _groupedColumnsCacheSourceVersion = -1;
+        private EntrySortField _groupedColumnsCacheSortField;
+        private SortDirection _groupedColumnsCacheSortDirection;
+        private EntryGroupField _groupedColumnsCacheGroupField;
         private readonly EntriesPresentationBuilder _entriesPresentationBuilder = new();
-        private IEntriesViewHost? _entriesViewHost;
         private IEntriesViewHost? _detailsEntriesViewHost;
         private IEntriesViewHost? _groupedEntriesViewHost;
+        private NavigationPerfSession? _activeNavigationPerfSession;
         public ObservableCollection<BreadcrumbItemViewModel> Breadcrumbs { get; } = new();
         public ObservableCollection<BreadcrumbItemViewModel> VisibleBreadcrumbs { get; } = new();
         private ulong _nextCursor;
@@ -254,7 +311,6 @@ namespace FileExplorerUI
         private bool _isLoading;
         private bool _entriesFlyoutOpen;
         private CommandMenuFlyout? _activeEntriesContextFlyout;
-        private bool _entriesPointerHooked;
         private string _currentPath = ShellMyComputerPath;
         private string? _selectedEntryPath;
         private uint _currentPageSize = InitialPageSize;
@@ -266,9 +322,10 @@ namespace FileExplorerUI
         private SortDirection _currentSortDirection = SortDirection.Ascending;
         private EntryGroupField _currentGroupField = EntryGroupField.None;
         private EntryViewDensityMode _currentEntryViewDensityMode = EntryViewDensityMode.Normal;
-        private ScrollViewer? _listScrollViewer;
-        private double _lastListHorizontalOffset = double.NaN;
-        private double _lastListVerticalOffset = double.NaN;
+        private double _lastDetailsHorizontalOffset = double.NaN;
+        private double _lastDetailsVerticalOffset = double.NaN;
+        private double _lastGroupedHorizontalOffset = double.NaN;
+        private double _lastGroupedVerticalOffset = double.NaN;
         private double _estimatedItemHeight = 32.0;
         private int _groupedListRowsPerColumn = -1;
         private Brush? _pathDefaultBorderBrush;
@@ -410,6 +467,10 @@ namespace FileExplorerUI
                 rootElement.ActualThemeChanged += MainWindowRoot_ActualThemeChanged;
                 rootElement.PointerEntered += RootElement_PointerEnteredOrMoved;
                 rootElement.PointerMoved += RootElement_PointerEnteredOrMoved;
+                rootElement.AddHandler(
+                    UIElement.PointerPressedEvent,
+                    new PointerEventHandler(RootElement_PointerPressedPreview),
+                    true);
             }
             PathTextBox.Text = ShellMyComputerPath;
             RegisterColumnSplitterHandlers(HeaderSplitter1);
@@ -417,14 +478,13 @@ namespace FileExplorerUI
             RegisterColumnSplitterHandlers(HeaderSplitter3);
             RegisterColumnSplitterHandlers(HeaderSplitter4);
             RegisterSidebarSplitterHandlers(SidebarSplitter);
-            _entriesViewHost = new ExistingListEntriesViewHost(EntriesListView);
+            RegisterEntriesKeyHandlers(DetailsEntriesScrollViewer);
+            RegisterEntriesKeyHandlers(GroupedEntriesScrollViewer);
+            DetailsEntriesScrollViewer.ViewChanged += DetailsEntriesScrollViewer_ViewChanged;
+            GroupedEntriesScrollViewer.ViewChanged += GroupedEntriesScrollViewer_ViewChanged;
             _detailsEntriesViewHost = new VisualTreeEntriesViewHost(DetailsEntriesScrollViewer);
-            _groupedEntriesViewHost = new VisualTreeEntriesViewHost(GroupedEntriesScrollViewer);
-            _entriesViewHost.SetItems(_entries);
-            FileEntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
-            FolderEntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
-            BackgroundEntriesContextFlyout.OverlayInputPassThroughElement = EntriesListView;
-            EntriesListView.SizeChanged += EntriesListView_SizeChanged;
+            _groupedEntriesViewHost = new GroupedColumnsEntriesViewHost(GroupedEntriesScrollViewer);
+            UpdateEntriesContextOverlayTargets();
             this.SizeChanged += MainWindow_SizeChanged;
             this.Activated += MainWindow_Activated;
             _pathDefaultBorderBrush = PathTextBox.BorderBrush;
@@ -472,6 +532,14 @@ namespace FileExplorerUI
                 : GroupedEntriesScrollViewer;
         }
 
+        private void UpdateEntriesContextOverlayTargets()
+        {
+            UIElement overlayTarget = GetVisibleEntriesRoot();
+            FileEntriesContextFlyout.OverlayInputPassThroughElement = overlayTarget;
+            FolderEntriesContextFlyout.OverlayInputPassThroughElement = overlayTarget;
+            BackgroundEntriesContextFlyout.OverlayInputPassThroughElement = overlayTarget;
+        }
+
         private IEntriesViewHost? GetVisibleEntriesViewHost()
         {
             return _currentViewMode == EntryViewMode.Details
@@ -486,7 +554,9 @@ namespace FileExplorerUI
                 return true;
             }
 
-            double viewportWidth = EntriesListView?.ActualWidth ?? 0;
+            double viewportWidth = DetailsEntriesScrollViewer.ViewportWidth > 0
+                ? DetailsEntriesScrollViewer.ViewportWidth
+                : DetailsEntriesScrollViewer.ActualWidth;
             if (viewportWidth <= 0)
             {
                 return true;
@@ -572,12 +642,19 @@ namespace FileExplorerUI
             if (_currentViewMode == mode)
             {
                 UpdateViewCommandStates();
+                _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
                 return;
             }
 
             _currentViewMode = mode;
             NotifyPresentationModeChanged();
-            await ReloadCurrentPresentationAsync();
+            await ReloadCurrentPresentationAsync(PresentationReloadReason.ViewModeSwitch);
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateEntriesContextOverlayTargets();
+                GetVisibleEntriesRoot().UpdateLayout();
+                FocusEntriesList();
+            });
         }
 
         private async Task SetSortAsync(EntrySortField field, SortDirection? explicitDirection = null)
@@ -588,30 +665,38 @@ namespace FileExplorerUI
                 EntrySortField.ModifiedDate or EntrySortField.Size => SortDirection.Descending,
                 _ => SortDirection.Ascending
             };
+            InvalidateProjectionCaches();
             NotifyPresentationModeChanged();
-            await ReloadCurrentPresentationAsync();
+            await ReloadCurrentPresentationAsync(PresentationReloadReason.PresentationSettingsChange);
         }
 
         private async Task SetSortDirectionAsync(SortDirection direction)
         {
             _currentSortDirection = direction;
+            InvalidateProjectionCaches();
             NotifyPresentationModeChanged();
-            await ReloadCurrentPresentationAsync();
+            await ReloadCurrentPresentationAsync(PresentationReloadReason.PresentationSettingsChange);
         }
 
         private async Task SetGroupAsync(EntryGroupField field)
         {
             _currentGroupField = field;
+            InvalidateProjectionCaches();
             NotifyPresentationModeChanged();
-            await ReloadCurrentPresentationAsync();
+            await ReloadCurrentPresentationAsync(PresentationReloadReason.PresentationSettingsChange);
         }
 
-        private async Task ReloadCurrentPresentationAsync()
+        private async Task ReloadCurrentPresentationAsync(PresentationReloadReason reason = PresentationReloadReason.DataRefresh)
         {
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 PopulateMyComputerEntries();
                 ApplyCurrentPresentation();
+                return;
+            }
+
+            if (TryApplyPresentationFastPath(reason))
+            {
                 return;
             }
 
@@ -691,6 +776,11 @@ namespace FileExplorerUI
 
         private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
+            if (args.WindowActivationState == WindowActivationState.Deactivated)
+            {
+                HideRenameOverlay();
+            }
+
             TryResetSystemCursorToArrow();
         }
 
@@ -700,6 +790,22 @@ namespace FileExplorerUI
             {
                 TryResetSystemCursorToArrow();
             }
+        }
+
+        private void RootElement_PointerPressedPreview(object sender, PointerRoutedEventArgs e)
+        {
+            if (RenameOverlayBorder.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            if (e.OriginalSource is DependencyObject source &&
+                IsDescendantOf(source, RenameOverlayBorder))
+            {
+                return;
+            }
+
+            HideRenameOverlay();
         }
 
         private void ApplyTitleBarTheme()
@@ -718,6 +824,11 @@ namespace FileExplorerUI
             splitter.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
             splitter.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
             splitter.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
+        }
+
+        private void RegisterEntriesKeyHandlers(UIElement host)
+        {
+            host.AddHandler(UIElement.PreviewKeyDownEvent, new KeyEventHandler(EntriesView_KeyDown), true);
         }
 
         private void RegisterSidebarSplitterHandlers(UIElement splitter)
@@ -1073,7 +1184,7 @@ namespace FileExplorerUI
             await ExecutePasteAsync();
         }
 
-        private bool TryGetSelectedLoadedEntry(out EntryViewModel entry)
+        private bool TryGetSelectedLoadedEntry([NotNullWhen(true)] out EntryViewModel? entry)
         {
             entry = GetSelectedLoadedEntry()!;
             return entry is not null;
@@ -1232,7 +1343,7 @@ namespace FileExplorerUI
 
         private Task ExecuteRenameSelectedAsync()
         {
-            if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel? entry))
             {
                 UpdateStatusKey("StatusRenameFailedSelectLoaded");
                 return Task.CompletedTask;
@@ -1256,7 +1367,7 @@ namespace FileExplorerUI
 
         private async Task ExecuteDeleteSelectedAsync()
         {
-            if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel? entry))
             {
                 UpdateStatusKey("StatusDeleteFailedSelectLoaded");
                 return;
@@ -1310,7 +1421,7 @@ namespace FileExplorerUI
 
         private void CopySelectedEntry()
         {
-            if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel? entry))
             {
                 UpdateStatusKey("StatusCopyFailedSelectLoaded");
                 return;
@@ -1329,7 +1440,7 @@ namespace FileExplorerUI
 
         private void CutSelectedEntry()
         {
-            if (!TryGetSelectedLoadedEntry(out EntryViewModel entry))
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel? entry))
             {
                 UpdateStatusKey("StatusCutFailedSelectLoaded");
                 return;
@@ -1494,28 +1605,6 @@ namespace FileExplorerUI
             }
         }
 
-        private void EntriesListView_Loaded(object sender, RoutedEventArgs e)
-        {
-            _listScrollViewer ??= FindDescendant<ScrollViewer>(EntriesListView);
-            if (_listScrollViewer is not null)
-            {
-                _listScrollViewer.ViewChanged -= ListScrollViewer_ViewChanged;
-                _listScrollViewer.ViewChanged += ListScrollViewer_ViewChanged;
-                _lastListHorizontalOffset = _listScrollViewer.HorizontalOffset;
-                _lastListVerticalOffset = _listScrollViewer.VerticalOffset;
-            }
-            if (!_entriesPointerHooked)
-            {
-                EntriesListView.AddHandler(
-                    UIElement.PointerPressedEvent,
-                    new PointerEventHandler(EntriesListView_PointerPressedPreview),
-                    true);
-                _entriesPointerHooked = true;
-            }
-            UpdateEstimatedItemHeight();
-            RequestViewportWork();
-        }
-
         private async void RenameOverlayTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
             await Task.Delay(1);
@@ -1541,28 +1630,38 @@ namespace FileExplorerUI
                 e.Handled = true;
                 HideRenameOverlay();
                 FocusEntriesList();
+                return;
+            }
+
+            if (e.Key is Windows.System.VirtualKey.Up or Windows.System.VirtualKey.Down or Windows.System.VirtualKey.Left or Windows.System.VirtualKey.Right
+                or Windows.System.VirtualKey.Home or Windows.System.VirtualKey.End or Windows.System.VirtualKey.PageUp or Windows.System.VirtualKey.PageDown)
+            {
+                e.Handled = true;
+                HideRenameOverlay();
+                FocusEntriesList();
+                _ = DispatcherQueue.TryEnqueue(() =>
+                {
+                    HandleEntriesNavigationKey(e.Key);
+                });
             }
         }
 
-        private async void ListScrollViewer_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+        private async void DetailsEntriesScrollViewer_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
         {
             if (sender is not ScrollViewer viewer)
             {
                 return;
             }
 
-            bool scrolled =
-                double.IsNaN(_lastListHorizontalOffset) ||
-                double.IsNaN(_lastListVerticalOffset) ||
-                Math.Abs(viewer.HorizontalOffset - _lastListHorizontalOffset) > 0.1 ||
-                Math.Abs(viewer.VerticalOffset - _lastListVerticalOffset) > 0.1;
-
-            _lastListHorizontalOffset = viewer.HorizontalOffset;
-            _lastListVerticalOffset = viewer.VerticalOffset;
-
+            bool scrolled = HasScrollOffsetChanged(viewer, ref _lastDetailsHorizontalOffset, ref _lastDetailsVerticalOffset);
             if (scrolled && _entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
             {
                 HideActiveEntriesContextFlyout();
+            }
+
+            if (scrolled && RenameOverlayBorder.Visibility == Visibility.Visible)
+            {
+                HideRenameOverlay();
             }
 
             if (DetailsHeaderTranslateTransform is not null)
@@ -1577,16 +1676,33 @@ namespace FileExplorerUI
                 await EnsureDataForIndexAsync(estimatedIndex);
             }
             RequestMetadataForCurrentViewport();
-            UpdateRenameOverlayPosition();
         }
 
-        private void EntriesListView_SizeChanged(object sender, SizeChangedEventArgs e)
+        private void GroupedEntriesScrollViewer_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
         {
-            UpdateEstimatedItemHeight();
-            RequestViewportWork();
-            UpdateRenameOverlayPosition();
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
+            if (sender is not ScrollViewer viewer)
+            {
+                return;
+            }
+
+            bool scrolled = HasScrollOffsetChanged(viewer, ref _lastGroupedHorizontalOffset, ref _lastGroupedVerticalOffset);
+            if (scrolled && RenameOverlayBorder.Visibility == Visibility.Visible)
+            {
+                HideRenameOverlay();
+            }
+        }
+
+        private static bool HasScrollOffsetChanged(ScrollViewer viewer, ref double lastHorizontalOffset, ref double lastVerticalOffset)
+        {
+            bool changed =
+                double.IsNaN(lastHorizontalOffset) ||
+                double.IsNaN(lastVerticalOffset) ||
+                Math.Abs(viewer.HorizontalOffset - lastHorizontalOffset) > 0.1 ||
+                Math.Abs(viewer.VerticalOffset - lastVerticalOffset) > 0.1;
+
+            lastHorizontalOffset = viewer.HorizontalOffset;
+            lastVerticalOffset = viewer.VerticalOffset;
+            return changed;
         }
 
         private void GroupedEntriesScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -1618,6 +1734,8 @@ namespace FileExplorerUI
 
         private async Task LoadFirstPageAsync()
         {
+            NavigationPerfSession? perf = TryGetCurrentNavigationPerfSession();
+            perf?.Mark("load-first-page.enter");
             _currentPath = string.IsNullOrWhiteSpace(PathTextBox.Text) ? ShellMyComputerPath : PathTextBox.Text.Trim();
             if (!_sidebarInitialized)
             {
@@ -1639,6 +1757,11 @@ namespace FileExplorerUI
                 PopulateMyComputerEntries();
                 ApplyCurrentPresentation();
                 UpdateFileCommandStates();
+                if (perf is not null)
+                {
+                    ScheduleNavigationPerfFirstFrameMark(perf, "load-first-page.first-frame");
+                }
+                perf?.Mark("load-first-page.my-computer.completed");
                 return;
             }
 
@@ -1646,12 +1769,13 @@ namespace FileExplorerUI
             ConfigureDirectoryWatcher(_currentPath);
             EnsureRefreshFallbackInvalidation(_currentPath, "manual_load");
             SyncActivePanelPresentationState();
+            perf?.Mark("load-first-page.pipeline-selected", UsesClientPresentationPipeline() ? "client" : "paged");
             if (UsesClientPresentationPipeline())
             {
-                await LoadAllEntriesForPresentationAsync(_currentPath);
+                await LoadAllEntriesForPresentationAsync(_currentPath, perf);
                 return;
             }
-            await LoadPageAsync(_currentPath, cursor: 0, append: false);
+            await LoadPageAsync(_currentPath, cursor: 0, append: false, perf);
         }
 
         private async Task NavigateToPathAsync(string path, bool pushHistory)
@@ -1659,52 +1783,63 @@ namespace FileExplorerUI
             HideRenameOverlay();
 
             string target = string.IsNullOrWhiteSpace(path) ? @"C:\" : path.Trim();
-            if (string.Equals(target, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            NavigationPerfSession perf = BeginNavigationPerfSession(target, pushHistory ? "navigate" : "history");
+            try
             {
+                if (string.Equals(target, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (pushHistory && !string.Equals(_currentPath, target, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _backStack.Push(_currentPath);
+                        _forwardStack.Clear();
+                    }
+
+                    _currentPath = ShellMyComputerPath;
+                    PathTextBox.Text = ShellMyComputerPath;
+                    _currentQuery = string.Empty;
+                    SearchTextBox.Text = string.Empty;
+                    UpdateBreadcrumbs(_currentPath);
+                    UpdateNavButtonsState();
+                    _ = SelectSidebarTreePathAsync(_currentPath);
+                    await LoadFirstPageAsync();
+                    ClearListSelection();
+                    _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                    perf.Mark("navigate.completed");
+                    return;
+                }
+
+                if (!_explorerService.DirectoryExists(target))
+                {
+                    SetPathInputInvalid();
+                    UpdateStatusKey("StatusPathNotFound", target);
+                    perf.Mark("navigate.path-missing");
+                    return;
+                }
+                SetPathInputValid();
+                perf.Mark("navigate.validated");
+
                 if (pushHistory && !string.Equals(_currentPath, target, StringComparison.OrdinalIgnoreCase))
                 {
                     _backStack.Push(_currentPath);
                     _forwardStack.Clear();
                 }
 
-                _currentPath = ShellMyComputerPath;
-                PathTextBox.Text = ShellMyComputerPath;
+                _currentPath = target;
+                PathTextBox.Text = target;
                 _currentQuery = string.Empty;
                 SearchTextBox.Text = string.Empty;
-                UpdateBreadcrumbs(_currentPath);
+                UpdateBreadcrumbs(target);
                 UpdateNavButtonsState();
                 _ = SelectSidebarTreePathAsync(_currentPath);
                 await LoadFirstPageAsync();
-                return;
+                ClearListSelection();
+                _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                perf.Mark("navigate.completed");
             }
-
-            if (!_explorerService.DirectoryExists(target))
+            finally
             {
-                SetPathInputInvalid();
-                UpdateStatusKey("StatusPathNotFound", target);
-                return;
+                EndNavigationPerfSession(perf);
             }
-            SetPathInputValid();
-
-            if (!await CanReadDirectoryAsync(target))
-            {
-                return;
-            }
-
-            if (pushHistory && !string.Equals(_currentPath, target, StringComparison.OrdinalIgnoreCase))
-            {
-                _backStack.Push(_currentPath);
-                _forwardStack.Clear();
-            }
-
-            _currentPath = target;
-            PathTextBox.Text = target;
-            _currentQuery = string.Empty;
-            SearchTextBox.Text = string.Empty;
-            UpdateBreadcrumbs(target);
-            UpdateNavButtonsState();
-            _ = SelectSidebarTreePathAsync(_currentPath);
-            await LoadFirstPageAsync();
         }
 
         private async Task LoadNextPageAsync()
@@ -1718,12 +1853,16 @@ namespace FileExplorerUI
             await LoadPageAsync(_currentPath, _nextCursor, append: true);
         }
 
-        private async Task LoadPageAsync(string path, ulong cursor, bool append)
+        private async Task LoadPageAsync(string path, ulong cursor, bool append, NavigationPerfSession? perf = null)
         {
             if (_isLoading)
             {
+                perf?.Mark("load-page.skipped", "already-loading");
                 return;
             }
+
+            InvalidatePresentationSourceCache();
+            perf?.Mark("load-page.enter", $"append={append} cursor={cursor}");
 
             if (!append)
             {
@@ -1805,21 +1944,44 @@ namespace FileExplorerUI
                 }
 
                 sw.Stop();
+                perf?.Mark("load-page.fetch-completed", $"rows={page.Rows.Count} total={page.TotalEntries} source={_explorerService.DescribeBatchSource(page.SourceKind)}");
                 _lastFetchMs = (uint)Math.Clamp(sw.ElapsedMilliseconds, 0, int.MaxValue);
+                _totalEntries = page.TotalEntries;
+
                 if (!append)
                 {
-                    _entries.Clear();
+                    int initialVisibleCount = GetInitialVisibleEntryCount(page.Rows.Count);
+                    EnsurePlaceholderCount(initialVisibleCount);
+                    perf?.Mark("load-page.placeholders-synced", $"total={initialVisibleCount}");
+                    FillPageRows(0, page.Rows.Take(initialVisibleCount).ToList(), path);
+                    perf?.Mark("load-page.rows-filled", $"filled={initialVisibleCount}");
+                    TrimTrailingEntries(initialVisibleCount);
+                    perf?.Mark("load-page.visible-entries-updated", $"count={initialVisibleCount}");
+                    ScheduleDeferredLoadedPageExpansion(path, _directorySnapshotVersion, page.Rows, initialVisibleCount, perf);
                 }
-
-                _totalEntries = page.TotalEntries;
-                EnsurePlaceholderCount((int)_totalEntries);
-                FillPageRows((int)cursor, page.Rows);
+                else
+                {
+                    EnsurePlaceholderCount((int)_totalEntries);
+                    perf?.Mark("load-page.placeholders-synced", $"total={_totalEntries}");
+                    FillPageRows((int)cursor, page.Rows, path);
+                    perf?.Mark("load-page.rows-filled", $"filled={page.Rows.Count}");
+                }
                 if (!append)
                 {
                     RestoreListSelectionByPath(ensureVisible: false);
+                    perf?.Mark("load-page.selection-restored");
                 }
                 UpdateFileCommandStates();
-                RequestMetadataForCurrentViewport();
+                if (!append)
+                {
+                    RequestMetadataForCurrentViewportDeferred(48);
+                    perf?.Mark("load-page.viewport-metadata-deferred");
+                }
+                else
+                {
+                    RequestMetadataForCurrentViewport();
+                    perf?.Mark("load-page.viewport-metadata-requested");
+                }
 
                 _nextCursor = page.NextCursor;
                 _hasMore = page.HasMore;
@@ -1844,12 +2006,18 @@ namespace FileExplorerUI
                     nextCursor: _nextCursor,
                     usn: DescribeUsnCapability(_usnCapability)
                 );
+                if (!append && perf is not null)
+                {
+                    ScheduleNavigationPerfFirstFrameMark(perf, "load-page.first-frame");
+                }
+                perf?.Mark("load-page.bind-completed", $"visible={_entries.Count} hasMore={_hasMore}");
             }
             catch (Exception ex)
             {
                 _lastTitleWasReadFailed = true;
                 UpdateWindowTitle();
                 UpdateStatusKey("StatusPathError", path, ex.Message);
+                perf?.Mark("load-page.failed", ex.Message);
             }
             finally
             {
@@ -1859,17 +2027,20 @@ namespace FileExplorerUI
                 SidebarNavView.IsEnabled = true;
                 StyledSidebarView.IsEnabled = true;
                 UpdateFileCommandStates();
+                perf?.Mark("load-page.exit");
             }
         }
 
-        private async Task LoadAllEntriesForPresentationAsync(string path)
+        private async Task LoadAllEntriesForPresentationAsync(string path, NavigationPerfSession? perf = null)
         {
             if (_isLoading)
             {
+                perf?.Mark("load-all.skipped", "already-loading");
                 return;
             }
 
             BeginDirectorySnapshot();
+            perf?.Mark("load-all.enter");
             _isLoading = true;
             LoadButton.IsEnabled = false;
             NextButton.IsEnabled = false;
@@ -1940,11 +2111,12 @@ namespace FileExplorerUI
 
                     cursor = page.NextCursor;
                     hasMore = page.HasMore;
+                    perf?.Mark("load-all.batch", $"loaded={loadedEntries.Count} total={totalEntries} hasMore={hasMore}");
                 } while (hasMore);
 
-                _presentationSourceEntries.Clear();
-                _presentationSourceEntries.AddRange(loadedEntries);
-                ApplyCurrentPresentation();
+                SetPresentationSourceEntries(loadedEntries);
+                perf?.Mark("load-all.fetch-completed", $"loaded={loadedEntries.Count}");
+                ApplyCurrentPresentation(perf);
                 _totalEntries = totalEntries == 0 ? (uint)loadedEntries.Count : totalEntries;
                 _nextCursor = 0;
                 _hasMore = false;
@@ -1952,10 +2124,16 @@ namespace FileExplorerUI
                 _lastTitleWasReadFailed = false;
                 UpdateWindowTitle();
                 UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
+                if (perf is not null)
+                {
+                    ScheduleNavigationPerfFirstFrameMark(perf, "load-all.first-frame");
+                }
+                perf?.Mark("load-all.completed", $"visible={_entries.Count}");
             }
             catch (Exception ex)
             {
                 UpdateStatusKey("StatusLoadFailedWithReason", ex.Message);
+                perf?.Mark("load-all.failed", ex.Message);
             }
             finally
             {
@@ -1965,6 +2143,7 @@ namespace FileExplorerUI
                 SidebarNavView.IsEnabled = true;
                 StyledSidebarView.IsEnabled = true;
                 UpdateFileCommandStates();
+                perf?.Mark("load-all.exit");
             }
         }
 
@@ -2014,6 +2193,104 @@ namespace FileExplorerUI
             Debug.WriteLine(
                 $"[PERF] mode={mode} path=\"{path}\" query=\"{q}\" source={source} loaded={loaded} total={total} scanned={scanned} matched={matched} hit={hitRate:F1}% fetch_ms={fetchMs} batch={batch} has_more={hasMore} next={nextCursor} usn={usn}"
             );
+        }
+
+        private NavigationPerfSession BeginNavigationPerfSession(string targetPath, string trigger)
+        {
+            var session = new NavigationPerfSession(targetPath, trigger);
+            _activeNavigationPerfSession = session;
+            return session;
+        }
+
+        private NavigationPerfSession? TryGetCurrentNavigationPerfSession()
+        {
+            return _activeNavigationPerfSession;
+        }
+
+        private void EndNavigationPerfSession(NavigationPerfSession session)
+        {
+            if (ReferenceEquals(_activeNavigationPerfSession, session))
+            {
+                _activeNavigationPerfSession = null;
+            }
+        }
+
+        private static void AppendNavigationPerfLog(string message)
+        {
+            string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}";
+            lock (s_navigationPerfLogLock)
+            {
+                File.AppendAllText(s_navigationPerfLogPath, line, Encoding.UTF8);
+            }
+        }
+
+        private int GetInitialVisibleEntryCount(int loadedCount)
+        {
+            if (loadedCount <= 0)
+            {
+                return 0;
+            }
+
+            double viewportHeight = DetailsEntriesScrollViewer.ViewportHeight > 0
+                ? DetailsEntriesScrollViewer.ViewportHeight
+                : DetailsEntriesScrollViewer.ActualHeight;
+            int visibleCount = viewportHeight > 0
+                ? Math.Max(1, (int)Math.Ceiling(viewportHeight / _estimatedItemHeight))
+                : 12;
+            int bufferedCount = Math.Max(visibleCount + 8, visibleCount * 2);
+            return Math.Min(loadedCount, bufferedCount);
+        }
+
+        private void ScheduleNavigationPerfFirstFrameMark(NavigationPerfSession perf, string stage)
+        {
+            void OnRendering(object? sender, object args)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+                perf.Mark(stage);
+            }
+
+            CompositionTarget.Rendering += OnRendering;
+        }
+
+        private ScrollViewer GetCurrentViewportScrollViewer()
+        {
+            return _currentViewMode == EntryViewMode.Details
+                ? DetailsEntriesScrollViewer
+                : GroupedEntriesScrollViewer;
+        }
+
+        private void ScheduleDeferredLoadedPageExpansion(
+            string path,
+            long snapshotVersion,
+            IReadOnlyList<FileRow> rows,
+            int initialCount,
+            NavigationPerfSession? perf)
+        {
+            if (initialCount >= rows.Count)
+            {
+                return;
+            }
+
+            void OnRendering(object? sender, object args)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+                _ = DispatcherQueue.TryEnqueue(async () =>
+                {
+                    await Task.Delay(32);
+                    if (!string.Equals(_currentPath, path, StringComparison.OrdinalIgnoreCase) ||
+                        _directorySnapshotVersion != snapshotVersion)
+                    {
+                        return;
+                    }
+
+                    EnsurePlaceholderCount(rows.Count);
+                    FillPageRows(initialCount, rows.Skip(initialCount).ToList(), path);
+                    perf?.Mark("load-page.deferred-rows-applied", $"count={rows.Count - initialCount}");
+                    RequestMetadataForCurrentViewportDeferred(24);
+                });
+            }
+
+            CompositionTarget.Rendering += OnRendering;
         }
 
         private void EnsureRefreshFallbackInvalidation(string path, string reason)
@@ -2536,6 +2813,7 @@ namespace FileExplorerUI
         {
             _entries.Clear();
             _selectedEntryPath = null;
+            var drives = new List<EntryViewModel>();
             foreach (DriveInfo drive in _explorerService.GetReadyDrives())
             {
                 string root = drive.RootDirectory.FullName;
@@ -2544,7 +2822,7 @@ namespace FileExplorerUI
                     ? S("DriveTypeLocalDisk")
                     : SF("DriveTypeVolumeFormat", drive.VolumeLabel, drive.DriveFormat);
 
-                _entries.Add(new EntryViewModel
+                drives.Add(new EntryViewModel
                 {
                     Name = label,
                     PendingName = label,
@@ -2562,10 +2840,16 @@ namespace FileExplorerUI
                 });
             }
 
+            foreach (EntryViewModel driveEntry in drives)
+            {
+                _entries.Add(driveEntry);
+            }
+
+            SetPresentationSourceEntries(drives);
+
             _totalEntries = (uint)_entries.Count;
             _nextCursor = 0;
             _hasMore = false;
-            EntriesListView.SelectedItem = null;
             UpdateFileCommandStates();
             _lastTitleWasReadFailed = false;
             UpdateWindowTitle();
@@ -3290,6 +3574,14 @@ namespace FileExplorerUI
                 return 0;
             }
 
+            if (_currentViewMode == EntryViewMode.List)
+            {
+                int rowsPerColumn = Math.Max(1, GetGroupedListRowsPerColumn());
+                double columnStride = Math.Max(1, EntryContainerWidth + 16);
+                int columnIndex = (int)Math.Floor(viewer.HorizontalOffset / columnStride);
+                return Math.Clamp(columnIndex * rowsPerColumn, 0, _entries.Count - 1);
+            }
+
             double scrollable = Math.Max(1.0, viewer.ScrollableHeight);
             double progress = viewer.VerticalOffset / scrollable;
             progress = Math.Clamp(progress, 0.0, 1.0);
@@ -3299,7 +3591,9 @@ namespace FileExplorerUI
         private int EstimateViewportBottomIndex(ScrollViewer viewer)
         {
             int topIndex = EstimateViewportIndex(viewer);
-            int visibleCount = Math.Max(1, (int)Math.Ceiling(viewer.ViewportHeight / _estimatedItemHeight));
+            int visibleCount = _currentViewMode == EntryViewMode.List
+                ? Math.Max(1, GetGroupedListRowsPerColumn() * Math.Max(1, (int)Math.Ceiling(viewer.ViewportWidth / Math.Max(1, EntryContainerWidth + 16))))
+                : Math.Max(1, (int)Math.Ceiling(viewer.ViewportHeight / _estimatedItemHeight));
             int bottom = topIndex + visibleCount;
             return Math.Min(_entries.Count - 1, Math.Max(0, bottom));
         }
@@ -3311,7 +3605,10 @@ namespace FileExplorerUI
                 return;
             }
 
-            int dynamicWindow = Math.Max(32, (int)Math.Ceiling((_listScrollViewer?.ViewportHeight ?? 0) / _estimatedItemHeight) * 2);
+            double viewportHeight = DetailsEntriesScrollViewer.ViewportHeight > 0
+                ? DetailsEntriesScrollViewer.ViewportHeight
+                : DetailsEntriesScrollViewer.ActualHeight;
+            int dynamicWindow = Math.Max(32, (int)Math.Ceiling(Math.Max(1, viewportHeight) / _estimatedItemHeight) * 2);
             int prefetchWindow = (int)Math.Max(dynamicWindow, _currentPageSize * 2);
             int rounds = 0;
             while (!_isLoading && _hasMore && index >= ((int)_nextCursor - prefetchWindow) && rounds < 6)
@@ -3323,19 +3620,37 @@ namespace FileExplorerUI
 
         private void RequestViewportWork()
         {
+            if (_currentViewMode != EntryViewMode.Details)
+            {
+                return;
+            }
+
             RequestPrefetchForCurrentViewport();
             RequestMetadataForCurrentViewport();
         }
 
         private void RequestPrefetchForCurrentViewport()
         {
-            if (_listScrollViewer is null || !_hasMore)
+            if (!_hasMore)
             {
                 return;
             }
 
-            int idx = EstimateViewportBottomIndex(_listScrollViewer);
+            int idx = EstimateViewportBottomIndex(DetailsEntriesScrollViewer);
             _ = EnsureDataForIndexAsync(idx);
+        }
+
+        private void RequestMetadataForCurrentViewportDeferred(int delayMs = 1)
+        {
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                if (delayMs > 0)
+                {
+                    await Task.Delay(delayMs);
+                }
+
+                RequestMetadataForCurrentViewport();
+            });
         }
 
         private void RequestMetadataForCurrentViewport()
@@ -3348,15 +3663,15 @@ namespace FileExplorerUI
 
             int visibleStart;
             int visibleEnd;
-            if (_listScrollViewer is null)
+            if (_currentViewMode != EntryViewMode.Details)
             {
                 visibleStart = 0;
-                visibleEnd = Math.Min(_entries.Count - 1, (int)_currentPageSize - 1);
+                visibleEnd = _entries.Count - 1;
             }
             else
             {
-                visibleStart = EstimateViewportIndex(_listScrollViewer);
-                visibleEnd = EstimateViewportBottomIndex(_listScrollViewer);
+                visibleStart = EstimateViewportIndex(DetailsEntriesScrollViewer);
+                visibleEnd = EstimateViewportBottomIndex(DetailsEntriesScrollViewer);
             }
 
             if (visibleEnd < visibleStart)
@@ -3519,19 +3834,7 @@ namespace FileExplorerUI
 
         private void UpdateEstimatedItemHeight()
         {
-            const double fallback = 32.0;
-            double found = 0;
-            int sample = Math.Min(_entries.Count, 16);
-            for (int i = 0; i < sample; i++)
-            {
-                if (EntriesListView.ContainerFromIndex(i) is ListViewItem item && item.ActualHeight > 4)
-                {
-                    found = item.ActualHeight;
-                    break;
-                }
-            }
-
-            _estimatedItemHeight = found > 0 ? found : fallback;
+            _estimatedItemHeight = Math.Max(32.0, EntryItemMetrics.RowHeight + 4);
         }
 
         private void EnsurePlaceholderCount(int target)
@@ -3567,56 +3870,55 @@ namespace FileExplorerUI
             }
         }
 
-        private void FillPageRows(int startIndex, IReadOnlyList<FileRow> rows)
+        private void FillPageRows(int startIndex, IReadOnlyList<FileRow> rows, string? basePathOverride = null)
         {
             if (startIndex < 0 || startIndex >= _entries.Count)
             {
                 return;
             }
 
+            string basePath = string.IsNullOrWhiteSpace(basePathOverride) ? _currentPath : basePathOverride;
             int max = Math.Min(rows.Count, _entries.Count - startIndex);
             for (int i = 0; i < max; i++)
             {
                 FileRow row = rows[i];
                 EntryViewModel current = _entries[startIndex + i];
-                current.Name = row.Name;
-                current.PendingName = row.Name;
-                current.FullPath = Path.Combine(_currentPath, row.Name);
-                current.Type = GetEntryTypeText(row.Name, row.IsDirectory, row.IsLink);
-                current.IconGlyph = GetEntryIconGlyph(row.IsDirectory, row.IsLink, row.Name);
-                current.IconForeground = GetEntryIconBrush(row.IsDirectory, row.IsLink, row.Name);
-                current.MftRef = row.MftRef;
-                current.SizeText = string.Empty;
-                current.ModifiedText = string.Empty;
-                current.IsDirectory = row.IsDirectory;
-                current.IsLink = row.IsLink;
-                current.IsPendingCreate = false;
-                current.PendingCreateIsDirectory = false;
-                current.IsLoaded = true;
-                current.IsMetadataLoaded = false;
+                ApplyLoadedEntryRow(current, basePath, row);
             }
         }
 
         private EntryViewModel CreateLoadedEntryModel(string basePath, FileRow row)
         {
-            return new EntryViewModel
+            var entry = new EntryViewModel();
+            ApplyLoadedEntryRow(entry, basePath, row);
+            return entry;
+        }
+
+        private void ApplyLoadedEntryRow(EntryViewModel entry, string basePath, FileRow row)
+        {
+            entry.Name = row.Name;
+            entry.PendingName = row.Name;
+            entry.FullPath = Path.Combine(basePath, row.Name);
+            entry.Type = GetEntryTypeText(row.Name, row.IsDirectory, row.IsLink);
+            entry.IconGlyph = GetEntryIconGlyph(row.IsDirectory, row.IsLink, row.Name);
+            entry.IconForeground = GetEntryIconBrush(row.IsDirectory, row.IsLink, row.Name);
+            entry.MftRef = row.MftRef;
+            entry.SizeText = string.Empty;
+            entry.ModifiedText = string.Empty;
+            entry.IsDirectory = row.IsDirectory;
+            entry.IsLink = row.IsLink;
+            entry.IsPendingCreate = false;
+            entry.PendingCreateIsDirectory = false;
+            entry.IsLoaded = true;
+            entry.IsMetadataLoaded = false;
+        }
+
+        private void TrimTrailingEntries(int target)
+        {
+            while (_entries.Count > target)
             {
-                Name = row.Name,
-                PendingName = row.Name,
-                FullPath = Path.Combine(basePath, row.Name),
-                Type = GetEntryTypeText(row.Name, row.IsDirectory, row.IsLink),
-                IconGlyph = GetEntryIconGlyph(row.IsDirectory, row.IsLink, row.Name),
-                IconForeground = GetEntryIconBrush(row.IsDirectory, row.IsLink, row.Name),
-                MftRef = row.MftRef,
-                SizeText = string.Empty,
-                ModifiedText = string.Empty,
-                IsDirectory = row.IsDirectory,
-                IsLink = row.IsLink,
-                IsPendingCreate = false,
-                PendingCreateIsDirectory = false,
-                IsLoaded = true,
-                IsMetadataLoaded = false
-            };
+                _entries.RemoveAt(_entries.Count - 1);
+            }
         }
 
         private void PopulateEntryMetadata(EntryViewModel entry)
@@ -3663,33 +3965,45 @@ namespace FileExplorerUI
             entry.IsMetadataLoaded = true;
         }
 
-        private void ApplyCurrentPresentation()
+        private void ApplyCurrentPresentation(NavigationPerfSession? perf = null)
         {
+            perf?.Mark("apply-presentation.enter", $"view={_currentViewMode} group={_currentGroupField} sort={_currentSortField}/{_currentSortDirection}");
             List<EntryViewModel> sourceEntries = _presentationSourceEntries.Count > 0
                 ? _presentationSourceEntries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList()
                 : _entries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList();
 
             sourceEntries.Sort(CompareEntriesForPresentation);
+            perf?.Mark("apply-presentation.sorted", $"count={sourceEntries.Count}");
             string? selectedPath = _selectedEntryPath;
-            _entries.Clear();
             if (UsesColumnsListPresentation())
             {
+                _groupedListRowsPerColumn = GetGroupedListRowsPerColumn();
                 ApplyEntryViewState(sourceEntries);
-                foreach (EntryViewModel entry in sourceEntries)
+
+                if (!MatchesCurrentVisibleEntries(sourceEntries))
                 {
-                    _entries.Add(entry);
+                    ReplaceVisibleEntries(sourceEntries);
                 }
 
-                RebuildGroupedEntryColumns(sourceEntries);
-                EntriesListView.SelectedItem = null;
+                if (TryUseGroupedColumnsCache())
+                {
+                    ApplyGroupedColumnsProjection(_groupedColumnsProjectionCache!);
+                    perf?.Mark("apply-presentation.columns-cache-hit", $"columns={_groupedEntryColumns.Count}");
+                }
+                else
+                {
+                    RebuildGroupedEntryColumns(sourceEntries);
+                    perf?.Mark("apply-presentation.columns-rebuilt", $"columns={_groupedEntryColumns.Count}");
+                }
                 _ = DispatcherQueue.TryEnqueue(RefreshGroupedColumnsForViewport);
             }
             else
             {
                 List<EntryViewModel> presentedEntries = BuildPresentedEntries(sourceEntries);
-                foreach (EntryViewModel entry in presentedEntries)
+                perf?.Mark("apply-presentation.rows-built", $"count={presentedEntries.Count}");
+                if (!MatchesCurrentVisibleEntries(presentedEntries))
                 {
-                    _entries.Add(entry);
+                    ReplaceVisibleEntries(presentedEntries);
                 }
 
                 _groupedEntryColumns.Clear();
@@ -3702,12 +4016,48 @@ namespace FileExplorerUI
 
             UpdateEntrySelectionVisuals();
             UpdateViewCommandStates();
+            perf?.Mark("apply-presentation.exit", $"visible={_entries.Count}");
+        }
+
+        private bool MatchesCurrentVisibleEntries(IReadOnlyList<EntryViewModel> entries)
+        {
+            if (_entries.Count != entries.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (!ReferenceEquals(_entries[i], entries[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void ReplaceVisibleEntries(IReadOnlyList<EntryViewModel> entries)
+        {
+            _entries.Clear();
+            foreach (EntryViewModel entry in entries)
+            {
+                _entries.Add(entry);
+            }
         }
 
         private void RebuildGroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries)
         {
+            List<GroupedEntryColumnViewModel> projection = BuildGroupedEntryColumns(orderedEntries);
+            _groupedColumnsProjectionCache = projection;
+            ApplyGroupedColumnsProjection(projection);
+            UpdateGroupedColumnsCacheStamp();
+        }
+
+        private void ApplyGroupedColumnsProjection(IReadOnlyList<GroupedEntryColumnViewModel> projection)
+        {
             _groupedEntryColumns.Clear();
-            foreach (GroupedEntryColumnViewModel column in BuildGroupedEntryColumns(orderedEntries))
+            foreach (GroupedEntryColumnViewModel column in projection)
             {
                 _groupedEntryColumns.Add(column);
             }
@@ -3788,12 +4138,15 @@ namespace FileExplorerUI
 
         private int GetGroupedListRowsPerColumn()
         {
-            const double rowHeight = 30;
-            double headerHeight = _currentGroupField == EntryGroupField.None ? 0 : 28;
+            double rowPitch = EntryItemMetrics.RowHeight + 4;
+            double verticalPadding = GroupedEntriesScrollViewer.Padding.Top + GroupedEntriesScrollViewer.Padding.Bottom;
+            double headerHeight = _currentGroupField == EntryGroupField.None ? 0 : EntryItemMetrics.GroupHeaderHeight;
             double viewportHeight = GroupedEntriesScrollViewer.ActualHeight;
             if (viewportHeight <= headerHeight)
             {
-                viewportHeight = EntriesListView.ActualHeight;
+                viewportHeight = GroupedEntriesScrollViewer.ViewportHeight > 0
+                    ? GroupedEntriesScrollViewer.ViewportHeight
+                    : GroupedEntriesScrollViewer.ActualHeight;
             }
 
             if (viewportHeight <= headerHeight)
@@ -3801,8 +4154,8 @@ namespace FileExplorerUI
                 return 12;
             }
 
-            double availableHeight = Math.Max(rowHeight, viewportHeight - headerHeight);
-            return Math.Max(1, (int)Math.Floor(availableHeight / rowHeight));
+            double availableHeight = Math.Max(rowPitch, viewportHeight - verticalPadding - headerHeight);
+            return Math.Max(1, (int)Math.Floor(availableHeight / rowPitch));
         }
 
         private void RefreshGroupedColumnsForViewport()
@@ -3820,6 +4173,112 @@ namespace FileExplorerUI
 
             _groupedListRowsPerColumn = rowsPerColumn;
             RebuildGroupedEntryColumns(_entries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList());
+        }
+
+        private bool TryApplyPresentationFastPath(PresentationReloadReason reason)
+        {
+            if (!CanApplyPresentationFastPath(reason))
+            {
+                return false;
+            }
+
+            EnsurePresentationSourceCacheFromCurrentEntries();
+            ApplyCurrentPresentation();
+            return true;
+        }
+
+        private bool CanApplyPresentationFastPath(PresentationReloadReason reason)
+        {
+            if (_presentationSourceEntries.Count > 0)
+            {
+                return true;
+            }
+
+            if (reason == PresentationReloadReason.DataRefresh)
+            {
+                return false;
+            }
+
+            if (_hasMore)
+            {
+                return false;
+            }
+
+            List<EntryViewModel> loadedEntries = GetLoadedEntriesFromCurrentCollection();
+            if (loadedEntries.Count == 0)
+            {
+                return false;
+            }
+
+            return _totalEntries == 0 || loadedEntries.Count >= _totalEntries;
+        }
+
+        private void EnsurePresentationSourceCacheFromCurrentEntries()
+        {
+            if (_presentationSourceEntries.Count > 0)
+            {
+                return;
+            }
+
+            List<EntryViewModel> loadedEntries = GetLoadedEntriesFromCurrentCollection();
+            if (loadedEntries.Count == 0)
+            {
+                return;
+            }
+
+            SetPresentationSourceEntries(loadedEntries);
+        }
+
+        private List<EntryViewModel> GetLoadedEntriesFromCurrentCollection()
+        {
+            List<EntryViewModel> loadedEntries = _entries
+                .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
+                .ToList();
+            return loadedEntries;
+        }
+
+        private bool TryUseGroupedColumnsCache()
+        {
+            return _groupedColumnsCacheSourceVersion == _presentationSourceVersion
+                && _groupedColumnsCacheSortField == _currentSortField
+                && _groupedColumnsCacheSortDirection == _currentSortDirection
+                && _groupedColumnsCacheGroupField == _currentGroupField
+                && _groupedListRowsPerColumn > 0
+                && _groupedColumnsCacheRowsPerColumn == _groupedListRowsPerColumn
+                && _groupedColumnsProjectionCache is { Count: > 0 };
+        }
+
+        private int _groupedColumnsCacheRowsPerColumn = -1;
+
+        private void UpdateGroupedColumnsCacheStamp()
+        {
+            _groupedColumnsCacheSourceVersion = _presentationSourceVersion;
+            _groupedColumnsCacheSortField = _currentSortField;
+            _groupedColumnsCacheSortDirection = _currentSortDirection;
+            _groupedColumnsCacheGroupField = _currentGroupField;
+            _groupedColumnsCacheRowsPerColumn = _groupedListRowsPerColumn;
+        }
+
+        private void InvalidateProjectionCaches()
+        {
+            _groupedColumnsCacheSourceVersion = -1;
+            _groupedColumnsCacheRowsPerColumn = -1;
+            _groupedColumnsProjectionCache = null;
+        }
+
+        private void InvalidatePresentationSourceCache()
+        {
+            _presentationSourceEntries.Clear();
+            _presentationSourceVersion++;
+            InvalidateProjectionCaches();
+        }
+
+        private void SetPresentationSourceEntries(IReadOnlyList<EntryViewModel> entries)
+        {
+            _presentationSourceEntries.Clear();
+            _presentationSourceEntries.AddRange(entries);
+            _presentationSourceVersion++;
+            InvalidateProjectionCaches();
         }
 
         private List<EntryViewModel> BuildPresentedEntries(IReadOnlyList<EntryViewModel> orderedEntries)
@@ -3921,6 +4380,11 @@ namespace FileExplorerUI
 
         private int CompareEntriesForPresentation(EntryViewModel left, EntryViewModel right)
         {
+            if (left.IsDirectory != right.IsDirectory)
+            {
+                return left.IsDirectory ? -1 : 1;
+            }
+
             int result = _currentSortField switch
             {
                 EntrySortField.ModifiedDate => Nullable.Compare(left.ModifiedAt, right.ModifiedAt),
@@ -3967,7 +4431,10 @@ namespace FileExplorerUI
         private static EntryGroupDescriptor GetTypeGroupDescriptor(EntryViewModel entry)
         {
             string label = string.IsNullOrWhiteSpace(entry.Type) ? "-" : entry.Type;
-            return new EntryGroupDescriptor($"type:{label}", $"type:{label}", label, label);
+            string orderKey = entry.IsDirectory
+                ? $"0000:{label}"
+                : $"1000:{label}";
+            return new EntryGroupDescriptor($"type:{label}", $"type:{label}", label, orderKey);
         }
 
         private static EntryGroupDescriptor GetModifiedDateGroupDescriptor(EntryViewModel entry)
@@ -4397,15 +4864,11 @@ namespace FileExplorerUI
             }
         }
 
-        private void EntriesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-        }
-
         private int GetCreateInsertIndex()
         {
-            if (_listScrollViewer is not null && _entries.Count > 0)
+            if (_currentViewMode == EntryViewMode.Details && _entries.Count > 0)
             {
-                int visibleEnd = EstimateViewportBottomIndex(_listScrollViewer);
+                int visibleEnd = EstimateViewportBottomIndex(DetailsEntriesScrollViewer);
                 return Math.Min(Math.Max(0, visibleEnd + 1), _entries.Count);
             }
 
@@ -4420,28 +4883,16 @@ namespace FileExplorerUI
 
         private async Task EnsureCreateInsertVisibleAsync(int insertIndex)
         {
-            const double createRevealBottomPadding = 0;
-
-            if (_entries.Count == 0)
+            if (_entries.Count == 0 || _currentViewMode != EntryViewMode.Details)
             {
-                return;
-            }
-
-            _listScrollViewer ??= FindDescendant<ScrollViewer>(EntriesListView);
-            if (_listScrollViewer is null)
-            {
-                int anchorIndex = Math.Clamp(insertIndex <= 0 ? 0 : insertIndex - 1, 0, _entries.Count - 1);
-                EntriesListView.ScrollIntoView(_entries[anchorIndex]);
-                await Task.Delay(16);
-                EntriesListView.UpdateLayout();
                 return;
             }
 
             await EnsureDataForIndexAsync(insertIndex);
-            EntriesListView.UpdateLayout();
+            DetailsEntriesScrollViewer.UpdateLayout();
 
-            int visibleCount = Math.Max(1, (int)Math.Ceiling(_listScrollViewer.ViewportHeight / _estimatedItemHeight));
-            int visibleStart = EstimateViewportIndex(_listScrollViewer);
+            int visibleCount = Math.Max(1, (int)Math.Ceiling(DetailsEntriesScrollViewer.ViewportHeight / _estimatedItemHeight));
+            int visibleStart = EstimateViewportIndex(DetailsEntriesScrollViewer);
             int visibleEnd = Math.Min(_entries.Count - 1, visibleStart + visibleCount - 1);
 
             if (insertIndex >= visibleStart && insertIndex <= visibleEnd)
@@ -4451,18 +4902,16 @@ namespace FileExplorerUI
 
             if (insertIndex > visibleEnd)
             {
-                double targetOffset = Math.Max(
-                    0,
-                    ((insertIndex + 1) * _estimatedItemHeight) - _listScrollViewer.ViewportHeight + createRevealBottomPadding);
-                _listScrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
+                double targetOffset = Math.Max(0, ((insertIndex + 1) * _estimatedItemHeight) - DetailsEntriesScrollViewer.ViewportHeight);
+                DetailsEntriesScrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
             }
             else
             {
                 double targetOffset = insertIndex * _estimatedItemHeight;
-                _listScrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
+                DetailsEntriesScrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
             }
             await Task.Delay(16);
-            EntriesListView.UpdateLayout();
+            DetailsEntriesScrollViewer.UpdateLayout();
         }
 
         private bool IsIndexInCurrentViewport(int index)
@@ -4472,15 +4921,14 @@ namespace FileExplorerUI
                 return false;
             }
 
-            _listScrollViewer ??= FindDescendant<ScrollViewer>(EntriesListView);
-            if (_listScrollViewer is null)
+            if (_currentViewMode != EntryViewMode.Details)
             {
                 return false;
             }
 
-            EntriesListView.UpdateLayout();
-            int visibleCount = Math.Max(1, (int)Math.Ceiling(_listScrollViewer.ViewportHeight / _estimatedItemHeight));
-            int visibleStart = EstimateViewportIndex(_listScrollViewer);
+            DetailsEntriesScrollViewer.UpdateLayout();
+            int visibleCount = Math.Max(1, (int)Math.Ceiling(DetailsEntriesScrollViewer.ViewportHeight / _estimatedItemHeight));
+            int visibleStart = EstimateViewportIndex(DetailsEntriesScrollViewer);
             int visibleEnd = Math.Min(_entries.Count - 1, visibleStart + visibleCount - 1);
             return index >= visibleStart && index <= visibleEnd;
         }
@@ -4488,6 +4936,7 @@ namespace FileExplorerUI
         private void ClearListSelection()
         {
             _selectedEntryPath = null;
+            SyncActivePanelPresentationState();
             UpdateEntrySelectionVisuals();
             UpdateFileCommandStates();
         }
@@ -4495,7 +4944,7 @@ namespace FileExplorerUI
         private async Task<bool> StartRenameForCreatedEntryAsync(EntryViewModel entry, int insertIndex)
         {
             await Task.Delay(16);
-            EntriesListView.UpdateLayout();
+            GetVisibleEntriesRoot().UpdateLayout();
 
             bool renameStarted = await BeginRenameOverlayAsync(entry, ensureVisible: false, updateSelection: false);
             if (renameStarted)
@@ -4503,9 +4952,9 @@ namespace FileExplorerUI
                 return true;
             }
 
-            EntriesListView.ScrollIntoView(entry);
+            ScrollEntryIntoView(entry);
             await Task.Delay(16);
-            EntriesListView.UpdateLayout();
+            GetVisibleEntriesRoot().UpdateLayout();
             bool retryStarted = await BeginRenameOverlayAsync(entry, ensureVisible: false, updateSelection: false);
             return retryStarted;
         }
@@ -4524,7 +4973,6 @@ namespace FileExplorerUI
         {
             HideRenameOverlay();
             bool alreadySelected =
-                ReferenceEquals(EntriesListView.SelectedItem, entry) ||
                 string.Equals(_selectedEntryPath, entry.FullPath, StringComparison.OrdinalIgnoreCase);
 
             if (updateSelection && !alreadySelected)
@@ -4566,20 +5014,34 @@ namespace FileExplorerUI
                 return false;
             }
 
-            GeneralTransform transform = anchor.TransformToVisual(RenameOverlayCanvas);
-            Rect bounds = transform.TransformBounds(new Rect(0, 0, anchor.ActualWidth, anchor.ActualHeight));
-            if (bounds.Width <= 0 || bounds.Height <= 0)
+            FrameworkElement textAnchor = anchor.NameTextElement;
+            GeneralTransform cellTransform = anchor.TransformToVisual(RenameOverlayCanvas);
+            Rect cellBounds = cellTransform.TransformBounds(new Rect(0, 0, anchor.ActualWidth, anchor.ActualHeight));
+            GeneralTransform textTransform = textAnchor.TransformToVisual(RenameOverlayCanvas);
+            Rect textBounds = textTransform.TransformBounds(new Rect(0, 0, textAnchor.ActualWidth, textAnchor.ActualHeight));
+            if (cellBounds.Width <= 0 || cellBounds.Height <= 0 || textBounds.Width <= 0 || textBounds.Height <= 0)
             {
                 return false;
             }
 
             double overlayHeight = RenameOverlayBorder.ActualHeight > 0
                 ? RenameOverlayBorder.ActualHeight
-                : (RenameOverlayBorder.Height > 0 ? RenameOverlayBorder.Height : bounds.Height);
+                : (RenameOverlayBorder.Height > 0 ? RenameOverlayBorder.Height : textBounds.Height);
 
-            Canvas.SetLeft(RenameOverlayBorder, bounds.X - 2);
-            Canvas.SetTop(RenameOverlayBorder, Math.Max(0, bounds.Y + ((bounds.Height - overlayHeight) / 2)));
-            RenameOverlayBorder.Width = Math.Max(140, Math.Min(NameColumnWidth.Value - 18, bounds.Width + 12));
+            double left = Math.Max(0, textBounds.X - 1);
+            double top = Math.Max(0, cellBounds.Y + ((cellBounds.Height - overlayHeight) / 2));
+            const double renameRightMargin = 12;
+            const double renameWidthPadding = 24;
+            const double renameMinWidth = 88;
+            double canvasAvailableWidth = RenameOverlayCanvas.ActualWidth > 0
+                ? RenameOverlayCanvas.ActualWidth - left - renameRightMargin
+                : cellBounds.Right - left - renameRightMargin;
+            double availableWidth = Math.Max(renameMinWidth, canvasAvailableWidth);
+            double desiredWidth = textBounds.Width + renameWidthPadding;
+
+            Canvas.SetLeft(RenameOverlayBorder, left);
+            Canvas.SetTop(RenameOverlayBorder, top);
+            RenameOverlayBorder.Width = Math.Min(availableWidth, Math.Max(renameMinWidth, desiredWidth));
             return true;
         }
 
@@ -4596,19 +5058,29 @@ namespace FileExplorerUI
             }
         }
 
-        private bool TryGetEntryAnchor<T>(EntryViewModel entry, out T? anchor) where T : FrameworkElement
+        private bool TryGetEntryAnchor<T>(EntryViewModel entry, [NotNullWhen(true)] out T? anchor) where T : FrameworkElement
         {
             anchor = null;
-            FrameworkElement root = GetVisibleEntriesRoot();
-            root.UpdateLayout();
-
-            foreach (T element in FindDescendants<T>(root))
+            if (entry is null || string.IsNullOrWhiteSpace(entry.FullPath))
             {
-                if (ReferenceEquals(element.DataContext, entry))
-                {
-                    anchor = element;
-                    return true;
-                }
+                return false;
+            }
+
+            IEntriesViewHost? host = GetActiveEntriesViewHost();
+            if (host is null)
+            {
+                return false;
+            }
+
+            GetVisibleEntriesRoot().UpdateLayout();
+
+            FrameworkElement? found = typeof(T) == typeof(EntryNameCell)
+                ? host.FindEntryNameCell(entry.FullPath)
+                : host.FindEntryContainer(entry.FullPath);
+            if (found is T typed)
+            {
+                anchor = typed;
+                return true;
             }
 
             return false;
@@ -4616,35 +5088,479 @@ namespace FileExplorerUI
 
         private void ScrollEntryIntoView(EntryViewModel entry)
         {
-            if (!TryGetEntryAnchor<FrameworkElement>(entry, out FrameworkElement? element))
+            if (entry is null || string.IsNullOrWhiteSpace(entry.FullPath))
             {
                 return;
             }
 
+            if (GetActiveEntriesViewHost()?.ScrollEntryIntoView(entry.FullPath) == true)
+            {
+                return;
+            }
+        }
+
+        private void EntriesView_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (IsFocusedElementWithinRenameOverlay())
+            {
+                return;
+            }
+
+            e.Handled = HandleEntriesNavigationKey(e.Key);
+        }
+
+        private bool HandleEntriesNavigationKey(Windows.System.VirtualKey key)
+        {
+            switch (key)
+            {
+                case Windows.System.VirtualKey.Up:
+                    if (!TryMoveSelectionVertically(-1))
+                    {
+                        TryMoveSelectionBy(-1);
+                    }
+                    return true;
+                case Windows.System.VirtualKey.Down:
+                    if (!TryMoveSelectionVertically(1))
+                    {
+                        TryMoveSelectionBy(1);
+                    }
+                    return true;
+                case Windows.System.VirtualKey.Left:
+                    if (_currentViewMode == EntryViewMode.List)
+                    {
+                        TryMoveSelectionHorizontally(-1);
+                        return true;
+                    }
+                    return false;
+                case Windows.System.VirtualKey.Right:
+                    if (_currentViewMode == EntryViewMode.List)
+                    {
+                        TryMoveSelectionHorizontally(1);
+                        return true;
+                    }
+                    return false;
+                case Windows.System.VirtualKey.Home:
+                    if (_currentViewMode == EntryViewMode.List)
+                    {
+                        TrySelectBoundaryEntry(first: true);
+                    }
+                    else
+                    {
+                        TrySelectBoundaryEntry(first: true);
+                    }
+                    return true;
+                case Windows.System.VirtualKey.End:
+                    if (_currentViewMode == EntryViewMode.List)
+                    {
+                        TrySelectBoundaryEntry(first: false);
+                    }
+                    else
+                    {
+                        TrySelectBoundaryEntry(first: false);
+                    }
+                    return true;
+                case Windows.System.VirtualKey.PageUp:
+                    TryMoveSelectionByPage(-1);
+                    return true;
+                case Windows.System.VirtualKey.PageDown:
+                    TryMoveSelectionByPage(1);
+                    return true;
+                case Windows.System.VirtualKey.Enter:
+                    TryActivateSelectedEntry();
+                    return true;
+                case Windows.System.VirtualKey.F2:
+                    if (CanRenameSelectedEntry())
+                    {
+                        _ = ExecuteRenameSelectedAsync();
+                        return true;
+                    }
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        private bool TryMoveSelectionBy(int delta)
+        {
+            List<EntryViewModel> selectableEntries = GetSelectableEntriesInPresentationOrder();
+            if (selectableEntries.Count == 0)
+            {
+                return false;
+            }
+
+            int currentIndex = GetSelectedPresentedEntryIndex(selectableEntries);
+            int targetIndex = currentIndex < 0
+                ? (delta >= 0 ? 0 : selectableEntries.Count - 1)
+                : Math.Clamp(currentIndex + delta, 0, selectableEntries.Count - 1);
+
+            SelectEntryFromKeyboard(selectableEntries[targetIndex]);
+            return true;
+        }
+
+        private bool TryMoveSelectionVertically(int delta)
+        {
+            if (_currentViewMode != EntryViewMode.List)
+            {
+                return false;
+            }
+
+            return TryMoveSelectionInListColumns(0, delta);
+        }
+
+        private bool TryMoveSelectionHorizontally(int delta)
+        {
+            if (_currentViewMode != EntryViewMode.List)
+            {
+                return false;
+            }
+
+            return TryMoveSelectionInListColumns(delta, 0);
+        }
+
+        private bool TryMoveSelectionInListColumns(int columnDelta, int rowDelta)
+        {
+            List<IReadOnlyList<EntryViewModel>> columns = GetListNavigationColumns();
+            if (columns.Count == 0)
+            {
+                return false;
+            }
+
+            if (!TryGetSelectedListColumnPosition(columns, out int currentColumnIndex, out int currentRowIndex))
+            {
+                IReadOnlyList<EntryViewModel> edgeColumn = columnDelta < 0 || rowDelta < 0
+                    ? columns[^1]
+                    : columns[0];
+                if (edgeColumn.Count == 0)
+                {
+                    return false;
+                }
+
+                EntryViewModel initialEntry = columnDelta < 0 || rowDelta < 0
+                    ? edgeColumn[^1]
+                    : edgeColumn[0];
+                SelectEntryFromKeyboard(initialEntry);
+                return true;
+            }
+
+            int targetColumnIndex = Math.Clamp(currentColumnIndex + columnDelta, 0, columns.Count - 1);
+            IReadOnlyList<EntryViewModel> targetColumn = columns[targetColumnIndex];
+            if (targetColumn.Count == 0)
+            {
+                return false;
+            }
+
+            int targetRowIndex = columnDelta == 0
+                ? Math.Clamp(currentRowIndex + rowDelta, 0, targetColumn.Count - 1)
+                : Math.Min(currentRowIndex, targetColumn.Count - 1);
+
+            SelectEntryFromKeyboard(targetColumn[targetRowIndex]);
+            return true;
+        }
+
+        private bool TryGetSelectedListColumnPosition(
+            IReadOnlyList<IReadOnlyList<EntryViewModel>> columns,
+            out int columnIndex,
+            out int rowIndex)
+        {
+            columnIndex = -1;
+            rowIndex = -1;
+
+            if (string.IsNullOrWhiteSpace(_selectedEntryPath))
+            {
+                return false;
+            }
+
+            for (int c = 0; c < columns.Count; c++)
+            {
+                IReadOnlyList<EntryViewModel> column = columns[c];
+                for (int r = 0; r < column.Count; r++)
+                {
+                    if (string.Equals(column[r].FullPath, _selectedEntryPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnIndex = c;
+                        rowIndex = r;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private List<IReadOnlyList<EntryViewModel>> GetListNavigationColumns()
+        {
+            var columns = new List<IReadOnlyList<EntryViewModel>>();
+            foreach (GroupedEntryColumnViewModel groupColumn in _groupedEntryColumns)
+            {
+                foreach (GroupedEntryItemColumnViewModel itemColumn in groupColumn.ItemColumns)
+                {
+                    List<EntryViewModel> items = itemColumn.Items
+                        .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
+                        .ToList();
+                    if (items.Count > 0)
+                    {
+                        columns.Add(items);
+                    }
+                }
+            }
+
+            if (columns.Count > 0)
+            {
+                return columns;
+            }
+
+            return GetSelectableEntriesInPresentationOrder()
+                .Chunk(Math.Max(1, GetGroupedListRowsPerColumn()))
+                .Select(chunk => (IReadOnlyList<EntryViewModel>)chunk.ToList())
+                .ToList();
+        }
+
+        private bool TrySelectBoundaryEntry(bool first)
+        {
+            List<EntryViewModel> selectableEntries = _currentViewMode == EntryViewMode.List
+                ? GetListNavigationColumns()
+                    .SelectMany(column => column)
+                    .ToList()
+                : GetSelectableEntriesInPresentationOrder();
+            if (selectableEntries.Count == 0)
+            {
+                return false;
+            }
+
+            SelectEntryFromKeyboard(first ? selectableEntries[0] : selectableEntries[^1]);
+            return true;
+        }
+
+        private bool TrySelectListColumnBoundary(bool first)
+        {
+            List<IReadOnlyList<EntryViewModel>> columns = GetListNavigationColumns();
+            if (columns.Count == 0)
+            {
+                return false;
+            }
+
+            if (!TryGetSelectedListColumnPosition(columns, out int currentColumnIndex, out _))
+            {
+                IReadOnlyList<EntryViewModel> edgeColumn = first ? columns[0] : columns[^1];
+                if (edgeColumn.Count == 0)
+                {
+                    return false;
+                }
+
+                SelectEntryFromKeyboard(first ? edgeColumn[0] : edgeColumn[^1]);
+                return true;
+            }
+
+            IReadOnlyList<EntryViewModel> currentColumn = columns[currentColumnIndex];
+            if (currentColumn.Count == 0)
+            {
+                return false;
+            }
+
+            SelectEntryFromKeyboard(first ? currentColumn[0] : currentColumn[^1]);
+            return true;
+        }
+
+        private bool TryMoveSelectionByPage(int direction)
+        {
+            if (_currentViewMode == EntryViewMode.List)
+            {
+                return TryMoveSelectionByPageInListColumns(direction);
+            }
+
+            int step = Math.Max(1, GetKeyboardPageStep());
+            return TryMoveSelectionBy(direction * step);
+        }
+
+        private int GetKeyboardPageStep()
+        {
+            if (_currentViewMode == EntryViewMode.List)
+            {
+                return GetGroupedListRowsPerColumn();
+            }
+
+            double viewportHeight = DetailsEntriesScrollViewer.ViewportHeight > 0
+                ? DetailsEntriesScrollViewer.ViewportHeight
+                : DetailsEntriesScrollViewer.ActualHeight;
+            if (viewportHeight <= 0 || _estimatedItemHeight <= 0)
+            {
+                return 8;
+            }
+
+            return Math.Max(1, (int)Math.Floor(viewportHeight / _estimatedItemHeight));
+        }
+
+        private bool TryMoveSelectionByPageInListColumns(int direction)
+        {
+            List<IReadOnlyList<EntryViewModel>> columns = GetListNavigationColumns();
+            if (columns.Count == 0)
+            {
+                return false;
+            }
+
+            if (!TryGetSelectedListColumnPosition(columns, out int currentColumnIndex, out int currentRowIndex))
+            {
+                IReadOnlyList<EntryViewModel> edgeColumn = direction < 0 ? columns[0] : columns[^1];
+                if (edgeColumn.Count == 0)
+                {
+                    return false;
+                }
+
+                SelectEntryFromKeyboard(direction < 0 ? edgeColumn[0] : edgeColumn[^1]);
+                return true;
+            }
+
+            int targetColumnIndex = currentColumnIndex + direction;
+            if (targetColumnIndex < 0)
+            {
+                IReadOnlyList<EntryViewModel> currentColumn = columns[currentColumnIndex];
+                if (currentColumn.Count == 0)
+                {
+                    return false;
+                }
+
+                SelectEntryFromKeyboard(currentColumn[0]);
+                return true;
+            }
+
+            if (targetColumnIndex >= columns.Count)
+            {
+                IReadOnlyList<EntryViewModel> currentColumn = columns[currentColumnIndex];
+                if (currentColumn.Count == 0)
+                {
+                    return false;
+                }
+
+                SelectEntryFromKeyboard(currentColumn[^1]);
+                return true;
+            }
+
+            IReadOnlyList<EntryViewModel> targetColumn = columns[targetColumnIndex];
+            if (targetColumn.Count == 0)
+            {
+                return false;
+            }
+
+            int targetRowIndex = currentRowIndex < targetColumn.Count
+                ? currentRowIndex
+                : targetColumn.Count - 1;
+
+            SelectEntryFromKeyboard(targetColumn[targetRowIndex]);
+            return true;
+        }
+
+        private void SelectEntryFromKeyboard(EntryViewModel entry)
+        {
             ScrollViewer viewer = _currentViewMode == EntryViewMode.Details
                 ? DetailsEntriesScrollViewer
                 : GroupedEntriesScrollViewer;
+            double originalHorizontalOffset = viewer.HorizontalOffset;
+            double originalVerticalOffset = viewer.VerticalOffset;
 
-            if (viewer.Content is not UIElement content)
+            bool wasVisible = IsEntryFullyVisible(entry, viewer);
+            SelectEntryInList(entry, ensureVisible: false);
+            viewer.ChangeView(originalHorizontalOffset, originalVerticalOffset, null, disableAnimation: true);
+
+            _ = DispatcherQueue.TryEnqueue(() =>
             {
-                return;
+                if (wasVisible)
+                {
+                    viewer.ChangeView(originalHorizontalOffset, originalVerticalOffset, null, disableAnimation: true);
+                    return;
+                }
+
+                ScrollEntryIntoView(entry);
+            });
+        }
+
+        private bool IsEntryFullyVisible(EntryViewModel entry, ScrollViewer viewer)
+        {
+            if (!TryGetEntryAnchor<FrameworkElement>(entry, out FrameworkElement? element) ||
+                viewer.Content is not UIElement content)
+            {
+                return false;
             }
 
             GeneralTransform transform = element.TransformToVisual(content);
             Rect bounds = transform.TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
-            double? horizontalOffset = null;
-            double? verticalOffset = null;
-
             if (_currentViewMode == EntryViewMode.Details)
             {
-                verticalOffset = Math.Max(0, bounds.Y - Math.Max(0, (viewer.ViewportHeight - bounds.Height) / 2));
-            }
-            else
-            {
-                horizontalOffset = Math.Max(0, bounds.X - Math.Max(0, (viewer.ViewportWidth - bounds.Width) / 2));
+                double viewportTop = viewer.VerticalOffset;
+                double viewportBottom = viewportTop + viewer.ViewportHeight;
+                return bounds.Y >= viewportTop && (bounds.Y + bounds.Height) <= viewportBottom;
             }
 
-            viewer.ChangeView(horizontalOffset, verticalOffset, null, disableAnimation: false);
+            double viewportLeft = viewer.HorizontalOffset;
+            double viewportRight = viewportLeft + viewer.ViewportWidth;
+            return bounds.X >= viewportLeft && (bounds.X + bounds.Width) <= viewportRight;
+        }
+
+        private List<EntryViewModel> GetSelectableEntriesInPresentationOrder()
+        {
+            return _entries
+                .Where(entry => !entry.IsGroupHeader && entry.IsLoaded)
+                .ToList();
+        }
+
+        private int GetSelectedPresentedEntryIndex(IReadOnlyList<EntryViewModel> entries)
+        {
+            if (string.IsNullOrWhiteSpace(_selectedEntryPath))
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (string.Equals(entries[i].FullPath, _selectedEntryPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private bool TryActivateSelectedEntry()
+        {
+            if (!TryGetSelectedLoadedEntry(out EntryViewModel? entry))
+            {
+                return false;
+            }
+
+            _ = ActivateEntryAsync(entry);
+            return true;
+        }
+
+        private async Task ActivateEntryAsync(EntryViewModel row)
+        {
+            if (row is null || !row.IsLoaded)
+            {
+                return;
+            }
+
+            string targetPath = string.IsNullOrWhiteSpace(row.FullPath)
+                ? Path.Combine(_currentPath, row.Name)
+                : row.FullPath;
+            if (row.IsDirectory)
+            {
+                ClearListSelection();
+                await NavigateToPathAsync(targetPath, pushHistory: true);
+                return;
+            }
+
+            try
+            {
+                _ = Process.Start(new ProcessStartInfo
+                {
+                    FileName = targetPath,
+                    UseShellExecute = true
+                });
+                UpdateStatusKey("StatusOpened", row.Name);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusOpenFailed", ex.Message);
+            }
         }
 
         private async Task CommitRenameOverlayAsync()
@@ -4761,6 +5677,7 @@ namespace FileExplorerUI
                 entry.MftRef = 0;
                 entry.IsLoaded = true;
                 entry.IsMetadataLoaded = true;
+                InvalidatePresentationSourceCache();
 
                 if (entry.PendingCreateIsDirectory && FindSidebarTreeNodeByPath(_currentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
                 {
@@ -4790,6 +5707,7 @@ namespace FileExplorerUI
             }
 
             _entries.RemoveAt(index);
+            InvalidatePresentationSourceCache();
         }
 
         private void HideRenameOverlay()
@@ -4819,9 +5737,25 @@ namespace FileExplorerUI
             return false;
         }
 
+        private static bool IsDescendantOf(DependencyObject? source, DependencyObject ancestor)
+        {
+            DependencyObject? current = source;
+            while (current is not null)
+            {
+                if (ReferenceEquals(current, ancestor))
+                {
+                    return true;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return false;
+        }
+
         private void FocusEntriesList()
         {
-            GetVisibleEntriesRoot().Focus(FocusState.Pointer);
+            GetVisibleEntriesRoot().Focus(FocusState.Programmatic);
         }
 
         private static void SelectRenameTargetText(TextBox textBox, EntryViewModel entry)
@@ -5121,6 +6055,7 @@ namespace FileExplorerUI
             current.ModifiedText = string.Empty;
             current.IsLoaded = true;
             current.IsMetadataLoaded = false;
+            InvalidatePresentationSourceCache();
             RequestMetadataForCurrentViewport();
         }
 
@@ -5148,10 +6083,11 @@ namespace FileExplorerUI
             }
 
             EntryViewModel current = _entries[index];
-            bool wasSelected = ReferenceEquals(EntriesListView.SelectedItem, current);
+            bool wasSelected = string.Equals(_selectedEntryPath, current.FullPath, StringComparison.OrdinalIgnoreCase);
             current.Name = newName;
             current.PendingName = newName;
             current.FullPath = Path.Combine(_currentPath, newName);
+            InvalidatePresentationSourceCache();
 
             if (wasSelected)
             {
@@ -5166,10 +6102,9 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (ReferenceEquals(EntriesListView.SelectedItem, _entries[index]))
+            if (string.Equals(_selectedEntryPath, _entries[index].FullPath, StringComparison.OrdinalIgnoreCase))
             {
                 _selectedEntryPath = null;
-                EntriesListView.SelectedItem = null;
             }
 
             _entries.RemoveAt(index);
@@ -5182,6 +6117,7 @@ namespace FileExplorerUI
                 _entries.RemoveAt(_entries.Count - 1);
             }
             _hasMore = _nextCursor < _totalEntries;
+            InvalidatePresentationSourceCache();
             UpdateFileCommandStates();
         }
 
@@ -5204,11 +6140,6 @@ namespace FileExplorerUI
             {
                 // Keep local state if background refresh fails; next manual load can recover.
             }
-        }
-
-        private async void EntriesListView_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
-        {
-            await HandleEntriesViewDoubleTappedAsync(e);
         }
 
         private async void GroupedEntriesView_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
@@ -5284,6 +6215,8 @@ namespace FileExplorerUI
                 SelectEntryInList(entry, ensureVisible: false);
             }
 
+            FocusEntriesList();
+
             if (point.Properties.IsLeftButtonPressed)
             {
                 e.Handled = true;
@@ -5312,22 +6245,24 @@ namespace FileExplorerUI
             return GetVisibleEntriesViewHost();
         }
 
-        private void EntriesListView_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
-        {
-        }
-
-        private void EntryContainer_RightTapped(object sender, RightTappedRoutedEventArgs e)
-        {
-        }
-
-        private void EntriesListView_RightTapped(object sender, RightTappedRoutedEventArgs e)
-        {
-            HandleEntriesViewRightTapped(e);
-        }
-
         private void GroupedEntriesView_RightTapped(object sender, RightTappedRoutedEventArgs e)
         {
             HandleEntriesViewRightTapped(e);
+        }
+
+        private void GroupedListHeader_RightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private void GroupedListHeader_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private void GroupedListHeader_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            e.Handled = true;
         }
 
         private void HandleEntriesViewRightTapped(RightTappedRoutedEventArgs e)
@@ -5335,12 +6270,17 @@ namespace FileExplorerUI
             EntriesViewHitResult? hit = GetActiveEntriesViewHost()?.ResolveRightTappedHit(e);
             if (hit is null)
             {
+                if (IsEntriesGroupHeaderSource(e.OriginalSource as DependencyObject))
+                {
+                    e.Handled = true;
+                }
                 return;
             }
 
             if (hit.Entry?.IsGroupHeader == true)
             {
-                hit = new EntriesViewHitResult(EntriesListView, e.GetPosition(EntriesListView), null, false);
+                FrameworkElement root = GetVisibleEntriesRoot();
+                hit = new EntriesViewHitResult(root, e.GetPosition(root), null, false);
             }
 
             _lastEntriesContextItem = hit.Entry;
@@ -5355,6 +6295,29 @@ namespace FileExplorerUI
                 hit.Entry,
                 hit.IsItemTarget));
             e.Handled = true;
+        }
+
+        private static bool IsEntriesGroupHeaderSource(DependencyObject? source)
+        {
+            DependencyObject? current = source;
+            while (current is not null)
+            {
+                if (current is EntryGroupHeader)
+                {
+                    return true;
+                }
+
+                if (current is FrameworkElement element &&
+                    element.DataContext is EntryViewModel entry &&
+                    entry.IsGroupHeader)
+                {
+                    return true;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return false;
         }
 
         private void ShowEntriesContextFlyout(EntriesContextRequest request)
@@ -5466,11 +6429,6 @@ namespace FileExplorerUI
                     Glyph = glyph
                 }
             };
-        }
-
-        private void EntriesListView_PointerPressedPreview(object sender, PointerRoutedEventArgs e)
-        {
-            HandleEntriesViewPointerPressedPreview(e);
         }
 
         private void GroupedEntriesView_PointerPressedPreview(object sender, PointerRoutedEventArgs e)

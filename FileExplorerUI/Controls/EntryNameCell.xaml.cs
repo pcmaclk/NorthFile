@@ -49,6 +49,8 @@ public sealed partial class EntryNameCell : UserControl
         set => SetValue(ContentMarginProperty, value);
     }
 
+    public FrameworkElement NameTextElement => EntryNameTextBlock;
+
     public GridLength IconColumnWidthGridLength => new(Metrics.IconColumnWidth);
 
     public GridLength IconTextSpacingGridLength => new(Metrics.IconTextSpacing);

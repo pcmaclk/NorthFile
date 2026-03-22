@@ -80,7 +80,9 @@ public sealed class EntryItemHost : ContentControl
         DefaultStyleKey = typeof(EntryItemHost);
         HorizontalContentAlignment = HorizontalAlignment.Stretch;
         VerticalContentAlignment = VerticalAlignment.Center;
+        IsTabStop = false;
         UseSystemFocusVisuals = true;
+        DataContextChanged += EntryItemHost_DataContextChanged;
     }
 
     public bool IsSelected
@@ -191,6 +193,13 @@ public sealed class EntryItemHost : ContentControl
     private static void OnVisualPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         ((EntryItemHost)d).UpdateVisuals();
+    }
+
+    private void EntryItemHost_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
+    {
+        _isPointerOver = false;
+        _isPressed = false;
+        UpdateVisuals();
     }
 
     private void UpdateVisuals()
