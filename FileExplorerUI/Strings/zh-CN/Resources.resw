@@ -228,17 +228,29 @@
   <data name="CommonSortByModifiedDate" xml:space="preserve">
     <value>修改日期</value>
   </data>
+  <data name="CommonSortAscending" xml:space="preserve">
+    <value>升序</value>
+  </data>
+  <data name="CommonSortDescending" xml:space="preserve">
+    <value>降序</value>
+  </data>
   <data name="CommonGroupBy" xml:space="preserve">
     <value>分组方式</value>
   </data>
   <data name="CommonGroupByNone" xml:space="preserve">
     <value>无</value>
   </data>
+  <data name="CommonGroupByName" xml:space="preserve">
+    <value>名称</value>
+  </data>
   <data name="CommonGroupByType" xml:space="preserve">
     <value>类型</value>
   </data>
   <data name="CommonGroupByModifiedDate" xml:space="preserve">
     <value>修改日期</value>
+  </data>
+  <data name="CommonUnknown" xml:space="preserve">
+    <value>未知</value>
   </data>
   <data name="CommonNew" xml:space="preserve">
     <value>新建</value>
@@ -464,6 +476,15 @@
   </data>
   <data name="StatusLanguageSwitched" xml:space="preserve">
     <value>语言已切换为：{0}</value>
+  </data>
+  <data name="StatusViewChanged" xml:space="preserve">
+    <value>视图已切换为：{0}</value>
+  </data>
+  <data name="StatusSortChanged" xml:space="preserve">
+    <value>排序方式已切换为：{0}，{1}</value>
+  </data>
+  <data name="StatusGroupChanged" xml:space="preserve">
+    <value>分组方式已切换为：{0}</value>
   </data>
   <data name="CreateKindFile" xml:space="preserve">
     <value>文件</value>
@@ -794,6 +815,51 @@
   </data>
   <data name="CommonEmpty" xml:space="preserve">
     <value>（空）</value>
+  </data>
+  <data name="GroupTypeFolder" xml:space="preserve">
+    <value>文件夹</value>
+  </data>
+  <data name="GroupTypeDocument" xml:space="preserve">
+    <value>文档</value>
+  </data>
+  <data name="GroupTypeImage" xml:space="preserve">
+    <value>图片</value>
+  </data>
+  <data name="GroupTypeAudio" xml:space="preserve">
+    <value>音频</value>
+  </data>
+  <data name="GroupTypeVideo" xml:space="preserve">
+    <value>视频</value>
+  </data>
+  <data name="GroupTypeArchive" xml:space="preserve">
+    <value>压缩包</value>
+  </data>
+  <data name="GroupTypeProgram" xml:space="preserve">
+    <value>程序</value>
+  </data>
+  <data name="GroupTypeOther" xml:space="preserve">
+    <value>其他</value>
+  </data>
+  <data name="GroupTypeUnknown" xml:space="preserve">
+    <value>未知</value>
+  </data>
+  <data name="GroupDateToday" xml:space="preserve">
+    <value>今天</value>
+  </data>
+  <data name="GroupDateYesterday" xml:space="preserve">
+    <value>昨天</value>
+  </data>
+  <data name="GroupDatePast7Days" xml:space="preserve">
+    <value>过去 7 天</value>
+  </data>
+  <data name="GroupDateEarlierThisMonth" xml:space="preserve">
+    <value>本月更早</value>
+  </data>
+  <data name="GroupDateOlder" xml:space="preserve">
+    <value>更早</value>
+  </data>
+  <data name="GroupDateUnknown" xml:space="preserve">
+    <value>日期未知</value>
   </data>
   <data name="InteropUnknown" xml:space="preserve">
     <value>未知</value>

@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Unified sort-field default directions when switching fields:
+  - `Name / Type` reset to ascending
+  - `Size / Modified Date` reset to descending
+  - manual ascending/descending toggles still override the current field until the next field switch
+- Refined `Sort by -> Type` semantics so type sorting is no longer a plain compare of the localized type-column text:
+  - folders stay first
+  - entries then sort by stable type family
+  - items inside the same family sort by extension and then by name
+  - related formats such as `png / jpg / webp` now stay clustered together instead of being split only by display text
+- Extracted the main explorer entries surface into a dedicated `ExplorerEntriesView` WinUI component so future list-state cleanup and multi-tab isolation can move out of `MainWindow` incrementally.
+- Enabled the background context-menu `View / Sort by / Group by` entries as a first working WinUI pass:
+  - `View` now switches the main list between `Details` and `List`
+  - `Sort by` now supports `Name / Modified Date / Type / Size` plus `Ascending / Descending`
+  - `Group by` now works in a minimal inline-header form for `None / Name / Type / Modified Date`, matching the current flat-list structure instead of forcing a larger grouped-items refactor
+  - non-default sort/group modes now materialize the current directory into a client-side presentation pipeline so the list actually changes instead of staying as placeholder menu wiring
 - Refined the current WinUI localization/debug-language pass:
   - fixed debug `--lang=...` startup override so `x:Uid` text and runtime resource text switch together
   - updated sidebar wording from `Pinned / 固定` to `Favorites / 收藏`
