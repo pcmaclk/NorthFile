@@ -406,6 +406,7 @@ namespace FileExplorerUI
         private CommandMenuFlyout? _activeEntriesContextFlyout;
         private string _currentPath = ShellMyComputerPath;
         private string? _selectedEntryPath;
+        private string? _focusedEntryPath;
         private uint _currentPageSize = InitialPageSize;
         private uint _lastFetchMs;
         private uint _totalEntries;
@@ -4499,6 +4500,9 @@ namespace FileExplorerUI
                 entry.IsExplicitlySelected = !entry.IsGroupHeader &&
                     !string.IsNullOrWhiteSpace(_selectedEntryPath) &&
                     string.Equals(entry.FullPath, _selectedEntryPath, StringComparison.OrdinalIgnoreCase);
+                entry.IsKeyboardAnchor = !entry.IsGroupHeader &&
+                    !string.IsNullOrWhiteSpace(_focusedEntryPath) &&
+                    string.Equals(entry.FullPath, _focusedEntryPath, StringComparison.OrdinalIgnoreCase);
             }
         }
 
@@ -4957,6 +4961,7 @@ namespace FileExplorerUI
             }
 
             _selectedEntryPath = entry.FullPath;
+            _focusedEntryPath = entry.FullPath;
             if (ensureVisible)
             {
                 _ = DispatcherQueue.TryEnqueue(() => ScrollEntryIntoView(entry));
@@ -5058,6 +5063,14 @@ namespace FileExplorerUI
         }
 
         private void ClearListSelection()
+        {
+            _selectedEntryPath = null;
+            SyncActivePanelPresentationState();
+            UpdateEntrySelectionVisuals();
+            UpdateFileCommandStates();
+        }
+
+        private void ClearExplicitSelectionKeepAnchor()
         {
             _selectedEntryPath = null;
             SyncActivePanelPresentationState();
@@ -5764,14 +5777,17 @@ namespace FileExplorerUI
 
         private int GetSelectedPresentedEntryIndex(IReadOnlyList<EntryViewModel> entries)
         {
-            if (string.IsNullOrWhiteSpace(_selectedEntryPath))
+            string? activePath = !string.IsNullOrWhiteSpace(_selectedEntryPath)
+                ? _selectedEntryPath
+                : _focusedEntryPath;
+            if (string.IsNullOrWhiteSpace(activePath))
             {
                 return -1;
             }
 
             for (int i = 0; i < entries.Count; i++)
             {
-                if (string.Equals(entries[i].FullPath, _selectedEntryPath, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(entries[i].FullPath, activePath, StringComparison.OrdinalIgnoreCase))
                 {
                     return i;
                 }
@@ -6407,6 +6423,10 @@ namespace FileExplorerUI
             {
                 _selectedEntryPath = null;
             }
+            if (string.Equals(_focusedEntryPath, _entries[index].FullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                _focusedEntryPath = null;
+            }
 
             _entries.RemoveAt(index);
             if (_totalEntries > 0)
@@ -7014,6 +7034,14 @@ namespace FileExplorerUI
         {
             if (!_entriesFlyoutOpen)
             {
+                if (GetActiveEntriesViewHost()?.ResolvePressedEntry(e) is null &&
+                    !IsEntriesGroupHeaderSource(e.OriginalSource as DependencyObject) &&
+                    !string.IsNullOrWhiteSpace(_selectedEntryPath))
+                {
+                    ClearExplicitSelectionKeepAnchor();
+                    FocusEntriesList();
+                }
+
                 return;
             }
 
@@ -7038,6 +7066,12 @@ namespace FileExplorerUI
                 {
                     SelectEntryInList(entry, ensureVisible: false);
                 }
+            }
+            else if (!IsEntriesGroupHeaderSource(e.OriginalSource as DependencyObject) &&
+                !string.IsNullOrWhiteSpace(_selectedEntryPath))
+            {
+                ClearExplicitSelectionKeepAnchor();
+                FocusEntriesList();
             }
 
             _activeEntriesContextFlyout?.Hide();
@@ -7935,6 +7969,7 @@ namespace FileExplorerUI
         private bool _isPendingCreate;
         private bool _pendingCreateIsDirectory;
         private bool _isExplicitlySelected;
+        private bool _isKeyboardAnchor;
         private string _pendingName = string.Empty;
         private bool _isNameEditing;
         private long? _sizeBytes;
@@ -8334,6 +8369,21 @@ namespace FileExplorerUI
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExplicitlySelected)));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowBackground)));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowSelectionIndicatorVisibility)));
+            }
+        }
+
+        public bool IsKeyboardAnchor
+        {
+            get => _isKeyboardAnchor;
+            set
+            {
+                if (_isKeyboardAnchor == value)
+                {
+                    return;
+                }
+
+                _isKeyboardAnchor = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsKeyboardAnchor)));
             }
         }
 

@@ -70,8 +70,30 @@ public sealed class EntryItemHost : ContentControl
             typeof(EntryItemHost),
             new PropertyMetadata(3d, OnVisualPropertyChanged));
 
+    public static readonly DependencyProperty IsAnchorFocusedProperty =
+        DependencyProperty.Register(
+            nameof(IsAnchorFocused),
+            typeof(bool),
+            typeof(EntryItemHost),
+            new PropertyMetadata(false, OnVisualPropertyChanged));
+
+    public static readonly DependencyProperty AnchorBorderBrushProperty =
+        DependencyProperty.Register(
+            nameof(AnchorBorderBrush),
+            typeof(Brush),
+            typeof(EntryItemHost),
+            new PropertyMetadata(null, OnVisualPropertyChanged));
+
+    public static readonly DependencyProperty AnchorBorderThicknessProperty =
+        DependencyProperty.Register(
+            nameof(AnchorBorderThickness),
+            typeof(Thickness),
+            typeof(EntryItemHost),
+            new PropertyMetadata(default(Thickness), OnVisualPropertyChanged));
+
     private Border? _backgroundBorder;
     private Border? _selectionIndicator;
+    private Border? _anchorBorder;
     private bool _isPointerOver;
     private bool _isPressed;
 
@@ -139,11 +161,30 @@ public sealed class EntryItemHost : ContentControl
         set => SetValue(IndicatorWidthProperty, value);
     }
 
+    public bool IsAnchorFocused
+    {
+        get => (bool)GetValue(IsAnchorFocusedProperty);
+        set => SetValue(IsAnchorFocusedProperty, value);
+    }
+
+    public Brush? AnchorBorderBrush
+    {
+        get => (Brush?)GetValue(AnchorBorderBrushProperty);
+        set => SetValue(AnchorBorderBrushProperty, value);
+    }
+
+    public Thickness AnchorBorderThickness
+    {
+        get => (Thickness)GetValue(AnchorBorderThicknessProperty);
+        set => SetValue(AnchorBorderThicknessProperty, value);
+    }
+
     protected override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
         _backgroundBorder = GetTemplateChild("BackgroundBorder") as Border;
         _selectionIndicator = GetTemplateChild("SelectionIndicator") as Border;
+        _anchorBorder = GetTemplateChild("AnchorBorder") as Border;
         UpdateVisuals();
     }
 
@@ -215,6 +256,13 @@ public sealed class EntryItemHost : ContentControl
             _selectionIndicator.CornerRadius = IndicatorCornerRadius;
             _selectionIndicator.Width = IndicatorWidth;
             _selectionIndicator.Visibility = IsSelected ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (_anchorBorder is not null)
+        {
+            _anchorBorder.BorderBrush = AnchorBorderBrush;
+            _anchorBorder.BorderThickness = AnchorBorderThickness;
+            _anchorBorder.Visibility = !IsSelected && IsAnchorFocused ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 

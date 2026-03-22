@@ -22,6 +22,8 @@
                 <Setter Property="IndicatorBrush" Value="{ThemeResource ListViewItemSelectionIndicatorBrush}" />
                 <Setter Property="IndicatorCornerRadius" Value="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}" />
                 <Setter Property="IndicatorWidth" Value="3" />
+                <Setter Property="AnchorBorderBrush" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+                <Setter Property="AnchorBorderThickness" Value="1" />
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="controls:EntryItemHost">
@@ -33,6 +35,13 @@
                                         x:Name="BackgroundBorder"
                                         Background="{TemplateBinding Background}"
                                         CornerRadius="{ThemeResource ListViewItemCornerRadius}" />
+                                    <Border
+                                        x:Name="AnchorBorder"
+                                        BorderBrush="{TemplateBinding AnchorBorderBrush}"
+                                        BorderThickness="{TemplateBinding AnchorBorderThickness}"
+                                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                                        Margin="1"
+                                        Visibility="Collapsed" />
                                     <Grid Margin="{TemplateBinding Padding}">
                                         <Border
                                             x:Name="SelectionIndicator"
@@ -44,6 +53,7 @@
                                             Content="{TemplateBinding Content}"
                                             ContentTemplate="{TemplateBinding ContentTemplate}"
                                             HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                            Margin="0,-1,0,1"
                                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                                     </Grid>
                                 </Grid>

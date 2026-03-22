@@ -5,6 +5,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid Margin="{x:Bind ContentMargin, Mode=OneWay}" VerticalAlignment="Center">
+        <Grid.RenderTransform>
+            <TranslateTransform Y="0" />
+        </Grid.RenderTransform>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="{x:Bind IconColumnWidthGridLength, Mode=OneWay}" />
             <ColumnDefinition Width="{x:Bind IconTextSpacingGridLength, Mode=OneWay}" />
