@@ -455,6 +455,9 @@ namespace FileExplorerUI
         private string _currentPath = ShellMyComputerPath;
         private string? _selectedEntryPath;
         private string? _focusedEntryPath;
+        private string? _pendingParentReturnAnchorPath;
+        private string? _pendingHistoryStateRestorePath;
+        private readonly Dictionary<string, DirectoryViewState> _directoryViewStates = new(StringComparer.OrdinalIgnoreCase);
         private uint _currentPageSize = InitialPageSize;
         private uint _lastFetchMs;
         private uint _totalEntries;
@@ -565,6 +568,12 @@ namespace FileExplorerUI
             string SizeText,
             DateTime? ModifiedAt,
             string ModifiedText);
+
+        private sealed class DirectoryViewState
+        {
+            public double DetailsVerticalOffset { get; init; }
+            public string? SelectedEntryPath { get; init; }
+        }
 
         private sealed record EntryGroupDescriptor(string BucketKey, string StateKey, string Label, string OrderKey);
 
@@ -2152,6 +2161,7 @@ namespace FileExplorerUI
             HideRenameOverlay();
 
             string target = string.IsNullOrWhiteSpace(path) ? @"C:\" : path.Trim();
+            CaptureCurrentDirectoryViewState();
             NavigationPerfSession perf = BeginNavigationPerfSession(target, pushHistory ? "navigate" : "history");
             try
             {
@@ -2164,10 +2174,10 @@ namespace FileExplorerUI
                     }
 
                     _currentPath = ShellMyComputerPath;
+                    _pendingHistoryStateRestorePath = pushHistory ? null : ShellMyComputerPath;
                     PathTextBox.Text = ShellMyComputerPath;
                     _currentQuery = string.Empty;
                     SearchTextBox.Text = string.Empty;
-                    ResetEntriesViewport();
                     UpdateBreadcrumbs(_currentPath);
                     UpdateNavButtonsState();
                     _ = SelectSidebarTreePathAsync(_currentPath);
@@ -2198,10 +2208,10 @@ namespace FileExplorerUI
                 }
 
                 _currentPath = target;
+                _pendingHistoryStateRestorePath = pushHistory ? null : target;
                 PathTextBox.Text = target;
                 _currentQuery = string.Empty;
                 SearchTextBox.Text = string.Empty;
-                ResetEntriesViewport();
                 UpdateBreadcrumbs(target);
                 UpdateNavButtonsState();
                 _ = SelectSidebarTreePathAsync(_currentPath);
@@ -2306,6 +2316,7 @@ namespace FileExplorerUI
                         _nextCursor = 0;
                         if (!append)
                         {
+                            ResetEntriesViewport();
                             _entries.Clear();
                             _totalEntries = 0;
                             InvalidateEntriesLayouts();
@@ -2326,6 +2337,7 @@ namespace FileExplorerUI
 
                 if (!append)
                 {
+                    ResetEntriesViewport();
                     _entries.Clear();
                     EnsureLoadedRangeCapacity(0, page.Rows.Count);
                     FillPageRows(0, page.Rows, path);
@@ -2340,6 +2352,10 @@ namespace FileExplorerUI
                 if (!append)
                 {
                     RestoreListSelectionByPath(ensureVisible: false);
+                    if (!RestoreHistoryViewStateIfPending())
+                    {
+                        RestoreParentReturnAnchorIfPending();
+                    }
                     perf?.Mark("load-page.selection-restored");
                 }
                 UpdateFileCommandStates();
@@ -5656,6 +5672,87 @@ namespace FileExplorerUI
             SelectEntryByPath(_selectedEntryPath, ensureVisible);
         }
 
+        private void CaptureCurrentDirectoryViewState()
+        {
+            if (string.IsNullOrWhiteSpace(_currentPath) ||
+                string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _directoryViewStates[_currentPath] = new DirectoryViewState
+            {
+                DetailsVerticalOffset = double.IsNaN(_lastDetailsVerticalOffset)
+                    ? Math.Max(0, DetailsEntriesScrollViewer.VerticalOffset)
+                    : Math.Max(0, _lastDetailsVerticalOffset),
+                SelectedEntryPath = _selectedEntryPath,
+            };
+        }
+
+        private bool RestoreHistoryViewStateIfPending()
+        {
+            string? path = _pendingHistoryStateRestorePath;
+            if (string.IsNullOrWhiteSpace(path) ||
+                !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            _pendingHistoryStateRestorePath = null;
+            if (!_directoryViewStates.TryGetValue(path, out DirectoryViewState? state))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(state.SelectedEntryPath))
+            {
+                _selectedEntryPath = state.SelectedEntryPath;
+                RestoreListSelectionByPath(ensureVisible: false);
+            }
+
+            if (_currentViewMode == EntryViewMode.Details)
+            {
+                _ = DispatcherQueue.TryEnqueue(() =>
+                {
+                    DetailsEntriesScrollViewer.UpdateLayout();
+                    double maxOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableHeight);
+                    DetailsEntriesScrollViewer.ChangeView(
+                        null,
+                        Math.Min(maxOffset, Math.Max(0, state.DetailsVerticalOffset)),
+                        null,
+                        disableAnimation: true);
+                });
+            }
+
+            return true;
+        }
+
+        private void RestoreParentReturnAnchorIfPending()
+        {
+            string? targetPath = _pendingParentReturnAnchorPath;
+            if (string.IsNullOrWhiteSpace(targetPath))
+            {
+                return;
+            }
+
+            _pendingParentReturnAnchorPath = null;
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                EntryViewModel entry = _entries[i];
+                if (!string.Equals(entry.FullPath, targetPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                SelectEntryInList(entry, ensureVisible: false);
+                if (_currentViewMode == EntryViewMode.Details)
+                {
+                    _ = DispatcherQueue.TryEnqueue(() => ScrollEntryNearViewportBottom(i));
+                }
+                return;
+            }
+        }
+
         private void SelectEntryByPath(string targetPath, bool ensureVisible)
         {
             for (int i = 0; i < _entries.Count; i++)
@@ -5710,6 +5807,23 @@ namespace FileExplorerUI
             }
             await Task.Delay(16);
             DetailsEntriesScrollViewer.UpdateLayout();
+        }
+
+        private void ScrollEntryNearViewportBottom(int index)
+        {
+            if (_currentViewMode != EntryViewMode.Details || index < 0 || index >= _entries.Count)
+            {
+                return;
+            }
+
+            DetailsEntriesScrollViewer.UpdateLayout();
+            double viewportHeight = DetailsEntriesScrollViewer.ViewportHeight > 0
+                ? DetailsEntriesScrollViewer.ViewportHeight
+                : DetailsEntriesScrollViewer.ActualHeight;
+            double itemExtent = Math.Max(1.0, _estimatedItemHeight);
+            double targetOffset = Math.Max(0, ((index + 1) * itemExtent) - viewportHeight);
+            double maxOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableHeight);
+            DetailsEntriesScrollViewer.ChangeView(null, Math.Min(maxOffset, targetOffset), null, disableAnimation: true);
         }
 
         private bool IsIndexInCurrentViewport(int index)
@@ -8101,6 +8215,8 @@ namespace FileExplorerUI
                 await NavigateToPathAsync(ShellMyComputerPath, pushHistory: true);
                 return;
             }
+
+            _pendingParentReturnAnchorPath = _currentPath;
             await NavigateToPathAsync(parent, pushHistory: true);
         }
 

@@ -1,10 +1,14 @@
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::fs::OpenOptions;
+use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime};
+
+use serde::{Deserialize, Serialize};
 
 use crate::core::error::{FsError, FsErrorCode};
 use crate::core::traits::PathEngine;
@@ -123,6 +127,26 @@ const NTFS_META_CACHE_TTL: Duration = Duration::from_secs(15);
 const NTFS_DIR_CACHE_IDLE_TTL: Duration = Duration::from_secs(30);
 const MEMORY_DIR_CACHE_MAX_ENTRIES: usize = 48;
 const NTFS_DIR_CACHE_MAX_ENTRIES: usize = 96;
+const PERSISTENT_DIRECTORY_CACHE_SCHEMA: u32 = 1;
+const PERSISTENT_DIRECTORY_CACHE_MAX_FILES: usize = 160;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PersistentDirectoryItem {
+    name: String,
+    is_dir: bool,
+    is_link: bool,
+    size_bytes: Option<u64>,
+    modified_unix_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PersistentDirectorySnapshot {
+    schema_version: u32,
+    path: String,
+    sort_mode: u8,
+    dir_modified_unix_ms: Option<u64>,
+    items: Vec<PersistentDirectoryItem>,
+}
 
 #[derive(Debug, Clone)]
 struct CachedDirectory {
@@ -186,6 +210,176 @@ fn append_range_perf_log(message: &str) {
 
 fn directory_cache_key(dir_path: &Path, sort_mode: u8) -> String {
     format!("{}|{}", dir_path.to_string_lossy(), normalize_sort_mode(sort_mode))
+}
+
+fn system_time_to_unix_ms_u64(time: SystemTime) -> Option<u64> {
+    time.duration_since(SystemTime::UNIX_EPOCH)
+        .ok()
+        .map(|duration| duration.as_millis() as u64)
+}
+
+fn persistent_directory_cache_root() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        let local_app_data = std::env::var_os("LOCALAPPDATA")?;
+        let mut path = PathBuf::from(local_app_data);
+        path.push("NorthFile");
+        path.push("cache");
+        path.push("resultsets");
+        Some(path)
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+fn persistent_directory_cache_path(dir_path: &Path, sort_mode: u8) -> Option<PathBuf> {
+    let mut root = persistent_directory_cache_root()?;
+    let key = directory_cache_key(dir_path, sort_mode);
+    let mut hasher = DefaultHasher::new();
+    key.hash(&mut hasher);
+    root.push(format!("{:016x}.json", hasher.finish()));
+    Some(root)
+}
+
+fn prune_persistent_directory_cache() {
+    let Some(root) = persistent_directory_cache_root() else {
+        return;
+    };
+
+    let Ok(read_dir) = fs::read_dir(&root) else {
+        return;
+    };
+
+    let mut files: Vec<(PathBuf, SystemTime)> = read_dir
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if !path.is_file() {
+                return None;
+            }
+
+            let modified = entry
+                .metadata()
+                .ok()
+                .and_then(|metadata| metadata.modified().ok())
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            Some((path, modified))
+        })
+        .collect();
+
+    if files.len() <= PERSISTENT_DIRECTORY_CACHE_MAX_FILES {
+        return;
+    }
+
+    files.sort_by_key(|(_, modified)| *modified);
+    let remove_count = files.len() - PERSISTENT_DIRECTORY_CACHE_MAX_FILES;
+    for (path, _) in files.into_iter().take(remove_count) {
+        if fs::remove_file(&path).is_ok() {
+            append_range_perf_log(&format!(
+                "[RUST-RANGE] kind=persistent-cache stage=evict path=\"{}\"",
+                path.display()
+            ));
+        }
+    }
+}
+
+fn load_persistent_directory_snapshot(
+    dir_path: &Path,
+    sort_mode: u8,
+    dir_modified: Option<SystemTime>,
+) -> Option<Vec<MemoryDirItem>> {
+    let path = persistent_directory_cache_path(dir_path, sort_mode)?;
+    let bytes = fs::read(path).ok()?;
+    let snapshot: PersistentDirectorySnapshot = serde_json::from_slice(&bytes).ok()?;
+    if snapshot.schema_version != PERSISTENT_DIRECTORY_CACHE_SCHEMA {
+        return None;
+    }
+
+    if snapshot.path != dir_path.to_string_lossy() {
+        return None;
+    }
+
+    if snapshot.sort_mode != normalize_sort_mode(sort_mode) {
+        return None;
+    }
+
+    let current_modified_unix_ms = dir_modified.and_then(system_time_to_unix_ms_u64);
+    if snapshot.dir_modified_unix_ms != current_modified_unix_ms {
+        return None;
+    }
+
+    append_range_perf_log(&format!(
+        "[RUST-RANGE] kind=persistent-cache stage=hit path=\"{}\" sort={} items={}",
+        dir_path.display(),
+        normalize_sort_mode(sort_mode),
+        snapshot.items.len()
+    ));
+
+    Some(
+        snapshot
+            .items
+            .into_iter()
+            .map(|item| MemoryDirItem {
+                name: item.name,
+                is_dir: item.is_dir,
+                is_link: item.is_link,
+                size_bytes: item.size_bytes,
+                modified_unix_ms: item.modified_unix_ms,
+            })
+            .collect(),
+    )
+}
+
+fn write_persistent_directory_snapshot(
+    dir_path: &Path,
+    sort_mode: u8,
+    dir_modified: Option<SystemTime>,
+    items: &[MemoryDirItem],
+) {
+    let Some(path) = persistent_directory_cache_path(dir_path, sort_mode) else {
+        return;
+    };
+
+    let Some(parent) = path.parent() else {
+        return;
+    };
+
+    if fs::create_dir_all(parent).is_err() {
+        return;
+    }
+
+    let snapshot = PersistentDirectorySnapshot {
+        schema_version: PERSISTENT_DIRECTORY_CACHE_SCHEMA,
+        path: dir_path.to_string_lossy().into_owned(),
+        sort_mode: normalize_sort_mode(sort_mode),
+        dir_modified_unix_ms: dir_modified.and_then(system_time_to_unix_ms_u64),
+        items: items
+            .iter()
+            .map(|item| PersistentDirectoryItem {
+                name: item.name.clone(),
+                is_dir: item.is_dir,
+                is_link: item.is_link,
+                size_bytes: item.size_bytes,
+                modified_unix_ms: item.modified_unix_ms,
+            })
+            .collect(),
+    };
+
+    let Ok(json) = serde_json::to_vec(&snapshot) else {
+        return;
+    };
+
+    if fs::write(&path, json).is_ok() {
+        append_range_perf_log(&format!(
+            "[RUST-RANGE] kind=persistent-cache stage=write path=\"{}\" sort={} items={}",
+            dir_path.display(),
+            normalize_sort_mode(sort_mode),
+            items.len()
+        ));
+        prune_persistent_directory_cache();
+    }
 }
 
 fn prune_oldest_memory_directories(table: &mut MemoryTable) {
@@ -428,55 +622,90 @@ pub fn list_directory_page_memory(
 
     let cache_mode;
     if needs_reload {
-        cache_mode = "reload";
-        let read_sw = Instant::now();
-        let mut loaded: Vec<MemoryDirItem> = Vec::new();
-        let entries = fs::read_dir(dir_path).map_err(|e| {
-            FsError::new(
-                FsErrorCode::VolumeAccess,
-                format!("failed to read directory '{}': {}", dir_path.display(), e),
-            )
-        })?;
+        let persistent_sw = Instant::now();
+        if let Some(loaded) = load_persistent_directory_snapshot(dir_path, sort_mode, current_modified) {
+            cache_mode = "persistent-hit";
+            let now = Instant::now();
+            let total_items = loaded.len();
+            table.insert(
+                key.clone(),
+                CachedDirectory {
+                    items: loaded,
+                    last_accessed_at: now,
+                    dir_modified: current_modified,
+                },
+            );
+            prune_oldest_memory_directories(&mut table);
+            append_range_perf_log(&format!(
+                "[RUST-RANGE] kind=memory path=\"{}\" cursor={} limit={} mode={} metadata={}ms persistent={}ms total_items={}",
+                dir_path.display(),
+                cursor,
+                limit,
+                cache_mode,
+                metadata_ms,
+                persistent_sw.elapsed().as_millis(),
+                total_items
+            ));
+        } else {
+            append_range_perf_log(&format!(
+                "[RUST-RANGE] kind=persistent-cache stage=miss path=\"{}\" sort={}",
+                dir_path.display(),
+                normalize_sort_mode(sort_mode)
+            ));
+            cache_mode = "reload";
+            let read_sw = Instant::now();
+            let mut loaded: Vec<MemoryDirItem> = Vec::new();
+            let entries = fs::read_dir(dir_path).map_err(|e| {
+                FsError::new(
+                    FsErrorCode::VolumeAccess,
+                    format!("failed to read directory '{}': {}", dir_path.display(), e),
+                )
+            })?;
 
-        for dir_entry in entries.flatten() {
-            let file_type = match dir_entry.file_type() {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-            let is_dir = resolve_entry_is_dir(&dir_entry, &file_type);
-            loaded.push(MemoryDirItem {
-                name: dir_entry.file_name().to_string_lossy().into_owned(),
-                is_dir,
-                is_link: resolve_entry_is_link(&dir_entry),
-                size_bytes: None,
-                modified_unix_ms: None,
-            });
+            for dir_entry in entries.flatten() {
+                let file_type = match dir_entry.file_type() {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                let is_dir = resolve_entry_is_dir(&dir_entry, &file_type);
+                loaded.push(MemoryDirItem {
+                    name: dir_entry.file_name().to_string_lossy().into_owned(),
+                    is_dir,
+                    is_link: resolve_entry_is_link(&dir_entry),
+                    size_bytes: None,
+                    modified_unix_ms: None,
+                });
+            }
+            let read_ms = read_sw.elapsed().as_millis();
+            let sort_sw = Instant::now();
+            sort_memory_items(&mut loaded, sort_mode);
+            let sort_ms = sort_sw.elapsed().as_millis();
+            let persist_sw = Instant::now();
+            write_persistent_directory_snapshot(dir_path, sort_mode, current_modified, &loaded);
+            let persist_ms = persist_sw.elapsed().as_millis();
+            let now = Instant::now();
+            table.insert(
+                key.clone(),
+                CachedDirectory {
+                    items: loaded.clone(),
+                    last_accessed_at: now,
+                    dir_modified: current_modified,
+                },
+            );
+            prune_oldest_memory_directories(&mut table);
+            append_range_perf_log(&format!(
+                "[RUST-RANGE] kind=memory path=\"{}\" cursor={} limit={} mode={} metadata={}ms read={}ms sort={}ms persist={}ms total_items={}",
+                dir_path.display(),
+                cursor,
+                limit,
+                cache_mode,
+                metadata_ms,
+                read_ms,
+                sort_ms,
+                persist_ms,
+                loaded.len()
+            ));
         }
-        let read_ms = read_sw.elapsed().as_millis();
-        let sort_sw = Instant::now();
-        sort_memory_items(&mut loaded, sort_mode);
-        let sort_ms = sort_sw.elapsed().as_millis();
-        let now = Instant::now();
-        table.insert(
-            key.clone(),
-            CachedDirectory {
-                items: loaded.clone(),
-                last_accessed_at: now,
-                dir_modified: current_modified,
-            },
-        );
-        prune_oldest_memory_directories(&mut table);
-        append_range_perf_log(&format!(
-            "[RUST-RANGE] kind=memory path=\"{}\" cursor={} limit={} mode={} metadata={}ms read={}ms sort={}ms total_items={}",
-            dir_path.display(),
-            cursor,
-            limit,
-            cache_mode,
-            metadata_ms,
-            read_ms,
-            sort_ms,
-            loaded.len()
-        ));
     } else {
         cache_mode = "hit";
         match table.get_mut(&key) {

@@ -327,3 +327,17 @@ pub trait PathEngine {
   - 明确和当前内存热快照的关系：
     - 当前：会话内热目录快照
     - 下一阶段：跨会话可复用的目录结果集索引
+
+### 12.5 2026-03-23 持久结果集缓存进展
+
+- `MemoryPath` 当前已经补上目录级持久结果集缓存壳：
+  - 同一目录第二次及后续进入，首屏可以直接命中排序结果快照
+  - `System32` 这类目录的首屏 `fetch` 已经能稳定落到几十毫秒量级
+- 当前日志和来源信号已经能区分：
+  - Rust 侧：
+    - `kind=persistent-cache stage=hit/miss/write/evict`
+  - WinUI / interop 侧：
+    - `source=PersistentDirectoryCache`
+- 这意味着当前引擎线的主瓶颈已进一步缩小为：
+  - 第一次冷构建目录结果集
+  - 持久结果集后续更精确的失效与来源传播

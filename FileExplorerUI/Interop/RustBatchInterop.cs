@@ -517,6 +517,7 @@ public static partial class RustBatchInterop
             2 => "MemoryFallback",
             3 => "NTFS_INDEX_ROOT",
             4 => "Search",
+            5 => "PersistentDirectoryCache",
             _ => "Unknown",
         };
 

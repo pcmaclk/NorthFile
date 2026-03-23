@@ -236,6 +236,7 @@ const SOURCE_TRADITIONAL: u8 = 1;
 const SOURCE_MEMORY_FALLBACK: u8 = 2;
 const SOURCE_NTFS_INDEX_ROOT: u8 = 3;
 const SOURCE_SEARCH: u8 = 4;
+const SOURCE_PERSISTENT_DIRECTORY_CACHE: u8 = 5;
 
 const MIN_LIMIT: u32 = 64;
 const MAX_LIMIT: u32 = 1000;
@@ -572,6 +573,11 @@ pub extern "C" fn fe_list_dir_batch_memory(
         encode_sw.elapsed().as_millis()
     ));
 
+    let source_kind = if fetch_ms <= 32 && cursor == 0 {
+        SOURCE_PERSISTENT_DIRECTORY_CACHE
+    } else {
+        SOURCE_MEMORY_FALLBACK
+    };
     let suggested_next_limit = suggest_next_limit(limit, items.len(), has_more, last_fetch_ms);
     FfiBatchResult::ok(
         entries,
@@ -582,7 +588,7 @@ pub extern "C" fn fe_list_dir_batch_memory(
         next_cursor,
         has_more,
         suggested_next_limit,
-        SOURCE_MEMORY_FALLBACK,
+        source_kind,
     )
 }
 
