@@ -11,7 +11,6 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.ApplicationModel;
@@ -29,11 +28,23 @@ namespace FileExplorerUI
     /// </summary>
     public partial class App : Application
     {
-        private Window? _window;
+        private readonly List<Window> _windows = new();
+
+        public MainWindow CreateWindow(string? initialPath = null)
+        {
+            var window = new MainWindow(initialPath);
+            window.Closed += Window_Closed;
+            _windows.Add(window);
+            window.Activate();
+            return window;
+        }
 
         public void SetMainWindow(Window window)
         {
-            _window = window;
+            if (!_windows.Contains(window))
+            {
+                _windows.Add(window);
+            }
         }
 
         /// <summary>
@@ -60,8 +71,16 @@ namespace FileExplorerUI
 #if DEBUG
             ApplyLaunchArguments(args.Arguments);
 #endif
-            _window = new MainWindow();
-            _window.Activate();
+            CreateWindow();
+        }
+
+        private void Window_Closed(object sender, WindowEventArgs args)
+        {
+            if (sender is Window window)
+            {
+                window.Closed -= Window_Closed;
+                _windows.Remove(window);
+            }
         }
 
         private static void ApplyLaunchArguments(string arguments)

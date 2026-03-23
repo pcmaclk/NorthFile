@@ -1,4 +1,5 @@
 using FileExplorerUI.Commands;
+using FileExplorerUI.Collections;
 using FileExplorerUI.Controls;
 using FileExplorerUI.Interop;
 using FileExplorerUI.Services;
@@ -81,6 +82,7 @@ namespace FileExplorerUI
         private static readonly string s_navigationPerfLogPath = Path.Combine(
             AppContext.BaseDirectory,
             "navigation-perf.log");
+        private static int s_detailsViewportPerfSequence;
 
         private sealed record EntriesContextRequest(
             UIElement Anchor,
@@ -421,13 +423,14 @@ namespace FileExplorerUI
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsRowWidth)));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
+                InvalidateEntriesLayouts();
             }
         }
 
         private const uint InitialPageSize = 96;
         private const uint MinPageSize = 64;
         private const uint MaxPageSize = 1000;
-        private readonly ObservableCollection<EntryViewModel> _entries = new();
+        private readonly BatchObservableCollection<EntryViewModel> _entries = new();
         private readonly ObservableCollection<GroupedEntryColumnViewModel> _groupedEntryColumns = new();
         private readonly List<EntryViewModel> _presentationSourceEntries = new();
         private List<GroupedEntryColumnViewModel>? _groupedColumnsProjectionCache;
@@ -437,6 +440,8 @@ namespace FileExplorerUI
         private SortDirection _groupedColumnsCacheSortDirection;
         private EntryGroupField _groupedColumnsCacheGroupField;
         private readonly EntriesPresentationBuilder _entriesPresentationBuilder = new();
+        private readonly EntriesRepeaterLayoutProfile _detailsRepeaterLayoutProfile;
+        private readonly FixedExtentVirtualizingLayout _detailsVirtualizingLayout;
         private IEntriesViewHost? _detailsEntriesViewHost;
         private IEntriesViewHost? _groupedEntriesViewHost;
         private NavigationPerfSession? _activeNavigationPerfSession;
@@ -463,6 +468,9 @@ namespace FileExplorerUI
         private double _lastDetailsVerticalOffset = double.NaN;
         private double _lastGroupedHorizontalOffset = double.NaN;
         private double _lastGroupedVerticalOffset = double.NaN;
+        private double _lastDetailsVerticalDelta;
+        private int _lastDetailsViewportStartIndex = -1;
+        private int _lastDetailsViewportIndexDelta;
         private double _estimatedItemHeight = 32.0;
         private int _groupedListRowsPerColumn = -1;
         private Brush? _pathDefaultBorderBrush;
@@ -471,7 +479,12 @@ namespace FileExplorerUI
         private string _currentQuery = string.Empty;
         private readonly ExplorerService _explorerService = new();
         private readonly FileManagementCoordinator _fileManagementCoordinator;
+        private IEntryResultSet? _activeEntryResultSet;
         private readonly HashSet<string> _suppressedWatcherRefreshPaths = new(StringComparer.OrdinalIgnoreCase);
+        private readonly object _sparseViewportGate = new();
+        private int? _pendingSparseViewportTargetIndex;
+        private bool _pendingSparseViewportPreferMinimalPage;
+        private bool _isSparseViewportLoadActive;
         private readonly string _engineVersion;
         private EntryViewModel? _activeRenameOverlayEntry;
         private EntryViewModel? _pendingCreatedEntrySelection;
@@ -481,7 +494,9 @@ namespace FileExplorerUI
         private CancellationTokenSource? _watcherDebounceCts;
         private CancellationTokenSource? _directoryLoadCts;
         private CancellationTokenSource? _metadataPrefetchCts;
+        private int _metadataViewportRequestVersion;
         private long _directorySnapshotVersion;
+        private long _lastDetailsScrollInteractionTick;
         private CommandDockSide _commandDockSide = CommandDockSide.Top;
         private bool _showCommandDock = false;
         private bool _sidebarInitialized;
@@ -542,6 +557,15 @@ namespace FileExplorerUI
 
         private sealed record MetadataPayload(string SizeText, string ModifiedText, string IconGlyph, Brush IconForeground);
 
+        private sealed record MetadataHydrationResult(MetadataWorkItem Item, MetadataPayload Payload);
+
+        private sealed record ViewportMetadataResult(
+            int Index,
+            long? SizeBytes,
+            string SizeText,
+            DateTime? ModifiedAt,
+            string ModifiedText);
+
         private sealed record EntryGroupDescriptor(string BucketKey, string StateKey, string Label, string OrderKey);
 
         private enum SelectionSurfaceId
@@ -600,10 +624,20 @@ namespace FileExplorerUI
         private const double BreadcrumbItemSpacing = 2;
         private const double BreadcrumbWidthReserve = 4;
         private const string BreadcrumbMyComputerGlyph = "\uE7F4";
+        private readonly string _initialPath;
 
-        public MainWindow()
+        public MainWindow(string? initialPath = null)
         {
             InitializeComponent();
+            _initialPath = string.IsNullOrWhiteSpace(initialPath)
+                ? ShellMyComputerPath
+                : initialPath.Trim();
+            _detailsRepeaterLayoutProfile = new EntriesRepeaterLayoutProfile(
+                isVertical: true,
+                primaryItemExtentProvider: () => Math.Max(32.0, EntryItemMetrics.RowHeight + 4),
+                totalItemCountProvider: () => checked((int)Math.Max((uint)_entries.Count, _totalEntries)),
+                crossAxisExtentProvider: () => Math.Max(1, DetailsRowWidth));
+            _detailsVirtualizingLayout = new FixedExtentVirtualizingLayout(_detailsRepeaterLayoutProfile);
             _workspaceLayoutHost = new WorkspaceLayoutHost(_workspaceShellState);
             _fileManagementCoordinator = new FileManagementCoordinator(_explorerService);
             _entriesContextCommand = new DelegateCommand(ExecuteEntriesContextCommand);
@@ -622,17 +656,22 @@ namespace FileExplorerUI
                     true);
                 rootElement.GotFocus += RootElement_GotFocus;
             }
-            PathTextBox.Text = ShellMyComputerPath;
+            PathTextBox.Text = _initialPath;
             RegisterColumnSplitterHandlers(HeaderSplitter1);
             RegisterColumnSplitterHandlers(HeaderSplitter2);
             RegisterColumnSplitterHandlers(HeaderSplitter3);
             RegisterColumnSplitterHandlers(HeaderSplitter4);
             RegisterSidebarSplitterHandlers(SidebarSplitter);
+            DetailsEntriesRepeater.Layout = _detailsVirtualizingLayout;
             RegisterEntriesKeyHandlers(DetailsEntriesScrollViewer);
             RegisterEntriesKeyHandlers(GroupedEntriesScrollViewer);
             DetailsEntriesScrollViewer.ViewChanged += DetailsEntriesScrollViewer_ViewChanged;
             GroupedEntriesScrollViewer.ViewChanged += GroupedEntriesScrollViewer_ViewChanged;
-            _detailsEntriesViewHost = new VisualTreeEntriesViewHost(DetailsEntriesScrollViewer);
+            _detailsEntriesViewHost = new RepeaterEntriesViewHost(
+                DetailsEntriesScrollViewer,
+                DetailsEntriesRepeater,
+                _detailsRepeaterLayoutProfile);
+            _detailsEntriesViewHost.SetItems(_entries);
             _groupedEntriesViewHost = new GroupedColumnsEntriesViewHost(GroupedEntriesScrollViewer);
             UpdateEntriesContextOverlayTargets();
             this.SizeChanged += MainWindow_SizeChanged;
@@ -754,6 +793,7 @@ namespace FileExplorerUI
         {
             EntryItemMetrics = EntryItemMetrics.CreatePreset(_currentEntryViewDensityMode);
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntryItemMetrics)));
+            InvalidateEntriesLayouts();
         }
 
         private void UpdateViewCommandStates()
@@ -1835,14 +1875,18 @@ namespace FileExplorerUI
             }
         }
 
-        private async void DetailsEntriesScrollViewer_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+        private void DetailsEntriesScrollViewer_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
         {
             if (sender is not ScrollViewer viewer)
             {
                 return;
             }
 
+            double previousVerticalOffset = _lastDetailsVerticalOffset;
             bool scrolled = HasScrollOffsetChanged(viewer, ref _lastDetailsHorizontalOffset, ref _lastDetailsVerticalOffset);
+            _lastDetailsVerticalDelta = double.IsNaN(previousVerticalOffset)
+                ? 0.0
+                : Math.Abs(viewer.VerticalOffset - previousVerticalOffset);
             if (scrolled && _entriesFlyoutOpen && (_activeEntriesContextFlyout?.IsOpen ?? false))
             {
                 HideActiveEntriesContextFlyout();
@@ -1853,18 +1897,51 @@ namespace FileExplorerUI
                 HideRenameOverlay();
             }
 
+            int previousViewportStartIndex = _lastDetailsViewportStartIndex;
+            int viewportStartIndex = -1;
+            int viewportBottomIndex = -1;
+            if (scrolled)
+            {
+                _lastDetailsScrollInteractionTick = Environment.TickCount64;
+                InvalidateDetailsViewportRealization();
+            }
+
             if (DetailsHeaderTranslateTransform is not null)
             {
                 DetailsHeaderTranslateTransform.X = -viewer.HorizontalOffset;
             }
 
             UpdateEstimatedItemHeight();
-            int estimatedIndex = EstimateViewportBottomIndex(viewer);
-            if (_hasMore)
+            int logicalCount = GetLogicalEntryCount();
+            if (logicalCount > 0)
             {
-                await EnsureDataForIndexAsync(estimatedIndex);
+                viewportStartIndex = EstimateViewportIndex(viewer);
+                viewportBottomIndex = EstimateViewportBottomIndex(viewer);
+                LogDetailsViewportPerf(
+                    "view-changed",
+                    $"intermediate={e.IsIntermediate} offset={viewer.VerticalOffset:F1} scrollable={viewer.ScrollableHeight:F1} start={viewportStartIndex} end={viewportBottomIndex} entries={_entries.Count} total={_totalEntries}");
+                _ = EnsureDataForViewportAsync(viewportStartIndex, viewportBottomIndex, preferMinimalPage: e.IsIntermediate);
             }
-            RequestMetadataForCurrentViewport();
+
+            if (viewportStartIndex >= 0)
+            {
+                _lastDetailsViewportIndexDelta = previousViewportStartIndex < 0
+                    ? 0
+                    : Math.Abs(viewportStartIndex - previousViewportStartIndex);
+                _lastDetailsViewportStartIndex = viewportStartIndex;
+            }
+
+            if (e.IsIntermediate)
+            {
+                unchecked
+                {
+                    _metadataViewportRequestVersion++;
+                }
+
+                return;
+            }
+
+            RequestMetadataForCurrentViewportDeferred(48);
         }
 
         private void GroupedEntriesScrollViewer_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
@@ -1910,6 +1987,109 @@ namespace FileExplorerUI
             TryResetSystemCursorToArrow();
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
+        }
+
+        private void ResetEntriesViewport()
+        {
+            DetailsEntriesScrollViewer.ChangeView(0, 0, null, disableAnimation: true);
+            GroupedEntriesScrollViewer.ChangeView(0, 0, null, disableAnimation: true);
+            _lastDetailsHorizontalOffset = double.NaN;
+            _lastDetailsVerticalOffset = double.NaN;
+            _lastGroupedHorizontalOffset = double.NaN;
+            _lastGroupedVerticalOffset = double.NaN;
+            _lastDetailsViewportStartIndex = -1;
+            _lastDetailsViewportIndexDelta = 0;
+
+            if (DetailsHeaderTranslateTransform is not null)
+            {
+                DetailsHeaderTranslateTransform.X = 0;
+            }
+
+        }
+
+        private void InvalidateEntriesLayouts()
+        {
+            DetailsEntriesRepeater.InvalidateMeasure();
+        }
+
+        private void InvalidateDetailsViewportRealization(bool preferMinimalBuffer = false, bool forceSynchronous = false)
+        {
+            DetailsEntriesRepeater.InvalidateMeasure();
+            if (forceSynchronous)
+            {
+                DetailsEntriesScrollViewer.UpdateLayout();
+            }
+        }
+
+        private bool IsDetailsViewportInteractionHot()
+        {
+            if (_currentViewMode != EntryViewMode.Details)
+            {
+                return false;
+            }
+
+            return Environment.TickCount64 - Interlocked.Read(ref _lastDetailsScrollInteractionTick) < 180;
+        }
+
+        private bool IsSparseViewportLoadQueuedOrActive()
+        {
+            lock (_sparseViewportGate)
+            {
+                return _isSparseViewportLoadActive || _pendingSparseViewportTargetIndex is not null;
+            }
+        }
+
+        private bool RangeHasPendingMetadata(int startIndex, int endIndex)
+        {
+            if (_entries.Count == 0 || startIndex < 0 || endIndex < startIndex)
+            {
+                return false;
+            }
+
+            int cappedEnd = Math.Min(endIndex, _entries.Count - 1);
+            for (int i = Math.Max(0, startIndex); i <= cappedEnd; i++)
+            {
+                EntryViewModel entry = _entries[i];
+                if (entry.IsLoaded && !entry.IsMetadataLoaded)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool ViewportHasPendingMetadata()
+        {
+            if (_entries.Count == 0)
+            {
+                return false;
+            }
+
+            int startIndex;
+            int endIndex;
+            if (_currentViewMode != EntryViewMode.Details)
+            {
+                startIndex = 0;
+                endIndex = _entries.Count - 1;
+            }
+            else
+            {
+                startIndex = EstimateViewportIndex(DetailsEntriesScrollViewer);
+                endIndex = EstimateViewportBottomIndex(DetailsEntriesScrollViewer);
+            }
+
+            return RangeHasPendingMetadata(startIndex, endIndex);
+        }
+
+        private void CancelPendingViewportMetadataWork()
+        {
+            unchecked
+            {
+                _metadataViewportRequestVersion++;
+            }
+
+            CancelAndDispose(ref _metadataPrefetchCts);
         }
 
         private static void TryResetSystemCursorToArrow()
@@ -1987,6 +2167,7 @@ namespace FileExplorerUI
                     PathTextBox.Text = ShellMyComputerPath;
                     _currentQuery = string.Empty;
                     SearchTextBox.Text = string.Empty;
+                    ResetEntriesViewport();
                     UpdateBreadcrumbs(_currentPath);
                     UpdateNavButtonsState();
                     _ = SelectSidebarTreePathAsync(_currentPath);
@@ -2020,6 +2201,7 @@ namespace FileExplorerUI
                 PathTextBox.Text = target;
                 _currentQuery = string.Empty;
                 SearchTextBox.Text = string.Empty;
+                ResetEntriesViewport();
                 UpdateBreadcrumbs(target);
                 UpdateNavButtonsState();
                 _ = SelectSidebarTreePathAsync(_currentPath);
@@ -2048,6 +2230,22 @@ namespace FileExplorerUI
             await LoadPageAsync(_currentPath, _nextCursor, append: true);
         }
 
+        private void EnsureActiveEntryResultSet(string path)
+        {
+            string query = _currentQuery;
+            if (_activeEntryResultSet is not null &&
+                string.Equals(_activeEntryResultSet.Path, path, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(_activeEntryResultSet.Query, query, StringComparison.Ordinal) &&
+                _activeEntryResultSet.SortMode == _currentSortMode)
+            {
+                return;
+            }
+
+            _activeEntryResultSet = string.IsNullOrWhiteSpace(query)
+                ? _explorerService.CreateDirectoryResultSet(path, _currentSortMode)
+                : _explorerService.CreateSearchResultSet(path, query, _currentSortMode);
+        }
+
         private async Task LoadPageAsync(string path, ulong cursor, bool append, NavigationPerfSession? perf = null)
         {
             if (_isLoading)
@@ -2072,52 +2270,33 @@ namespace FileExplorerUI
 
             try
             {
+                EnsureActiveEntryResultSet(path);
                 uint requestedPageSize = _currentPageSize;
                 Stopwatch sw = Stopwatch.StartNew();
                 FileBatchPage page;
                 bool ok;
                 int rustErrorCode;
                 string rustErrorMessage;
-                if (string.IsNullOrWhiteSpace(_currentQuery))
+                IEntryResultSet? resultSet = _activeEntryResultSet;
+                if (resultSet is null)
                 {
-                    (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(
-                        () =>
-                        {
-                            bool success = _explorerService.TryReadDirectoryRowsAuto(
-                                path,
-                                cursor,
-                                requestedPageSize,
-                                _lastFetchMs,
-                                _currentSortMode,
-                                out FileBatchPage p,
-                                out int code,
-                                out string msg
-                            );
-                            return (success, p, code, msg);
-                        }
-                    );
+                    throw new InvalidOperationException("active entry result set was not initialized");
                 }
-                else
-                {
-                    string query = _currentQuery;
-                    (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(
-                        () =>
-                        {
-                            bool success = _explorerService.TrySearchDirectoryRowsAuto(
-                                path,
-                                query,
-                                cursor,
-                                requestedPageSize,
-                                _lastFetchMs,
-                                _currentSortMode,
-                                out FileBatchPage p,
-                                out int code,
-                                out string msg
-                            );
-                            return (success, p, code, msg);
-                        }
-                    );
-                }
+
+                (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(
+                    () =>
+                    {
+                        bool success = resultSet.TryReadRange(
+                            cursor,
+                            requestedPageSize,
+                            _lastFetchMs,
+                            out FileBatchPage p,
+                            out int code,
+                            out string msg
+                        );
+                        return (success, p, code, msg);
+                    }
+                );
 
                 if (!ok)
                 {
@@ -2129,6 +2308,7 @@ namespace FileExplorerUI
                         {
                             _entries.Clear();
                             _totalEntries = 0;
+                            InvalidateEntriesLayouts();
                         }
 
                         UpdateStatusKey("StatusPathAccessDeniedSkip", path);
@@ -2142,24 +2322,20 @@ namespace FileExplorerUI
                 perf?.Mark("load-page.fetch-completed", $"rows={page.Rows.Count} total={page.TotalEntries} source={_explorerService.DescribeBatchSource(page.SourceKind)}");
                 _lastFetchMs = (uint)Math.Clamp(sw.ElapsedMilliseconds, 0, int.MaxValue);
                 _totalEntries = page.TotalEntries;
+                InvalidateEntriesLayouts();
 
                 if (!append)
                 {
-                    int initialVisibleCount = GetInitialVisibleEntryCount(page.Rows.Count);
-                    EnsurePlaceholderCount(initialVisibleCount);
-                    perf?.Mark("load-page.placeholders-synced", $"total={initialVisibleCount}");
-                    FillPageRows(0, page.Rows.Take(initialVisibleCount).ToList(), path);
-                    perf?.Mark("load-page.rows-filled", $"filled={initialVisibleCount}");
-                    TrimTrailingEntries(initialVisibleCount);
-                    perf?.Mark("load-page.visible-entries-updated", $"count={initialVisibleCount}");
-                    ScheduleDeferredLoadedPageExpansion(path, _directorySnapshotVersion, page.Rows, initialVisibleCount, perf);
+                    _entries.Clear();
+                    EnsureLoadedRangeCapacity(0, page.Rows.Count);
+                    FillPageRows(0, page.Rows, path);
+                    perf?.Mark("load-page.visible-entries-updated", $"count={_entries.Count}");
                 }
                 else
                 {
-                    EnsurePlaceholderCount((int)_totalEntries);
-                    perf?.Mark("load-page.placeholders-synced", $"total={_totalEntries}");
+                    EnsureLoadedRangeCapacity((int)cursor, page.Rows.Count);
                     FillPageRows((int)cursor, page.Rows, path);
-                    perf?.Mark("load-page.rows-filled", $"filled={page.Rows.Count}");
+                    perf?.Mark("load-page.visible-entries-updated", $"count={_entries.Count}");
                 }
                 if (!append)
                 {
@@ -2167,7 +2343,11 @@ namespace FileExplorerUI
                     perf?.Mark("load-page.selection-restored");
                 }
                 UpdateFileCommandStates();
-                if (!append)
+                if (_currentViewMode == EntryViewMode.Details)
+                {
+                    CancelPendingViewportMetadataWork();
+                }
+                else if (!append)
                 {
                     RequestMetadataForCurrentViewportDeferred(48);
                     perf?.Mark("load-page.viewport-metadata-deferred");
@@ -2244,6 +2424,13 @@ namespace FileExplorerUI
 
             try
             {
+                EnsureActiveEntryResultSet(path);
+                IEntryResultSet? resultSet = _activeEntryResultSet;
+                if (resultSet is null)
+                {
+                    throw new InvalidOperationException("active entry result set was not initialized");
+                }
+
                 var loadedEntries = new List<EntryViewModel>();
                 ulong cursor = 0;
                 uint limit = 512;
@@ -2256,40 +2443,17 @@ namespace FileExplorerUI
                     int rustErrorCode;
                     string rustErrorMessage;
 
-                    if (string.IsNullOrWhiteSpace(_currentQuery))
+                    (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(() =>
                     {
-                        (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(() =>
-                        {
-                            bool success = _explorerService.TryReadDirectoryRowsAuto(
-                                path,
-                                cursor,
-                                limit,
-                                _lastFetchMs,
-                                DirectorySortMode.FolderFirstNameAsc,
-                                out FileBatchPage p,
-                                out int code,
-                                out string msg);
-                            return (success, p, code, msg);
-                        });
-                    }
-                    else
-                    {
-                        string query = _currentQuery;
-                        (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(() =>
-                        {
-                            bool success = _explorerService.TrySearchDirectoryRowsAuto(
-                                path,
-                                query,
-                                cursor,
-                                limit,
-                                _lastFetchMs,
-                                DirectorySortMode.FolderFirstNameAsc,
-                                out FileBatchPage p,
-                                out int code,
-                                out string msg);
-                            return (success, p, code, msg);
-                        });
-                    }
+                        bool success = resultSet.TryReadRange(
+                            cursor,
+                            limit,
+                            _lastFetchMs,
+                            out FileBatchPage p,
+                            out int code,
+                            out string msg);
+                        return (success, p, code, msg);
+                    });
 
                     if (!ok)
                     {
@@ -2313,6 +2477,7 @@ namespace FileExplorerUI
                 perf?.Mark("load-all.fetch-completed", $"loaded={loadedEntries.Count}");
                 ApplyCurrentPresentation(perf);
                 _totalEntries = totalEntries == 0 ? (uint)loadedEntries.Count : totalEntries;
+                InvalidateEntriesLayouts();
                 _nextCursor = 0;
                 _hasMore = false;
                 _currentPageSize = InitialPageSize;
@@ -2419,23 +2584,6 @@ namespace FileExplorerUI
             }
         }
 
-        private int GetInitialVisibleEntryCount(int loadedCount)
-        {
-            if (loadedCount <= 0)
-            {
-                return 0;
-            }
-
-            double viewportHeight = DetailsEntriesScrollViewer.ViewportHeight > 0
-                ? DetailsEntriesScrollViewer.ViewportHeight
-                : DetailsEntriesScrollViewer.ActualHeight;
-            int visibleCount = viewportHeight > 0
-                ? Math.Max(1, (int)Math.Ceiling(viewportHeight / _estimatedItemHeight))
-                : 12;
-            int bufferedCount = Math.Max(visibleCount + 8, visibleCount * 2);
-            return Math.Min(loadedCount, bufferedCount);
-        }
-
         private void ScheduleNavigationPerfFirstFrameMark(NavigationPerfSession perf, string stage)
         {
             void OnRendering(object? sender, object args)
@@ -2452,40 +2600,6 @@ namespace FileExplorerUI
             return _currentViewMode == EntryViewMode.Details
                 ? DetailsEntriesScrollViewer
                 : GroupedEntriesScrollViewer;
-        }
-
-        private void ScheduleDeferredLoadedPageExpansion(
-            string path,
-            long snapshotVersion,
-            IReadOnlyList<FileRow> rows,
-            int initialCount,
-            NavigationPerfSession? perf)
-        {
-            if (initialCount >= rows.Count)
-            {
-                return;
-            }
-
-            void OnRendering(object? sender, object args)
-            {
-                CompositionTarget.Rendering -= OnRendering;
-                _ = DispatcherQueue.TryEnqueue(async () =>
-                {
-                    await Task.Delay(32);
-                    if (!string.Equals(_currentPath, path, StringComparison.OrdinalIgnoreCase) ||
-                        _directorySnapshotVersion != snapshotVersion)
-                    {
-                        return;
-                    }
-
-                    EnsurePlaceholderCount(rows.Count);
-                    FillPageRows(initialCount, rows.Skip(initialCount).ToList(), path);
-                    perf?.Mark("load-page.deferred-rows-applied", $"count={rows.Count - initialCount}");
-                    RequestMetadataForCurrentViewportDeferred(24);
-                });
-            }
-
-            CompositionTarget.Rendering += OnRendering;
         }
 
         private void EnsureRefreshFallbackInvalidation(string path, string reason)
@@ -3043,6 +3157,7 @@ namespace FileExplorerUI
             SetPresentationSourceEntries(drives);
 
             _totalEntries = (uint)_entries.Count;
+            InvalidateEntriesLayouts();
             _nextCursor = 0;
             _hasMore = false;
             UpdateFileCommandStates();
@@ -3777,9 +3892,15 @@ namespace FileExplorerUI
             return false;
         }
 
+        private int GetLogicalEntryCount()
+        {
+            return Math.Max(_entries.Count, checked((int)Math.Min(int.MaxValue, _totalEntries)));
+        }
+
         private int EstimateViewportIndex(ScrollViewer viewer)
         {
-            if (_entries.Count <= 1)
+            int logicalCount = GetLogicalEntryCount();
+            if (logicalCount <= 1)
             {
                 return 0;
             }
@@ -3789,13 +3910,12 @@ namespace FileExplorerUI
                 int rowsPerColumn = Math.Max(1, GetGroupedListRowsPerColumn());
                 double columnStride = Math.Max(1, EntryContainerWidth + 16);
                 int columnIndex = (int)Math.Floor(viewer.HorizontalOffset / columnStride);
-                return Math.Clamp(columnIndex * rowsPerColumn, 0, _entries.Count - 1);
+                return Math.Clamp(columnIndex * rowsPerColumn, 0, logicalCount - 1);
             }
 
-            double scrollable = Math.Max(1.0, viewer.ScrollableHeight);
-            double progress = viewer.VerticalOffset / scrollable;
-            progress = Math.Clamp(progress, 0.0, 1.0);
-            return (int)Math.Round(progress * (_entries.Count - 1));
+            double itemExtent = Math.Max(1.0, _estimatedItemHeight);
+            int index = (int)Math.Floor(Math.Max(0.0, viewer.VerticalOffset) / itemExtent);
+            return Math.Clamp(index, 0, logicalCount - 1);
         }
 
         private int EstimateViewportBottomIndex(ScrollViewer viewer)
@@ -3805,12 +3925,219 @@ namespace FileExplorerUI
                 ? Math.Max(1, GetGroupedListRowsPerColumn() * Math.Max(1, (int)Math.Ceiling(viewer.ViewportWidth / Math.Max(1, EntryContainerWidth + 16))))
                 : Math.Max(1, (int)Math.Ceiling(viewer.ViewportHeight / _estimatedItemHeight));
             int bottom = topIndex + visibleCount;
-            return Math.Min(_entries.Count - 1, Math.Max(0, bottom));
+            return Math.Min(GetLogicalEntryCount() - 1, Math.Max(0, bottom));
         }
 
-        private async Task EnsureDataForIndexAsync(int index)
+        private async Task EnsureDataForViewportAsync(int startIndex, int endIndex, bool preferMinimalPage = false)
         {
-            if (!_hasMore)
+            int logicalCount = GetLogicalEntryCount();
+            if (logicalCount <= 0)
+            {
+                return;
+            }
+
+            int safeStartIndex = Math.Clamp(Math.Min(startIndex, endIndex), 0, logicalCount - 1);
+            int safeEndIndex = Math.Clamp(Math.Max(startIndex, endIndex), safeStartIndex, logicalCount - 1);
+            LogDetailsViewportPerf(
+                "ensure-viewport",
+                $"start={safeStartIndex} end={safeEndIndex} entries={_entries.Count} total={_totalEntries} loading={_isLoading}");
+
+            if (_currentViewMode == EntryViewMode.Details && _entries.Count < logicalCount)
+            {
+                EnsurePlaceholderCount(logicalCount);
+                InvalidateEntriesLayouts();
+            }
+
+            if (!IsViewportRangeLoaded(safeStartIndex, safeEndIndex))
+            {
+                LogDetailsViewportPerf("ensure-viewport.sparse-start", $"index={safeStartIndex}");
+                await QueueSparseViewportLoadAsync(safeStartIndex, preferMinimalPage);
+                return;
+            }
+
+            if (!MaybePrefetchDetailsViewportBlock(safeStartIndex, safeEndIndex, preferMinimalPage))
+            {
+                LogDetailsViewportPerf("ensure-viewport.loaded", $"start={safeStartIndex} end={safeEndIndex}");
+            }
+        }
+
+        private bool IsViewportRangeLoaded(int startIndex, int endIndex)
+        {
+            if (startIndex < 0 || endIndex < startIndex)
+            {
+                return true;
+            }
+
+            if (startIndex >= _entries.Count)
+            {
+                return false;
+            }
+
+            int cappedEnd = Math.Min(endIndex, _entries.Count - 1);
+            for (int index = startIndex; index <= cappedEnd; index++)
+            {
+                if (!_entries[index].IsLoaded)
+                {
+                    return false;
+                }
+            }
+
+            return cappedEnd >= endIndex;
+        }
+
+        private bool MaybePrefetchDetailsViewportBlock(int startIndex, int endIndex, bool preferMinimalPage)
+        {
+            if (_currentViewMode != EntryViewMode.Details)
+            {
+                return false;
+            }
+
+            if (IsSparseViewportLoadQueuedOrActive())
+            {
+                LogDetailsViewportPerf("ensure-viewport.skip-queued", $"start={startIndex} end={endIndex}");
+                return false;
+            }
+
+            int logicalCount = GetLogicalEntryCount();
+            if (logicalCount <= 0 || endIndex < 0)
+            {
+                return false;
+            }
+
+            int visibleCount = Math.Max(1, endIndex - startIndex + 1);
+            int prefetchDistance = Math.Max(6, visibleCount / 3);
+            int searchStart = Math.Min(logicalCount - 1, endIndex + 1);
+            int searchEnd = Math.Min(logicalCount - 1, endIndex + Math.Max(visibleCount * 2, 36));
+            int firstUnloadedIndex = -1;
+            for (int index = searchStart; index <= searchEnd; index++)
+            {
+                if (index >= _entries.Count || !_entries[index].IsLoaded)
+                {
+                    firstUnloadedIndex = index;
+                    break;
+                }
+            }
+
+            if (firstUnloadedIndex < 0)
+            {
+                return false;
+            }
+
+            int distanceToViewportEnd = firstUnloadedIndex - endIndex;
+            if (distanceToViewportEnd > prefetchDistance)
+            {
+                LogDetailsViewportPerf(
+                    "ensure-viewport.loaded",
+                    $"start={startIndex} end={endIndex} next-unloaded={firstUnloadedIndex} distance={distanceToViewportEnd}");
+                return false;
+            }
+
+            LogDetailsViewportPerf(
+                "ensure-viewport.prefetch",
+                $"index={firstUnloadedIndex} distance={distanceToViewportEnd} threshold={prefetchDistance}");
+            _ = QueueSparseViewportLoadAsync(firstUnloadedIndex, preferMinimalPage);
+            return true;
+        }
+
+        private async Task QueueSparseViewportLoadAsync(int targetIndex, bool preferMinimalPage = false)
+        {
+            bool shouldStartPump = false;
+            int logicalCount = GetLogicalEntryCount();
+            if (logicalCount <= 0)
+            {
+                return;
+            }
+
+            int clampedTargetIndex = Math.Clamp(targetIndex, 0, logicalCount - 1);
+
+            lock (_sparseViewportGate)
+            {
+                _pendingSparseViewportTargetIndex = clampedTargetIndex;
+                _pendingSparseViewportPreferMinimalPage = preferMinimalPage;
+                if (!_isSparseViewportLoadActive)
+                {
+                    _isSparseViewportLoadActive = true;
+                    shouldStartPump = true;
+                }
+            }
+
+            if (!shouldStartPump)
+            {
+                LogDetailsViewportPerf("sparse-queue.update", $"target={clampedTargetIndex}");
+                return;
+            }
+
+            try
+            {
+                while (true)
+                {
+                    int nextTargetIndex;
+                    bool consumeMinimalPage;
+                    lock (_sparseViewportGate)
+                    {
+                        if (_pendingSparseViewportTargetIndex is null)
+                        {
+                            _isSparseViewportLoadActive = false;
+                            return;
+                        }
+
+                        nextTargetIndex = _pendingSparseViewportTargetIndex.Value;
+                        consumeMinimalPage = _pendingSparseViewportPreferMinimalPage;
+                        _pendingSparseViewportTargetIndex = null;
+                        _pendingSparseViewportPreferMinimalPage = false;
+                    }
+
+                    LogDetailsViewportPerf("sparse-queue.consume", $"target={nextTargetIndex} minimal={consumeMinimalPage}");
+                    await LoadSparseViewportPageAsync(nextTargetIndex, consumeMinimalPage);
+                }
+            }
+            finally
+            {
+                lock (_sparseViewportGate)
+                {
+                    _isSparseViewportLoadActive = false;
+                }
+            }
+        }
+
+        private bool IsInitialDetailsSparseBootstrap(int targetIndex)
+        {
+            if (_currentViewMode != EntryViewMode.Details || targetIndex < 0 || targetIndex >= _entries.Count)
+            {
+                return false;
+            }
+
+            if (_entries[targetIndex].IsLoaded)
+            {
+                return false;
+            }
+
+            int loadedThreshold = Math.Max(192, checked((int)_currentPageSize) * 2);
+            int loadedCount = 0;
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (_entries[i].IsLoaded)
+                {
+                    loadedCount++;
+                    if (loadedCount > loadedThreshold)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return loadedCount <= loadedThreshold;
+        }
+
+        private async Task LoadSparseViewportPageAsync(int targetIndex, bool preferMinimalPage)
+        {
+            if (_currentViewMode != EntryViewMode.Details || string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            int logicalCount = GetLogicalEntryCount();
+            if (logicalCount <= 0)
             {
                 return;
             }
@@ -3818,14 +4145,97 @@ namespace FileExplorerUI
             double viewportHeight = DetailsEntriesScrollViewer.ViewportHeight > 0
                 ? DetailsEntriesScrollViewer.ViewportHeight
                 : DetailsEntriesScrollViewer.ActualHeight;
-            int dynamicWindow = Math.Max(32, (int)Math.Ceiling(Math.Max(1, viewportHeight) / _estimatedItemHeight) * 2);
-            int prefetchWindow = (int)Math.Max(dynamicWindow, _currentPageSize * 2);
-            int rounds = 0;
-            while (!_isLoading && _hasMore && index >= ((int)_nextCursor - prefetchWindow) && rounds < 6)
+            int visibleCount = Math.Max(1, (int)Math.Ceiling(Math.Max(1, viewportHeight) / _estimatedItemHeight));
+            int blockSize = preferMinimalPage
+                ? Math.Max(64, visibleCount * 4)
+                : Math.Max(192, visibleCount * 8);
+            blockSize = Math.Min(blockSize, logicalCount);
+            int alignedStartIndex = (targetIndex / Math.Max(1, blockSize)) * blockSize;
+            int maxStartIndex = Math.Max(0, logicalCount - blockSize);
+            int startIndex = Math.Clamp(alignedStartIndex, 0, maxStartIndex);
+            int pageSize = Math.Min(blockSize, logicalCount - startIndex);
+            ulong cursor = (ulong)startIndex;
+            int requestId = Interlocked.Increment(ref s_detailsViewportPerfSequence);
+
+            string path = _currentPath;
+            uint lastFetchMs = _lastFetchMs;
+            long snapshotVersion = _directorySnapshotVersion;
+            EnsureActiveEntryResultSet(path);
+            IEntryResultSet? resultSet = _activeEntryResultSet;
+            if (resultSet is null)
             {
-                await LoadNextPageAsync();
-                rounds++;
+                return;
             }
+
+            Stopwatch sw = Stopwatch.StartNew();
+            LogDetailsViewportPerf(
+                "sparse-fetch.begin",
+                $"req={requestId} target={targetIndex} cursor={cursor} pageSize={pageSize} visible={visibleCount} block={blockSize} minimal={preferMinimalPage} entries={_entries.Count} total={_totalEntries}");
+
+            FileBatchPage page;
+            bool ok;
+            int rustErrorCode;
+            string rustErrorMessage;
+            int viewportIndexDelta = _lastDetailsViewportIndexDelta;
+            int viewportBlockDelta = Math.Max(0, (int)Math.Ceiling(viewportIndexDelta / (double)Math.Max(1, blockSize)));
+            bool useSynchronousRead = preferMinimalPage &&
+                (viewportBlockDelta <= 1 || IsInitialDetailsSparseBootstrap(targetIndex));
+
+            if (useSynchronousRead)
+            {
+                ok = resultSet.TryReadRange(
+                    cursor,
+                    (uint)pageSize,
+                    lastFetchMs,
+                    out page,
+                    out rustErrorCode,
+                    out rustErrorMessage);
+            }
+            else
+            {
+                (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(() =>
+                {
+                    bool success = resultSet.TryReadRange(
+                        cursor,
+                        (uint)pageSize,
+                        lastFetchMs,
+                        out FileBatchPage p,
+                        out int code,
+                        out string msg);
+                    return (success, p, code, msg);
+                });
+            }
+
+            sw.Stop();
+            LogDetailsViewportPerf(
+                "sparse-fetch.end",
+                $"req={requestId} ok={ok} elapsed={sw.ElapsedMilliseconds}ms cursor={cursor} rows={page.Rows.Count} total={page.TotalEntries} rust={rustErrorCode} sync={useSynchronousRead} delta={_lastDetailsVerticalDelta:F1} indexDelta={viewportIndexDelta} blockDelta={viewportBlockDelta}");
+
+            if (!ok || snapshotVersion != _directorySnapshotVersion || !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                LogDetailsViewportPerf(
+                    "sparse-fetch.discard",
+                    $"req={requestId} ok={ok} snapshotMatch={snapshotVersion == _directorySnapshotVersion} pathMatch={string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase)}");
+                return;
+            }
+
+            Stopwatch bindSw = Stopwatch.StartNew();
+            _totalEntries = Math.Max(_totalEntries, page.TotalEntries);
+            EnsurePlaceholderCount(checked((int)Math.Min(int.MaxValue, _totalEntries)));
+            FillPageRows((int)cursor, page.Rows, path);
+            InvalidateEntriesLayouts();
+            CancelPendingViewportMetadataWork();
+            bindSw.Stop();
+            LogDetailsViewportPerf(
+                "sparse-bind.end",
+                $"req={requestId} elapsed={bindSw.ElapsedMilliseconds}ms cursor={cursor} rows={page.Rows.Count} entries={_entries.Count} total={_totalEntries}");
+        }
+
+        private static void LogDetailsViewportPerf(string stage, string detail)
+        {
+            string message = $"[DETAILS-VP] stage={stage} {detail}";
+            Debug.WriteLine(message);
+            AppendNavigationPerfLog(message);
         }
 
         private void RequestViewportWork()
@@ -3836,7 +4246,6 @@ namespace FileExplorerUI
             }
 
             RequestPrefetchForCurrentViewport();
-            RequestMetadataForCurrentViewport();
         }
 
         private void RequestPrefetchForCurrentViewport()
@@ -3846,17 +4255,24 @@ namespace FileExplorerUI
                 return;
             }
 
-            int idx = EstimateViewportBottomIndex(DetailsEntriesScrollViewer);
-            _ = EnsureDataForIndexAsync(idx);
+            int startIndex = EstimateViewportIndex(DetailsEntriesScrollViewer);
+            int endIndex = EstimateViewportBottomIndex(DetailsEntriesScrollViewer);
+            _ = EnsureDataForViewportAsync(startIndex, endIndex);
         }
 
         private void RequestMetadataForCurrentViewportDeferred(int delayMs = 1)
         {
+            int requestVersion = unchecked(++_metadataViewportRequestVersion);
             _ = DispatcherQueue.TryEnqueue(async () =>
             {
                 if (delayMs > 0)
                 {
                     await Task.Delay(delayMs);
+                }
+
+                if (requestVersion != _metadataViewportRequestVersion)
+                {
+                    return;
                 }
 
                 RequestMetadataForCurrentViewport();
@@ -3865,6 +4281,17 @@ namespace FileExplorerUI
 
         private void RequestMetadataForCurrentViewport()
         {
+            unchecked
+            {
+                _metadataViewportRequestVersion++;
+            }
+
+            if (IsDetailsViewportInteractionHot() || IsSparseViewportLoadQueuedOrActive())
+            {
+                RequestMetadataForCurrentViewportDeferred(96);
+                return;
+            }
+
             if (_entries.Count == 0)
             {
                 CancelAndDispose(ref _metadataPrefetchCts);
@@ -3890,11 +4317,16 @@ namespace FileExplorerUI
             }
 
             int visibleCount = Math.Max(1, visibleEnd - visibleStart + 1);
-            int lookahead = Math.Max(visibleCount, (int)_currentPageSize);
+            bool throttleMetadataPrefetch = _entries.Count > 1024;
+            int lookahead = throttleMetadataPrefetch
+                ? 0
+                : Math.Max(visibleCount, (int)_currentPageSize);
             int prefetchEnd = Math.Min(_entries.Count - 1, visibleEnd + lookahead);
 
             List<MetadataWorkItem> visibleItems = CollectMetadataWorkItems(visibleStart, visibleEnd);
-            List<MetadataWorkItem> prefetchItems = CollectMetadataWorkItems(visibleEnd + 1, prefetchEnd);
+            List<MetadataWorkItem> prefetchItems = throttleMetadataPrefetch
+                ? []
+                : CollectMetadataWorkItems(visibleEnd + 1, prefetchEnd);
             if (visibleItems.Count == 0 && prefetchItems.Count == 0)
             {
                 return;
@@ -3916,6 +4348,41 @@ namespace FileExplorerUI
             {
                 await HydrateMetadataBatchAsync(path, snapshotVersion, visibleItems, token);
                 await HydrateMetadataBatchAsync(path, snapshotVersion, prefetchItems, token);
+            }, token);
+        }
+
+        private void RequestMetadataForLoadedRange(int startIndex, int endIndex)
+        {
+            if (IsDetailsViewportInteractionHot() || IsSparseViewportLoadQueuedOrActive())
+            {
+                return;
+            }
+
+            List<MetadataWorkItem> items = CollectMetadataWorkItems(startIndex, endIndex);
+            if (items.Count == 0)
+            {
+                return;
+            }
+
+            CancellationTokenSource? baseCts = _directoryLoadCts;
+            if (baseCts is null)
+            {
+                return;
+            }
+
+            long snapshotVersion = _directorySnapshotVersion;
+            string path = _currentPath;
+            CancellationToken token = baseCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await HydrateMetadataBatchAsync(path, snapshotVersion, items, token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
             }, token);
         }
 
@@ -3949,22 +4416,37 @@ namespace FileExplorerUI
             CancellationToken token
         )
         {
+            if (items.Count == 0)
+            {
+                return;
+            }
+
+            var results = new List<MetadataHydrationResult>(items.Count);
             foreach (MetadataWorkItem item in items)
             {
                 token.ThrowIfCancellationRequested();
 
                 MetadataPayload payload = BuildMetadataPayload(path, item.Name, item.IsDirectory, item.IsLink, token);
+                results.Add(new MetadataHydrationResult(item, payload));
+            }
 
-                if (token.IsCancellationRequested)
+            if (token.IsCancellationRequested || results.Count == 0)
+            {
+                return;
+            }
+
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                if (snapshotVersion != _directorySnapshotVersion)
                 {
                     return;
                 }
 
-                _ = DispatcherQueue.TryEnqueue(() =>
+                foreach (MetadataHydrationResult result in results)
                 {
-                    ApplyMetadataPayload(snapshotVersion, item, payload);
-                });
-            }
+                    ApplyMetadataPayload(snapshotVersion, result.Item, result.Payload);
+                }
+            });
         }
 
         private MetadataPayload BuildMetadataPayload(
@@ -3983,6 +4465,76 @@ namespace FileExplorerUI
             string iconGlyph = GetEntryIconGlyph(isDirectory, isLink, name);
             Brush iconForeground = GetEntryIconBrush(isDirectory, isLink, name);
             return new MetadataPayload(sizeText, modifiedText, iconGlyph, iconForeground);
+        }
+
+        private static List<ViewportMetadataResult> BuildViewportMetadataResults(
+            string path,
+            int pageStartIndex,
+            IReadOnlyList<FileRow> rows)
+        {
+            if (rows.Count == 0)
+            {
+                return [];
+            }
+
+            var results = new List<ViewportMetadataResult>(rows.Count);
+
+            for (int rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+            {
+                int logicalIndex = pageStartIndex + rowIndex;
+                FileRow row = rows[rowIndex];
+                string fullPath = Path.Combine(path, row.Name);
+                if (row.IsDirectory)
+                {
+                    DateTime? modifiedAt = TryGetModifiedTime(fullPath, isDirectory: true);
+                    results.Add(new ViewportMetadataResult(
+                        logicalIndex,
+                        null,
+                        string.Empty,
+                        modifiedAt,
+                        FormatModifiedTime(modifiedAt)));
+                    continue;
+                }
+
+                (long? sizeBytes, string sizeText) = TryGetFileSize(fullPath);
+                DateTime? modifiedFileAt = TryGetModifiedTime(fullPath, isDirectory: false);
+                results.Add(new ViewportMetadataResult(
+                    logicalIndex,
+                    sizeBytes,
+                    sizeText,
+                    modifiedFileAt,
+                    FormatModifiedTime(modifiedFileAt)));
+            }
+
+            return results;
+        }
+
+        private void ApplyViewportMetadataResults(long snapshotVersion, IReadOnlyList<ViewportMetadataResult> results)
+        {
+            if (snapshotVersion != _directorySnapshotVersion || results.Count == 0)
+            {
+                return;
+            }
+
+            foreach (ViewportMetadataResult result in results)
+            {
+                if (result.Index < 0 || result.Index >= _entries.Count)
+                {
+                    continue;
+                }
+
+                EntryViewModel entry = _entries[result.Index];
+                if (!entry.IsLoaded)
+                {
+                    continue;
+                }
+
+                entry.SizeBytes = result.SizeBytes;
+                entry.SizeText = result.SizeText;
+                entry.ModifiedAt = result.ModifiedAt;
+                entry.ModifiedText = result.ModifiedText;
+                entry.IsMetadataLoaded = true;
+            }
         }
 
         private void ApplyMetadataPayload(long snapshotVersion, MetadataWorkItem item, MetadataPayload payload)
@@ -4047,37 +4599,62 @@ namespace FileExplorerUI
             _estimatedItemHeight = Math.Max(32.0, EntryItemMetrics.RowHeight + 4);
         }
 
+        private void ReplaceEntriesWithLoadedRows(string basePath, IReadOnlyList<FileRow> rows)
+        {
+            _entries.Clear();
+            AppendLoadedRows(basePath, rows);
+        }
+
+        private void AppendLoadedRows(string basePath, IReadOnlyList<FileRow> rows)
+        {
+            if (rows.Count == 0)
+            {
+                return;
+            }
+
+            foreach (FileRow row in rows)
+            {
+                _entries.Add(CreateLoadedEntryModel(basePath, row));
+            }
+        }
+
         private void EnsurePlaceholderCount(int target)
         {
-            if (target < 0)
+            _entries.Resize(target, CreatePlaceholderEntryModel);
+        }
+
+        private void EnsureLoadedRangeCapacity(int startIndex, int rowCount)
+        {
+            if (startIndex < 0 || rowCount <= 0)
             {
-                target = 0;
+                return;
             }
 
-            while (_entries.Count < target)
+            int target = checked(startIndex + rowCount);
+            if (target > _entries.Count)
             {
-                _entries.Add(new EntryViewModel
-                {
-                    Name = "...",
-                    PendingName = "...",
-                    FullPath = string.Empty,
-                    Type = "",
-                    IconGlyph = "\uE9CE",
-                    IconForeground = FileIconBrush,
-                    MftRef = 0,
-                    SizeText = "",
-                    ModifiedText = "",
-                    IsDirectory = false,
-                    IsLink = false,
-                    IsLoaded = false,
-                    IsMetadataLoaded = false
-                });
+                EnsurePlaceholderCount(target);
             }
+        }
 
-            while (_entries.Count > target)
+        private EntryViewModel CreatePlaceholderEntryModel()
+        {
+            return new EntryViewModel
             {
-                _entries.RemoveAt(_entries.Count - 1);
-            }
+                Name = string.Empty,
+                PendingName = string.Empty,
+                FullPath = string.Empty,
+                Type = string.Empty,
+                IconGlyph = string.Empty,
+                IconForeground = FileIconBrush,
+                MftRef = 0,
+                SizeText = string.Empty,
+                ModifiedText = string.Empty,
+                IsDirectory = false,
+                IsLink = false,
+                IsLoaded = false,
+                IsMetadataLoaded = false
+            };
         }
 
         private void FillPageRows(int startIndex, IReadOnlyList<FileRow> rows, string? basePathOverride = null)
@@ -4091,9 +4668,7 @@ namespace FileExplorerUI
             int max = Math.Min(rows.Count, _entries.Count - startIndex);
             for (int i = 0; i < max; i++)
             {
-                FileRow row = rows[i];
-                EntryViewModel current = _entries[startIndex + i];
-                ApplyLoadedEntryRow(current, basePath, row);
+                ApplyLoadedEntryRow(_entries[startIndex + i], basePath, rows[i]);
             }
         }
 
@@ -4113,27 +4688,30 @@ namespace FileExplorerUI
             entry.IconGlyph = GetEntryIconGlyph(row.IsDirectory, row.IsLink, row.Name);
             entry.IconForeground = GetEntryIconBrush(row.IsDirectory, row.IsLink, row.Name);
             entry.MftRef = row.MftRef;
-            entry.SizeText = string.Empty;
-            entry.ModifiedText = string.Empty;
+            entry.SizeBytes = row.SizeBytes;
+            entry.SizeText = row.IsDirectory
+                ? string.Empty
+                : row.SizeBytes is long sizeBytes
+                    ? FormatBytes(sizeBytes)
+                    : "-";
+            entry.ModifiedAt = row.ModifiedAt;
+            entry.ModifiedText = FormatModifiedTime(row.ModifiedAt);
             entry.IsDirectory = row.IsDirectory;
             entry.IsLink = row.IsLink;
             entry.IsPendingCreate = false;
             entry.PendingCreateIsDirectory = false;
             entry.IsLoaded = true;
-            entry.IsMetadataLoaded = false;
-        }
-
-        private void TrimTrailingEntries(int target)
-        {
-            while (_entries.Count > target)
-            {
-                _entries.RemoveAt(_entries.Count - 1);
-            }
+            entry.IsMetadataLoaded = row.ModifiedAt.HasValue || row.IsDirectory || row.SizeBytes.HasValue;
         }
 
         private void PopulateEntryMetadata(EntryViewModel entry)
         {
             if (!entry.IsLoaded)
+            {
+                return;
+            }
+
+            if (entry.IsMetadataLoaded)
             {
                 return;
             }
@@ -4249,11 +4827,7 @@ namespace FileExplorerUI
 
         private void ReplaceVisibleEntries(IReadOnlyList<EntryViewModel> entries)
         {
-            _entries.Clear();
-            foreach (EntryViewModel entry in entries)
-            {
-                _entries.Add(entry);
-            }
+            _entries.ReplaceAll(entries);
         }
 
         private void RebuildGroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries)
@@ -4828,23 +5402,33 @@ namespace FileExplorerUI
 
         private static string GetFileSizeText(string fullPath)
         {
+            return TryGetFileSize(fullPath).SizeText;
+        }
+
+        private static (long? SizeBytes, string SizeText) TryGetFileSize(string fullPath)
+        {
             try
             {
                 var fi = new FileInfo(fullPath);
                 if (!fi.Exists)
                 {
-                    return "-";
+                    return (null, "-");
                 }
 
-                return FormatBytes(fi.Length);
+                return (fi.Length, FormatBytes(fi.Length));
             }
             catch
             {
-                return "-";
+                return (null, "-");
             }
         }
 
         private static string GetModifiedTimeText(string fullPath, bool isDirectory)
+        {
+            return FormatModifiedTime(TryGetModifiedTime(fullPath, isDirectory));
+        }
+
+        private static DateTime? TryGetModifiedTime(string fullPath, bool isDirectory)
         {
             try
             {
@@ -4853,15 +5437,20 @@ namespace FileExplorerUI
                     : new FileInfo(fullPath).LastWriteTime;
                 if (dt == DateTime.MinValue)
                 {
-                    return "-";
+                    return null;
                 }
 
-                return dt.ToString("g", CultureInfo.CurrentCulture);
+                return dt;
             }
             catch
             {
-                return "-";
+                return null;
             }
+        }
+
+        private static string FormatModifiedTime(DateTime? modifiedAt)
+        {
+            return modifiedAt?.ToString("g", CultureInfo.CurrentCulture) ?? "-";
         }
 
         private static string FormatBytes(long bytes)
@@ -5087,13 +5676,7 @@ namespace FileExplorerUI
                 return Math.Min(Math.Max(0, visibleEnd + 1), _entries.Count);
             }
 
-            int loadedCount = 0;
-            while (loadedCount < _entries.Count && _entries[loadedCount].IsLoaded)
-            {
-                loadedCount++;
-            }
-
-            return loadedCount;
+            return _entries.Count;
         }
 
         private async Task EnsureCreateInsertVisibleAsync(int insertIndex)
@@ -5103,7 +5686,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            await EnsureDataForIndexAsync(insertIndex);
+            await EnsureDataForViewportAsync(insertIndex, insertIndex, preferMinimalPage: false);
             DetailsEntriesScrollViewer.UpdateLayout();
 
             int visibleCount = Math.Max(1, (int)Math.Ceiling(DetailsEntriesScrollViewer.ViewportHeight / _estimatedItemHeight));
@@ -5909,29 +6492,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            string targetPath = string.IsNullOrWhiteSpace(row.FullPath)
-                ? Path.Combine(_currentPath, row.Name)
-                : row.FullPath;
-            if (row.IsDirectory)
-            {
-                ClearListSelection();
-                await NavigateToPathAsync(targetPath, pushHistory: true);
-                return;
-            }
-
-            try
-            {
-                _ = Process.Start(new ProcessStartInfo
-                {
-                    FileName = targetPath,
-                    UseShellExecute = true
-                });
-                UpdateStatusKey("StatusOpened", row.Name);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatusKey("StatusOpenFailed", ex.Message);
-            }
+            await OpenEntryAsync(row, clearSelectionBeforeDirectoryNavigation: true);
         }
 
         private async Task CommitRenameOverlayAsync()
@@ -6626,28 +7187,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            string targetPath = string.IsNullOrWhiteSpace(row.FullPath)
-                ? Path.Combine(_currentPath, row.Name)
-                : row.FullPath;
-            if (row.IsDirectory)
-            {
-                await NavigateToPathAsync(targetPath, pushHistory: true);
-                return;
-            }
-
-            try
-            {
-                _ = Process.Start(new ProcessStartInfo
-                {
-                    FileName = targetPath,
-                    UseShellExecute = true
-                });
-                UpdateStatusKey("StatusOpened", row.Name);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatusKey("StatusOpenFailed", ex.Message);
-            }
+            await OpenEntryAsync(row, clearSelectionBeforeDirectoryNavigation: false);
         }
 
         private bool IsEntryAlreadySelected(EntryViewModel entry)
@@ -6902,6 +7442,21 @@ namespace FileExplorerUI
                 case FileCommandIds.CopyPath:
                     ExecuteCopyPathCommand(target);
                     break;
+                case FileCommandIds.CreateShortcut:
+                    await ExecuteCreateShortcutCommandAsync(target);
+                    break;
+                case FileCommandIds.OpenWith:
+                    ExecuteOpenWithCommand(target);
+                    break;
+                case FileCommandIds.OpenTarget:
+                    await ExecuteOpenTargetCommandAsync(target);
+                    break;
+                case FileCommandIds.RunAsAdministrator:
+                    ExecuteRunAsAdministratorCommand(target);
+                    break;
+                case FileCommandIds.OpenInNewWindow:
+                    ExecuteOpenInNewWindowCommand(target);
+                    break;
                 case FileCommandIds.OpenInTerminal:
                     ExecuteOpenInTerminalCommand(target);
                     break;
@@ -6945,6 +7500,17 @@ namespace FileExplorerUI
                     string.Equals(target.Path, _currentPath, StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
                 FileCommandIds.CopyPath => !string.IsNullOrWhiteSpace(target.Path),
+                FileCommandIds.CreateShortcut => !string.IsNullOrWhiteSpace(target.Path) &&
+                    !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
+                    _explorerService.DirectoryExists(_currentPath),
+                FileCommandIds.OpenWith => !string.IsNullOrWhiteSpace(target.Path) &&
+                    !target.IsDirectory,
+                FileCommandIds.OpenTarget => !string.IsNullOrWhiteSpace(target.Path) &&
+                    !target.IsDirectory,
+                FileCommandIds.RunAsAdministrator => !string.IsNullOrWhiteSpace(target.Path) &&
+                    !target.IsDirectory,
+                FileCommandIds.OpenInNewWindow => !string.IsNullOrWhiteSpace(target.Path) &&
+                    target.IsDirectory,
                 FileCommandIds.OpenInTerminal => !string.IsNullOrWhiteSpace(target.Path) &&
                     !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
                 FileCommandIds.Properties => !string.IsNullOrWhiteSpace(target.Path) &&
@@ -6961,6 +7527,12 @@ namespace FileExplorerUI
                 return;
             }
 
+            if ((target.Traits & FileEntryTraits.Shortcut) != 0)
+            {
+                await ExecuteOpenTargetCommandAsync(target);
+                return;
+            }
+
             try
             {
                 _ = Process.Start(new ProcessStartInfo
@@ -6969,6 +7541,45 @@ namespace FileExplorerUI
                     UseShellExecute = true
                 });
                 UpdateStatusKey("StatusOpened", target.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusOpenFailed", ex.Message);
+            }
+        }
+
+        private async Task OpenEntryAsync(EntryViewModel row, bool clearSelectionBeforeDirectoryNavigation)
+        {
+            string targetPath = string.IsNullOrWhiteSpace(row.FullPath)
+                ? Path.Combine(_currentPath, row.Name)
+                : row.FullPath;
+
+            if (row.IsDirectory)
+            {
+                if (clearSelectionBeforeDirectoryNavigation)
+                {
+                    ClearListSelection();
+                }
+
+                await NavigateToPathAsync(targetPath, pushHistory: true);
+                return;
+            }
+
+            FileCommandTarget target = FileCommandTargetResolver.ResolveEntry(targetPath, isDirectory: false);
+            if ((target.Traits & FileEntryTraits.Shortcut) != 0)
+            {
+                await ExecuteOpenTargetCommandAsync(target);
+                return;
+            }
+
+            try
+            {
+                _ = Process.Start(new ProcessStartInfo
+                {
+                    FileName = targetPath,
+                    UseShellExecute = true
+                });
+                UpdateStatusKey("StatusOpened", row.Name);
             }
             catch (Exception ex)
             {
@@ -7001,6 +7612,158 @@ namespace FileExplorerUI
             catch (Exception ex)
             {
                 UpdateStatusKey("StatusCopyPathFailed", ex.Message);
+            }
+        }
+
+        private async Task ExecuteCreateShortcutCommandAsync(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                return;
+            }
+
+            if (!TryEnsureCurrentDirectoryAvailable(out string errorMessage))
+            {
+                UpdateStatusKey("StatusCreateShortcutFailed", errorMessage);
+                return;
+            }
+
+            try
+            {
+                SuppressNextWatcherRefresh(_currentPath);
+                CreatedEntryInfo created = await _fileManagementCoordinator.CreateShortcutAsync(_currentPath, target.Path);
+                if (!created.ChangeNotified)
+                {
+                    EnsureRefreshFallbackInvalidation(_currentPath, "create-shortcut");
+                }
+
+                _selectedEntryPath = created.FullPath;
+                await LoadFirstPageAsync();
+                _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                UpdateFileCommandStates();
+                UpdateStatusKey("StatusCreateShortcutSuccess", created.Name);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusCreateShortcutFailed", ex.Message);
+            }
+        }
+
+        private void ExecuteOpenInNewWindowCommand(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path) || !target.IsDirectory)
+            {
+                return;
+            }
+
+            try
+            {
+                if (Application.Current is App app)
+                {
+                    app.CreateWindow(target.Path);
+                    UpdateStatusKey("StatusOpenedInNewWindow", target.DisplayName);
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusOpenInNewWindowFailed", ex.Message);
+            }
+        }
+
+        private async Task ExecuteOpenTargetCommandAsync(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path) || target.IsDirectory)
+            {
+                return;
+            }
+
+            try
+            {
+                string resolvedTargetPath = await Task.Run(() => _explorerService.ResolveShortcutTargetPath(target.Path));
+                if (Uri.TryCreate(resolvedTargetPath, UriKind.Absolute, out Uri? uri) &&
+                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                {
+                    _ = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = resolvedTargetPath,
+                        UseShellExecute = true
+                    });
+                    UpdateStatusKey("StatusOpened", target.DisplayName);
+                    return;
+                }
+
+                if (_explorerService.DirectoryExists(resolvedTargetPath))
+                {
+                    await NavigateToPathAsync(resolvedTargetPath, pushHistory: true);
+                    return;
+                }
+
+                if (_explorerService.PathExists(resolvedTargetPath))
+                {
+                    _ = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = resolvedTargetPath,
+                        UseShellExecute = true
+                    });
+                    UpdateStatusKey("StatusOpened", Path.GetFileName(resolvedTargetPath));
+                    return;
+                }
+
+                UpdateStatusKey("StatusOpenTargetFailed", resolvedTargetPath);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusOpenTargetFailed", ex.Message);
+            }
+        }
+
+        private void ExecuteRunAsAdministratorCommand(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path) || target.IsDirectory)
+            {
+                return;
+            }
+
+            try
+            {
+                _explorerService.RunAsAdministrator(target.Path);
+                UpdateStatusKey("StatusRunAsAdministratorStarted", target.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusRunAsAdministratorFailed", ex.Message);
+            }
+        }
+
+        private void ExecuteOpenWithCommand(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path) || target.IsDirectory)
+            {
+                return;
+            }
+
+            try
+            {
+                IntPtr ownerHandle = _windowHandle != IntPtr.Zero
+                    ? _windowHandle
+                    : WindowNative.GetWindowHandle(this);
+                var openAsInfo = new NativeMethods.OpenAsInfo
+                {
+                    FilePath = target.Path,
+                    ClassName = null,
+                    Flags = NativeMethods.OAIF_EXEC | NativeMethods.OAIF_HIDE_REGISTRATION
+                };
+                int hr = NativeMethods.SHOpenWithDialog(ownerHandle, ref openAsInfo);
+                if (hr < 0)
+                {
+                    Marshal.ThrowExceptionForHR(hr);
+                }
+
+                UpdateStatusKey("StatusOpenWithOpened", target.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusOpenWithFailed", ex.Message);
             }
         }
 
@@ -8747,6 +9510,21 @@ namespace FileExplorerUI
 
     internal static partial class NativeMethods
     {
+        internal const uint OAIF_EXEC = 0x00000004;
+        internal const uint OAIF_HIDE_REGISTRATION = 0x00000020;
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        internal struct OpenAsInfo
+        {
+            [MarshalAs(UnmanagedType.LPWStr)]
+            internal string FilePath;
+
+            [MarshalAs(UnmanagedType.LPWStr)]
+            internal string? ClassName;
+
+            internal uint Flags;
+        }
+
         [LibraryImport("user32.dll", EntryPoint = "LoadCursorW", SetLastError = true)]
         internal static partial IntPtr LoadCursor(IntPtr hInstance, int lpCursorName);
 
@@ -8758,6 +9536,9 @@ namespace FileExplorerUI
 
         [LibraryImport("user32.dll", EntryPoint = "CallWindowProcW")]
         internal static partial IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        internal static extern int SHOpenWithDialog(IntPtr hwndParent, ref OpenAsInfo openAsInfo);
     }
 
 }

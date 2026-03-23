@@ -180,6 +180,9 @@
   <data name="CommonCreateShortcut" xml:space="preserve">
     <value>创建快捷方式</value>
   </data>
+  <data name="ShortcutNameSuffix" xml:space="preserve">
+    <value> - 快捷方式</value>
+  </data>
   <data name="CommonCopyFilePath" xml:space="preserve">
     <value>复制文件路径</value>
   </data>
@@ -632,6 +635,33 @@
   </data>
   <data name="StatusCopyPathFailed" xml:space="preserve">
     <value>复制路径失败：{0}</value>
+  </data>
+  <data name="StatusCreateShortcutSuccess" xml:space="preserve">
+    <value>已创建快捷方式：{0}</value>
+  </data>
+  <data name="StatusCreateShortcutFailed" xml:space="preserve">
+    <value>创建快捷方式失败：{0}</value>
+  </data>
+  <data name="StatusOpenTargetFailed" xml:space="preserve">
+    <value>打开目标位置失败：{0}</value>
+  </data>
+  <data name="StatusRunAsAdministratorStarted" xml:space="preserve">
+    <value>已发起以管理员身份运行：{0}</value>
+  </data>
+  <data name="StatusRunAsAdministratorFailed" xml:space="preserve">
+    <value>以管理员身份运行失败：{0}</value>
+  </data>
+  <data name="StatusOpenWithOpened" xml:space="preserve">
+    <value>已打开“打开方式”对话框：{0}</value>
+  </data>
+  <data name="StatusOpenWithFailed" xml:space="preserve">
+    <value>打开方式失败：{0}</value>
+  </data>
+  <data name="StatusOpenedInNewWindow" xml:space="preserve">
+    <value>已在新窗口中打开：{0}</value>
+  </data>
+  <data name="StatusOpenInNewWindowFailed" xml:space="preserve">
+    <value>在新窗口中打开失败：{0}</value>
   </data>
   <data name="StatusOpenTerminalSuccess" xml:space="preserve">
     <value>已打开终端：{0}</value>

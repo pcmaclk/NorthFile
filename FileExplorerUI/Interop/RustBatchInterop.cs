@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace FileExplorerUI.Interop;
@@ -12,6 +14,8 @@ public struct RustFileEntry
     public ushort name_len;
     public ushort flags;
     public ulong mft_ref;
+    public ulong size_bytes;
+    public long modified_unix_ms;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -42,7 +46,13 @@ public struct RustNtfsVolumeMeta
     public int error_code;
 }
 
-public sealed record FileRow(ulong MftRef, string Name, bool IsDirectory, bool IsLink);
+public sealed record FileRow(
+    ulong MftRef,
+    string Name,
+    bool IsDirectory,
+    bool IsLink,
+    long? SizeBytes,
+    DateTime? ModifiedAt);
 public enum DirectorySortMode : byte
 {
     FolderFirstNameAsc = 1
@@ -61,9 +71,56 @@ public sealed record FileBatchPage(
 
 public static partial class RustBatchInterop
 {
+    private const ulong UnknownSizeBytes = ulong.MaxValue;
+    private const long UnknownModifiedUnixMs = long.MinValue;
     private static readonly object NativeCallGate = new();
     private static string S(string key) => LocalizedStrings.Instance.Get(key);
     private static string SF(string key, params object[] args) => string.Format(S(key), args);
+
+    private static void AppendBatchInteropPerfLog(string message)
+    {
+        try
+        {
+            string baseDirectory = AppContext.BaseDirectory;
+            if (string.IsNullOrWhiteSpace(baseDirectory))
+            {
+                return;
+            }
+
+            string logPath = Path.Combine(baseDirectory, "batch-interop-perf.log");
+            string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}";
+            File.AppendAllText(logPath, line);
+        }
+        catch
+        {
+        }
+    }
+
+    private static RustBatchResult InvokeBatchNative(
+        string operation,
+        string path,
+        ulong cursor,
+        uint limit,
+        Func<RustBatchResult> nativeCall,
+        out long waitMs,
+        out long nativeMs)
+    {
+        Stopwatch waitSw = Stopwatch.StartNew();
+        lock (NativeCallGate)
+        {
+            waitSw.Stop();
+            waitMs = waitSw.ElapsedMilliseconds;
+
+            Stopwatch nativeSw = Stopwatch.StartNew();
+            RustBatchResult batch = nativeCall();
+            nativeSw.Stop();
+            nativeMs = nativeSw.ElapsedMilliseconds;
+
+            AppendBatchInteropPerfLog(
+                $"[BATCH-INTEROP] op={operation} stage=native path=\"{path}\" cursor={cursor} limit={limit} wait={waitMs}ms native={nativeMs}ms error={batch.error_code} rows={batch.entries_len} total={batch.total_entries} source={batch.source_kind}");
+            return batch;
+        }
+    }
 
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_get_demo_batch")]
     private static partial RustBatchResult GetDemoBatch(uint limit);
@@ -212,11 +269,21 @@ public static partial class RustBatchInterop
         out string errorMessage
     )
     {
-        lock (NativeCallGate)
-        {
-            RustBatchResult batch = ListDirBatchAuto(path, cursor, limit, lastFetchMs, (byte)sortMode);
-            return TryDecodeAndFree(batch, out page, out errorCode, out errorMessage);
-        }
+        RustBatchResult batch = InvokeBatchNative(
+            "dir-auto.try",
+            path,
+            cursor,
+            limit,
+            () => ListDirBatchAuto(path, cursor, limit, lastFetchMs, (byte)sortMode),
+            out long waitMs,
+            out long nativeMs);
+
+        Stopwatch decodeSw = Stopwatch.StartNew();
+        bool ok = TryDecodeAndFree(batch, out page, out errorCode, out errorMessage);
+        decodeSw.Stop();
+        AppendBatchInteropPerfLog(
+            $"[BATCH-INTEROP] op=dir-auto.try stage=decode path=\"{path}\" cursor={cursor} limit={limit} wait={waitMs}ms native={nativeMs}ms decode={decodeSw.ElapsedMilliseconds}ms ok={ok} rows={page.Rows.Count} total={page.TotalEntries} error={errorCode} source={page.SourceKind}");
+        return ok;
     }
 
     public static unsafe bool TrySearchDirectoryRowsAuto(
@@ -231,11 +298,21 @@ public static partial class RustBatchInterop
         out string errorMessage
     )
     {
-        lock (NativeCallGate)
-        {
-            RustBatchResult batch = SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs, (byte)sortMode);
-            return TryDecodeAndFree(batch, out page, out errorCode, out errorMessage);
-        }
+        RustBatchResult batch = InvokeBatchNative(
+            "search-auto.try",
+            path,
+            cursor,
+            limit,
+            () => SearchDirBatchAuto(path, query, cursor, limit, lastFetchMs, (byte)sortMode),
+            out long waitMs,
+            out long nativeMs);
+
+        Stopwatch decodeSw = Stopwatch.StartNew();
+        bool ok = TryDecodeAndFree(batch, out page, out errorCode, out errorMessage);
+        decodeSw.Stop();
+        AppendBatchInteropPerfLog(
+            $"[BATCH-INTEROP] op=search-auto.try stage=decode path=\"{path}\" cursor={cursor} limit={limit} wait={waitMs}ms native={nativeMs}ms decode={decodeSw.ElapsedMilliseconds}ms ok={ok} rows={page.Rows.Count} total={page.TotalEntries} error={errorCode} source={page.SourceKind}");
+        return ok;
     }
 
     public static void InvalidateMemoryDirectory(string path)
@@ -311,7 +388,13 @@ public static partial class RustBatchInterop
                 string name = new(names.Slice(off, len));
                 bool isDirectory = (entry.flags & 0x0001) != 0;
                 bool isLink = (entry.flags & 0x0002) != 0;
-                rows.Add(new FileRow(entry.mft_ref, name, isDirectory, isLink));
+                rows.Add(new FileRow(
+                    entry.mft_ref,
+                    name,
+                    isDirectory,
+                    isLink,
+                    DecodeSizeBytes(entry.size_bytes),
+                    DecodeModifiedAt(entry.modified_unix_ms)));
             }
 
             return new FileBatchPage(
@@ -327,7 +410,10 @@ public static partial class RustBatchInterop
         }
         finally
         {
-            FreeBatchResult(batch);
+            lock (NativeCallGate)
+            {
+                FreeBatchResult(batch);
+            }
         }
     }
 
@@ -359,7 +445,13 @@ public static partial class RustBatchInterop
                 string name = new(names.Slice(off, len));
                 bool isDirectory = (entry.flags & 0x0001) != 0;
                 bool isLink = (entry.flags & 0x0002) != 0;
-                rows.Add(new FileRow(entry.mft_ref, name, isDirectory, isLink));
+                rows.Add(new FileRow(
+                    entry.mft_ref,
+                    name,
+                    isDirectory,
+                    isLink,
+                    DecodeSizeBytes(entry.size_bytes),
+                    DecodeModifiedAt(entry.modified_unix_ms)));
             }
 
             page = new FileBatchPage(
@@ -378,7 +470,10 @@ public static partial class RustBatchInterop
         }
         finally
         {
-            FreeBatchResult(batch);
+            lock (NativeCallGate)
+            {
+                FreeBatchResult(batch);
+            }
         }
     }
 
@@ -392,6 +487,28 @@ public static partial class RustBatchInterop
         0,
         0
     );
+
+    private static long? DecodeSizeBytes(ulong value) =>
+        value == UnknownSizeBytes
+            ? null
+            : checked((long)value);
+
+    private static DateTime? DecodeModifiedAt(long value)
+    {
+        if (value == UnknownModifiedUnixMs)
+        {
+            return null;
+        }
+
+        try
+        {
+            return DateTimeOffset.FromUnixTimeMilliseconds(value).LocalDateTime;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     public static string DescribeBatchSource(byte sourceKind) =>
         sourceKind switch

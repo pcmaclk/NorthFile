@@ -118,6 +118,15 @@
   <data name="StatusOpenFailed" xml:space="preserve"><value>Open failed: {0}</value></data>
   <data name="StatusCopyPathReady" xml:space="preserve"><value>Copied path: {0}</value></data>
   <data name="StatusCopyPathFailed" xml:space="preserve"><value>Copy path failed: {0}</value></data>
+  <data name="StatusCreateShortcutSuccess" xml:space="preserve"><value>Created shortcut: {0}</value></data>
+  <data name="StatusCreateShortcutFailed" xml:space="preserve"><value>Create shortcut failed: {0}</value></data>
+  <data name="StatusOpenTargetFailed" xml:space="preserve"><value>Open target failed: {0}</value></data>
+  <data name="StatusRunAsAdministratorStarted" xml:space="preserve"><value>Run as administrator started: {0}</value></data>
+  <data name="StatusRunAsAdministratorFailed" xml:space="preserve"><value>Run as administrator failed: {0}</value></data>
+  <data name="StatusOpenWithOpened" xml:space="preserve"><value>Opened with dialog: {0}</value></data>
+  <data name="StatusOpenWithFailed" xml:space="preserve"><value>Open with failed: {0}</value></data>
+  <data name="StatusOpenedInNewWindow" xml:space="preserve"><value>Opened in new window: {0}</value></data>
+  <data name="StatusOpenInNewWindowFailed" xml:space="preserve"><value>Open in new window failed: {0}</value></data>
   <data name="StatusOpenTerminalSuccess" xml:space="preserve"><value>Opened terminal: {0}</value></data>
   <data name="StatusOpenTerminalFailed" xml:space="preserve"><value>Open terminal failed: {0}</value></data>
   <data name="StatusPropertiesOpened" xml:space="preserve"><value>Opened properties: {0}</value></data>
@@ -162,6 +171,7 @@
   <data name="CommonCompressZip" xml:space="preserve"><value>ZIP</value></data>
   <data name="CommonCompress7z" xml:space="preserve"><value>7z</value></data>
   <data name="CommonCreateShortcut" xml:space="preserve"><value>Create shortcut</value></data>
+  <data name="ShortcutNameSuffix" xml:space="preserve"><value> - Shortcut</value></data>
   <data name="CommonCopyFilePath" xml:space="preserve"><value>Copy file path</value></data>
   <data name="CommonCopyFolderPath" xml:space="preserve"><value>Copy folder path</value></data>
   <data name="CommonCopyPath" xml:space="preserve"><value>Copy path</value></data>

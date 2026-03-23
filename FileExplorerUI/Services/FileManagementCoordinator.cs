@@ -80,6 +80,16 @@ public sealed class FileManagementCoordinator
         return new CreatedEntryInfo(name, fullPath, isDirectory, changeNotified);
     }
 
+    public async Task<CreatedEntryInfo> CreateShortcutAsync(string directoryPath, string targetPath)
+    {
+        string name = _explorerService.GenerateUniqueShortcutName(directoryPath, targetPath);
+        string fullPath = Path.Combine(directoryPath, name);
+
+        await _explorerService.CreateShortcutAsync(targetPath, fullPath);
+        bool changeNotified = TryMarkPathChanged(directoryPath);
+        return new CreatedEntryInfo(name, fullPath, IsDirectory: false, changeNotified);
+    }
+
     public async Task<RenamedEntryInfo> RenameEntryAsync(string directoryPath, string currentName, string newName)
     {
         string sourcePath = Path.Combine(directoryPath, currentName);

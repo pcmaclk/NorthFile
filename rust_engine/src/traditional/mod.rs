@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::fs;
 use std::path::Path;
+use std::time::SystemTime;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
 
@@ -14,6 +15,8 @@ pub struct TraditionalDirItem {
     pub name: String,
     pub is_dir: bool,
     pub is_link: bool,
+    pub size_bytes: Option<u64>,
+    pub modified_unix_ms: Option<i64>,
 }
 
 pub const SORT_DIRS_FIRST_NAME_ASC: u8 = 1;
@@ -127,6 +130,13 @@ impl PathEngine for TraditionalPathEngine {
 pub const ENTRY_FLAG_DIRECTORY: u16 = 0x0001;
 pub const ENTRY_FLAG_LINK: u16 = 0x0002;
 
+fn system_time_to_unix_ms(value: SystemTime) -> Option<i64> {
+    value
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+}
+
 pub fn list_directory_page(
     dir_path: &Path,
     cursor: u64,
@@ -169,11 +179,18 @@ pub fn list_directory_all(dir_path: &Path, sort_mode: u8) -> Result<Vec<Traditio
             Ok(v) => v,
             Err(_) => continue,
         };
+        let is_dir = resolve_entry_is_dir(&dir_entry, &file_type);
+        let metadata = dir_entry.metadata().ok();
 
         items.push(TraditionalDirItem {
             name: dir_entry.file_name().to_string_lossy().into_owned(),
-            is_dir: resolve_entry_is_dir(&dir_entry, &file_type),
+            is_dir,
             is_link: resolve_entry_is_link(&dir_entry),
+            size_bytes: metadata.as_ref().filter(|_| !is_dir).map(|value| value.len()),
+            modified_unix_ms: metadata
+                .as_ref()
+                .and_then(|value| value.modified().ok())
+                .and_then(system_time_to_unix_ms),
         });
     }
 

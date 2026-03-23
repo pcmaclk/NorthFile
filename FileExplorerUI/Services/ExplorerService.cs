@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,6 +46,29 @@ public sealed class ExplorerService
         {
             candidate = $"{baseName} ({suffix})";
             suffix++;
+        }
+
+        return candidate;
+    }
+
+    public string GenerateUniqueShortcutName(string directoryPath, string targetPath)
+    {
+        string normalizedTargetPath = targetPath.TrimEnd('\\');
+        string baseName = Path.GetFileName(normalizedTargetPath);
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+            baseName = normalizedTargetPath;
+        }
+
+        string suffix = LocalizedStrings.Instance.Get("ShortcutNameSuffix");
+        string candidateBaseName = baseName + suffix;
+        string candidate = candidateBaseName + ".lnk";
+        int disambiguator = 2;
+
+        while (PathExists(Path.Combine(directoryPath, candidate)))
+        {
+            candidate = $"{candidateBaseName} ({disambiguator}).lnk";
+            disambiguator++;
         }
 
         return candidate;
@@ -194,6 +218,16 @@ public sealed class ExplorerService
         return RustBatchInterop.TrySearchDirectoryRowsAuto(path, query, cursor, limit, lastFetchMs, sortMode, out page, out errorCode, out errorMessage);
     }
 
+    public IEntryResultSet CreateDirectoryResultSet(string path, DirectorySortMode sortMode)
+    {
+        return new DirectoryEntryResultSet(this, path, sortMode);
+    }
+
+    public IEntryResultSet CreateSearchResultSet(string path, string query, DirectorySortMode sortMode)
+    {
+        return new SearchEntryResultSet(this, path, query, sortMode);
+    }
+
     public string DescribeBatchSource(byte sourceKind)
     {
         return RustBatchInterop.DescribeBatchSource(sourceKind);
@@ -332,6 +366,163 @@ public sealed class ExplorerService
         }
     }
 
+    public void RunAsAdministrator(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Path is required.", nameof(path));
+        }
+
+        var info = new ShellExecuteInfo
+        {
+            cbSize = Marshal.SizeOf<ShellExecuteInfo>(),
+            lpVerb = "runas",
+            lpFile = path,
+            nShow = ShowNormal
+        };
+
+        if (!ShellExecuteEx(ref info))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+    }
+
+    public string ResolveShortcutTargetPath(string shortcutPath)
+    {
+        if (string.IsNullOrWhiteSpace(shortcutPath))
+        {
+            throw new ArgumentException("Path is required.", nameof(shortcutPath));
+        }
+
+        string extension = Path.GetExtension(shortcutPath);
+        if (string.Equals(extension, ".url", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (string line in File.ReadLines(shortcutPath))
+            {
+                if (line.StartsWith("URL=", StringComparison.OrdinalIgnoreCase))
+                {
+                    string value = line["URL=".Length..].Trim();
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        return value;
+                    }
+                }
+            }
+
+            throw new InvalidOperationException("Shortcut target is unavailable.");
+        }
+
+        Type shellType = Type.GetTypeFromProgID("WScript.Shell", throwOnError: true)
+            ?? throw new InvalidOperationException("WScript.Shell is unavailable.");
+        object? shell = null;
+        object? shortcut = null;
+
+        try
+        {
+            shell = Activator.CreateInstance(shellType);
+            shortcut = shellType.InvokeMember(
+                "CreateShortcut",
+                BindingFlags.InvokeMethod,
+                binder: null,
+                target: shell,
+                args: new object[] { shortcutPath });
+
+            if (shortcut is null)
+            {
+                throw new InvalidOperationException("Shortcut target is unavailable.");
+            }
+
+            object? targetPath = shortcut.GetType().InvokeMember(
+                "TargetPath",
+                BindingFlags.GetProperty,
+                binder: null,
+                target: shortcut,
+                args: null);
+            object? arguments = shortcut.GetType().InvokeMember(
+                "Arguments",
+                BindingFlags.GetProperty,
+                binder: null,
+                target: shortcut,
+                args: null);
+
+            string? value = targetPath as string;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException("Shortcut target is unavailable.");
+            }
+
+            if (string.Equals(Path.GetFileName(value), "explorer.exe", StringComparison.OrdinalIgnoreCase) &&
+                TryExtractExplorerShortcutTarget(arguments as string, out string? extractedTarget))
+            {
+                return extractedTarget;
+            }
+
+            return value;
+        }
+        finally
+        {
+            if (shortcut is not null && Marshal.IsComObject(shortcut))
+            {
+                Marshal.ReleaseComObject(shortcut);
+            }
+
+            if (shell is not null && Marshal.IsComObject(shell))
+            {
+                Marshal.ReleaseComObject(shell);
+            }
+        }
+    }
+
+    private static bool TryExtractExplorerShortcutTarget(string? arguments, out string extractedTarget)
+    {
+        extractedTarget = string.Empty;
+        if (string.IsNullOrWhiteSpace(arguments))
+        {
+            return false;
+        }
+
+        foreach (string rawPart in arguments.Split(','))
+        {
+            string part = rawPart.Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(part))
+            {
+                continue;
+            }
+
+            if (part.StartsWith("/select", StringComparison.OrdinalIgnoreCase) ||
+                part.StartsWith("/e", StringComparison.OrdinalIgnoreCase) ||
+                part.StartsWith("/root", StringComparison.OrdinalIgnoreCase) ||
+                part.StartsWith("/n", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (Directory.Exists(part) || File.Exists(part))
+            {
+                extractedTarget = part;
+                return true;
+            }
+        }
+
+        string trimmed = arguments.Trim();
+        int quoteStart = trimmed.IndexOf('"');
+        if (quoteStart >= 0)
+        {
+            int quoteEnd = trimmed.IndexOf('"', quoteStart + 1);
+            if (quoteEnd > quoteStart)
+            {
+                string quoted = trimmed[(quoteStart + 1)..quoteEnd];
+                if (Directory.Exists(quoted) || File.Exists(quoted))
+                {
+                    extractedTarget = quoted;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public Task CreateEmptyFileAsync(string path)
     {
         return Task.Run(
@@ -350,6 +541,71 @@ public sealed class ExplorerService
     public Task CreatePathAsync(string path, bool isDirectory)
     {
         return isDirectory ? CreateDirectoryAsync(path) : CreateEmptyFileAsync(path);
+    }
+
+    public Task CreateShortcutAsync(string targetPath, string shortcutPath)
+    {
+        return Task.Run(
+            () =>
+            {
+                Type shellType = Type.GetTypeFromProgID("WScript.Shell", throwOnError: true)
+                    ?? throw new InvalidOperationException("WScript.Shell is unavailable.");
+                object? shell = null;
+                object? shortcut = null;
+
+                try
+                {
+                    shell = Activator.CreateInstance(shellType);
+                    shortcut = shellType.InvokeMember(
+                        "CreateShortcut",
+                        BindingFlags.InvokeMethod,
+                        binder: null,
+                        target: shell,
+                        args: new object[] { shortcutPath });
+
+                    if (shortcut is null)
+                    {
+                        throw new InvalidOperationException("Failed to create shortcut object.");
+                    }
+
+                    Type shortcutType = shortcut.GetType();
+                    shortcutType.InvokeMember(
+                        "TargetPath",
+                        BindingFlags.SetProperty,
+                        binder: null,
+                        target: shortcut,
+                        args: new object[] { targetPath });
+
+                    string workingDirectory = Directory.Exists(targetPath)
+                        ? targetPath
+                        : Path.GetDirectoryName(targetPath) ?? string.Empty;
+                    shortcutType.InvokeMember(
+                        "WorkingDirectory",
+                        BindingFlags.SetProperty,
+                        binder: null,
+                        target: shortcut,
+                        args: new object[] { workingDirectory });
+
+                    shortcutType.InvokeMember(
+                        "Save",
+                        BindingFlags.InvokeMethod,
+                        binder: null,
+                        target: shortcut,
+                        args: Array.Empty<object>());
+                }
+                finally
+                {
+                    if (shortcut is not null && Marshal.IsComObject(shortcut))
+                    {
+                        Marshal.ReleaseComObject(shortcut);
+                    }
+
+                    if (shell is not null && Marshal.IsComObject(shell))
+                    {
+                        Marshal.ReleaseComObject(shell);
+                    }
+                }
+            });
     }
 
     private static void CopyDirectory(string sourcePath, string targetPath)

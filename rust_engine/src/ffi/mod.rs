@@ -1,7 +1,10 @@
 use std::ffi::{CStr, CString, c_char};
 use std::fs;
+use std::fs::OpenOptions;
 use std::io::ErrorKind;
+use std::io::Write;
 use std::path::Path;
+use std::time::Instant;
 
 use crate::core::types::FileEntry;
 use crate::engine::classify_path;
@@ -246,6 +249,8 @@ const OP_BUSY: i32 = 2105;
 const OP_INVALID_INPUT: i32 = 2106;
 const OP_UNSUPPORTED: i32 = 2107;
 const OP_IO_GENERIC: i32 = 2199;
+const UNKNOWN_SIZE_BYTES: u64 = u64::MAX;
+const UNKNOWN_MODIFIED_UNIX_MS: i64 = i64::MIN;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn fe_get_engine_version() -> *const c_char {
@@ -254,6 +259,34 @@ pub extern "C" fn fe_get_engine_version() -> *const c_char {
 
 fn clamp_limit(limit: u32) -> u32 {
     limit.clamp(MIN_LIMIT, MAX_LIMIT)
+}
+
+fn append_range_perf_log(message: &str) {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.to_path_buf()));
+    let Some(dir) = exe_dir else {
+        return;
+    };
+
+    let path = dir.join("rust-range-perf.log");
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{}", message);
+    }
+}
+
+fn append_auto_perf_log(message: &str) {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.to_path_buf()));
+    let Some(dir) = exe_dir else {
+        return;
+    };
+
+    let path = dir.join("rust-auto-perf.log");
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{}", message);
+    }
 }
 
 fn suggest_next_limit(requested: u32, returned: usize, has_more: bool, last_fetch_ms: u32) -> u32 {
@@ -283,6 +316,14 @@ fn map_io_error_code(kind: ErrorKind) -> i32 {
         ErrorKind::WouldBlock | ErrorKind::TimedOut | ErrorKind::Interrupted => OP_BUSY,
         _ => OP_IO_GENERIC,
     }
+}
+
+fn encode_size_bytes(value: Option<u64>) -> u64 {
+    value.unwrap_or(UNKNOWN_SIZE_BYTES)
+}
+
+fn encode_modified_unix_ms(value: Option<i64>) -> i64 {
+    value.unwrap_or(UNKNOWN_MODIFIED_UNIX_MS)
 }
 
 #[unsafe(no_mangle)]
@@ -331,6 +372,8 @@ pub extern "C" fn fe_get_demo_batch(limit: u32) -> FfiBatchResult {
             name_len: len,
             flags: if idx == 0 { 1 } else { 0 },
             mft_ref: (idx as u64) + 1,
+            size_bytes: UNKNOWN_SIZE_BYTES,
+            modified_unix_ms: UNKNOWN_MODIFIED_UNIX_MS,
         });
     }
 
@@ -394,6 +437,8 @@ pub extern "C" fn fe_list_dir_batch(
             flags: (if item.is_dir { ENTRY_FLAG_DIRECTORY } else { 0 })
                 | (if item.is_link { ENTRY_FLAG_LINK } else { 0 }),
             mft_ref: cursor + (idx as u64) + 1,
+            size_bytes: encode_size_bytes(item.size_bytes),
+            modified_unix_ms: encode_modified_unix_ms(item.modified_unix_ms),
         });
     }
 
@@ -419,6 +464,7 @@ pub extern "C" fn fe_list_dir_batch_memory(
     last_fetch_ms: u32,
     sort_mode: u8,
 ) -> FfiBatchResult {
+    let total_sw = Instant::now();
     if path_utf8.is_null() {
         return FfiBatchResult::err(1001, "path is null");
     }
@@ -434,26 +480,66 @@ pub extern "C" fn fe_list_dir_batch_memory(
     };
     let sort_mode = normalize_sort_mode(sort_mode);
     let path = Path::new(path_str);
-    let meta = match get_or_probe_ntfs_meta(path) {
-        Ok(v) => v,
-        Err(e) => return FfiBatchResult::err(e.code as i32, &e.message),
-    };
 
-    // Switchable source:
-    // 1) Prefer NTFS INDEX_ROOT traversal for current path.
-    // 2) Fall back to simulated memory directory listing for now.
-    if let Some(index_root_batch) =
-        try_index_root_batch(meta, path, cursor, limit, last_fetch_ms, sort_mode)
-    {
-        return index_root_batch;
+    // Prefer raw NTFS directory INDEX traversal when volume access is available.
+    // In a normal unelevated desktop session this probe can fail, so keep the
+    // browse path on the cached memory-directory route instead of surfacing an
+    // error and forcing auto mode down to the uncached traditional path.
+    let probe_sw = Instant::now();
+    match get_or_probe_ntfs_meta(path) {
+        Ok(meta) => {
+            let probe_ms = probe_sw.elapsed().as_millis();
+            append_auto_perf_log(&format!(
+                "[RUST-AUTO] path=\"{}\" cursor={} limit={} stage=memory.probe-ok probe={}ms total_elapsed={}ms",
+                path.display(),
+                cursor,
+                limit,
+                probe_ms,
+                total_sw.elapsed().as_millis()
+            ));
+            if let Some(index_root_batch) =
+                try_index_root_batch(meta, path, cursor, limit, last_fetch_ms, sort_mode)
+            {
+                append_auto_perf_log(&format!(
+                    "[RUST-AUTO] path=\"{}\" cursor={} limit={} stage=memory.ntfs-hit total_elapsed={}ms source={}",
+                    path.display(),
+                    cursor,
+                    limit,
+                    total_sw.elapsed().as_millis(),
+                    index_root_batch.source_kind
+                ));
+                return index_root_batch;
+            }
+            append_auto_perf_log(&format!(
+                "[RUST-AUTO] path=\"{}\" cursor={} limit={} stage=memory.ntfs-miss total_elapsed={}ms",
+                path.display(),
+                cursor,
+                limit,
+                total_sw.elapsed().as_millis()
+            ));
+        }
+        Err(err) => {
+            append_auto_perf_log(&format!(
+                "[RUST-AUTO] path=\"{}\" cursor={} limit={} stage=memory.probe-err probe={}ms code={} total_elapsed={}ms",
+                path.display(),
+                cursor,
+                limit,
+                probe_sw.elapsed().as_millis(),
+                err.code as i32,
+                total_sw.elapsed().as_millis()
+            ));
+        }
     }
 
+    let fetch_sw = Instant::now();
     let (items, next_cursor, has_more, total_entries) =
         match list_directory_page_memory(path, cursor, limit as usize, sort_mode) {
             Ok(v) => v,
             Err(e) => return FfiBatchResult::err(e.code as i32, &e.message),
         };
+    let fetch_ms = fetch_sw.elapsed().as_millis();
 
+    let encode_sw = Instant::now();
     let mut names_utf16: Vec<u16> = Vec::new();
     let mut entries: Vec<FileEntry> = Vec::with_capacity(items.len());
 
@@ -472,8 +558,19 @@ pub extern "C" fn fe_list_dir_batch_memory(
             flags: (if item.is_dir { ENTRY_FLAG_DIRECTORY } else { 0 })
                 | (if item.is_link { ENTRY_FLAG_LINK } else { 0 }),
             mft_ref: cursor + (idx as u64) + 1,
+            size_bytes: encode_size_bytes(item.size_bytes),
+            modified_unix_ms: encode_modified_unix_ms(item.modified_unix_ms),
         });
     }
+    append_range_perf_log(&format!(
+        "[RUST-RANGE] kind=memory-ffi path=\"{}\" cursor={} limit={} rows={} fetch={}ms encode={}ms",
+        path.display(),
+        cursor,
+        limit,
+        items.len(),
+        fetch_ms,
+        encode_sw.elapsed().as_millis()
+    ));
 
     let suggested_next_limit = suggest_next_limit(limit, items.len(), has_more, last_fetch_ms);
     FfiBatchResult::ok(
@@ -497,6 +594,7 @@ fn try_index_root_batch(
     last_fetch_ms: u32,
     sort_mode: u8,
 ) -> Option<FfiBatchResult> {
+    let fetch_sw = Instant::now();
     let (page, next_cursor, has_more, total_entries) = match list_directory_page_ntfs_cached(
         path,
         meta,
@@ -507,6 +605,7 @@ fn try_index_root_batch(
         Ok(v) => v,
         Err(_) => return None,
     };
+    let fetch_ms = fetch_sw.elapsed().as_millis();
 
     // Some volume roots still hit parser gaps in the raw NTFS path and can
     // incorrectly look empty. If the NTFS path returns no rows for the first
@@ -515,6 +614,7 @@ fn try_index_root_batch(
         return None;
     }
 
+    let encode_sw = Instant::now();
     let mut names_utf16: Vec<u16> = Vec::new();
     let mut entries: Vec<FileEntry> = Vec::with_capacity(page.len());
     for item in &page {
@@ -529,8 +629,19 @@ fn try_index_root_batch(
             name_len: len,
             flags: item.flags,
             mft_ref: item.file_ref,
+            size_bytes: UNKNOWN_SIZE_BYTES,
+            modified_unix_ms: UNKNOWN_MODIFIED_UNIX_MS,
         });
     }
+    append_range_perf_log(&format!(
+        "[RUST-RANGE] kind=ntfs-ffi path=\"{}\" cursor={} limit={} rows={} fetch={}ms encode={}ms",
+        path.display(),
+        cursor,
+        limit,
+        page.len(),
+        fetch_ms,
+        encode_sw.elapsed().as_millis()
+    ));
     let suggested_next_limit = suggest_next_limit(limit, page.len(), has_more, last_fetch_ms);
 
     Some(FfiBatchResult::ok(
@@ -561,6 +672,7 @@ pub extern "C" fn fe_list_dir_batch_auto(
     last_fetch_ms: u32,
     sort_mode: u8,
 ) -> FfiBatchResult {
+    let total_sw = Instant::now();
     if path_utf8.is_null() {
         return FfiBatchResult::err(1001, "path is null");
     }
@@ -576,21 +688,67 @@ pub extern "C" fn fe_list_dir_batch_auto(
         Err(_) => return FfiBatchResult::err(1001, "path is not valid utf-8"),
     };
     let path = Path::new(path_str);
+    let classify_sw = Instant::now();
+    let volume_kind = classify_path(path);
+    let classify_ms = classify_sw.elapsed().as_millis();
 
-    match classify_path(path) {
+    let result = match volume_kind {
         VolumeKind::NtfsLocal => {
+            let first_try_sw = Instant::now();
             let first_try =
                 fe_list_dir_batch_memory(path_utf8, cursor, limit, last_fetch_ms, sort_mode);
+            let first_try_ms = first_try_sw.elapsed().as_millis();
             if first_try.error_code == 0 {
+                append_auto_perf_log(&format!(
+                    "[RUST-AUTO] path=\"{}\" cursor={} limit={} classify={}ms route=ntfs-local->memory-ok first_try={}ms source={} total={} total_elapsed={}ms",
+                    path.display(),
+                    cursor,
+                    limit,
+                    classify_ms,
+                    first_try_ms,
+                    first_try.source_kind,
+                    first_try.total_entries,
+                    total_sw.elapsed().as_millis()
+                ));
                 first_try
             } else {
-                fe_list_dir_batch(path_utf8, cursor, limit, last_fetch_ms, sort_mode)
+                let fallback_sw = Instant::now();
+                let fallback = fe_list_dir_batch(path_utf8, cursor, limit, last_fetch_ms, sort_mode);
+                append_auto_perf_log(&format!(
+                    "[RUST-AUTO] path=\"{}\" cursor={} limit={} classify={}ms route=ntfs-local->memory-err->traditional first_try={}ms first_error={} fallback={}ms fallback_source={} total={} total_elapsed={}ms",
+                    path.display(),
+                    cursor,
+                    limit,
+                    classify_ms,
+                    first_try_ms,
+                    first_try.error_code,
+                    fallback_sw.elapsed().as_millis(),
+                    fallback.source_kind,
+                    fallback.total_entries,
+                    total_sw.elapsed().as_millis()
+                ));
+                fallback
             }
         }
         VolumeKind::OtherLocal | VolumeKind::Network => {
-            fe_list_dir_batch(path_utf8, cursor, limit, last_fetch_ms, sort_mode)
+            let traditional_sw = Instant::now();
+            let traditional = fe_list_dir_batch(path_utf8, cursor, limit, last_fetch_ms, sort_mode);
+            append_auto_perf_log(&format!(
+                "[RUST-AUTO] path=\"{}\" cursor={} limit={} classify={}ms route=traditional-only call={}ms source={} total={} total_elapsed={}ms",
+                path.display(),
+                cursor,
+                limit,
+                classify_ms,
+                traditional_sw.elapsed().as_millis(),
+                traditional.source_kind,
+                traditional.total_entries,
+                total_sw.elapsed().as_millis()
+            ));
+            traditional
         }
-    }
+    };
+
+    result
 }
 
 #[derive(Debug, Clone)]
@@ -688,6 +846,8 @@ pub extern "C" fn fe_search_dir_batch_auto(
             } else {
                 item.mft_ref
             },
+            size_bytes: UNKNOWN_SIZE_BYTES,
+            modified_unix_ms: UNKNOWN_MODIFIED_UNIX_MS,
         });
     }
 
@@ -1033,6 +1193,8 @@ pub extern "C" fn fe_ntfs_list_index_root(
             name_len: len,
             flags: item.flags,
             mft_ref: item.file_ref,
+            size_bytes: UNKNOWN_SIZE_BYTES,
+            modified_unix_ms: UNKNOWN_MODIFIED_UNIX_MS,
         });
     }
 

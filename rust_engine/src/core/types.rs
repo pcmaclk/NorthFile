@@ -35,6 +35,8 @@ pub struct FileEntry {
     pub name_len: u16,
     pub flags: u16,
     pub mft_ref: u64,
+    pub size_bytes: u64,
+    pub modified_unix_ms: i64,
 }
 
 #[derive(Debug, Clone)]

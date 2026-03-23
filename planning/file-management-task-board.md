@@ -1,6 +1,6 @@
 # NorthFile File Management Task Board
 
-Last updated: 2026-03-15
+Last updated: 2026-03-22
 Phase: post-`0.1.1`
 
 ## Scope
@@ -23,6 +23,10 @@ Deferred:
 
 ## Current Progress
 
+- 2026-03-22: wired the first real placeholder context-menu commands; `Open in new window` now opens a second `MainWindow` with the target folder path, and `Open with` now goes through the system `SHOpenWithDialog` path instead of staying as a disabled placeholder
+- 2026-03-22: documented the next follow-up for file context actions: `Open with` may later need an app-owned recent/recommended-program list, while `Create shortcut` still remains an unimplemented placeholder and should be split into `.lnk` creation, naming, refresh, and post-create selection work
+- 2026-03-23: aligned current large-directory browse work with the longer-term result-set plan; the UI browse path is starting to move from direct directory paging calls toward a `readRange(startIndex, count)`-style result-set abstraction so future local/global index backends can plug into the same scrolling host
+- 2026-03-23: moved details-mode batch metadata for normal directory browsing into the Rust result payload on the `MemoryFallback/Traditional` path, so the current visible block no longer needs a separate C# `FileInfo/DirectoryInfo` hydration pass just to fill `size` and `modified`
 - 2026-03-17: documented the placeholder context-menu matrix for file, folder, and background targets; first-pass compression should target ZIP, 7z remains a later follow-up, and background `New` is expected to become a submenu
 - 2026-03-17: expanded the list context menu into distinct file / folder / background display groups with placeholder commands for future features, while keeping only the already-implemented actions wired
 - 2026-03-17: stabilized repeated item right-click targeting so an already-established file/folder context no longer degrades into the background menu during the list-level `ContextRequested` pass
@@ -209,6 +213,44 @@ Allow selecting multiple items and applying delete safely.
 
 - User can select multiple items reliably
 - Batch delete works and gives clear confirmation
+
+## FM-07 Context Menu Follow-up Commands
+
+### Goal
+
+Finish the first batch of non-placeholder list context-menu actions without regressing the shared command model.
+
+### Tasks
+
+- Keep `Open in new window` aligned with the shared command catalog and dynamic menu wiring
+- Decide whether new windows should inherit view mode, sort mode, grouping, query text, and future panel/session state
+- Keep `Open with` on the system dialog for now, but document the later custom-dialog replacement path
+- Design a custom `Open with` dialog that can show recent apps, recommended apps, and a browse-more entry
+- Research and encapsulate candidate-app sources for a custom `Open with` dialog:
+- `OpenWithList`
+- `OpenWithProgids`
+- per-extension user choice / recent app state
+- Implement `Create shortcut` with `.lnk` creation, conflict naming, refresh, and post-create selection behavior
+- Add regression coverage so newly implemented context-menu items are not left as static disabled XAML placeholders again
+
+### Dependencies
+
+- Shared file-command catalog and target resolution
+- `FileManagementCoordinator` for refresh/reselect patterns
+- Stable window creation flow for multi-window support
+
+### Current implementation note
+
+- `Open in new window` is complete enough for daily use, but only carries the target path into the new window
+- `Open with` is intentionally still the system dialog; the resource-explorer-style app list is a later enhancement, not current behavior
+- `Create shortcut` is still pending
+
+### Definition of done
+
+- Folder context menu can open a new window reliably
+- File context menu can open the system `Open with` dialog reliably
+- Remaining first-batch placeholders have explicit follow-up notes instead of implicit disabled XAML
+- `Create shortcut` has either shipped or been split into a concrete follow-up checklist with owner-ready steps
 - Mixed file/folder selection is handled correctly
 
 ### Validation
@@ -301,3 +343,15 @@ Reason:
 - Shifted current-folder existence probing from menu-state calculation to action-time validation for create/paste so right-click menu opening stays I/O-light.
 - Hardened pointer/cursor behavior around context-menu and splitter interactions by removing global cursor forcing and keeping splitter feedback local, then adding arrow-reset fallback on activation/resize/client-pointer movement to avoid sticky busy/resize cursors.
 - Added list-scroll auto-dismiss for the entries context menu so wheel/scrollbar movement closes the open flyout immediately.
+- First-batch context-menu integration is now functionally complete for:
+  - `Open in new window`
+  - `Open with`
+  - `Create shortcut`
+  - `Open target`
+  - `Run as administrator`
+- Context-menu follow-up rule is now explicit:
+  - future command integrations must update provider visibility, `MainWindow.xaml.cs` execution/can-execute, and `MainWindow.xaml` dynamic menu wiring together so shipped commands do not remain static disabled placeholders.
+- Details large-directory scrolling has been moved off the old sequential paging assumptions:
+  - details now routes scrolling through viewport-range reads
+  - small moves prefetch near the loaded tail
+  - large jumps read the current viewport block directly
