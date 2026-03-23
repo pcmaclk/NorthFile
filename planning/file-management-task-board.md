@@ -355,3 +355,12 @@ Reason:
   - details now routes scrolling through viewport-range reads
   - small moves prefetch near the loaded tail
   - large jumps read the current viewport block directly
+## 2026-03-23 全局索引前置设计
+
+- 新增《全局索引数据结构与演进方案》：
+  - 明确主记录表、排序索引、搜索索引三层结构
+  - 明确与 `IEntryResultSet` 的集成方式
+  - 明确目录级缓存到全局索引的分阶段演进顺序
+- 下一阶段建议：
+  - 先做全局索引方案验证与基础类型定义
+  - 再新开分支做全局索引第一阶段原型
