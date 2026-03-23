@@ -379,7 +379,7 @@
                             Margin="10,0,0,4"
                             Padding="0"
                             HorizontalAlignment="Left"
-                            Background="AliceBlue"
+                            Background="Transparent"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="0,0,0,1"
                             Visibility="{x:Bind DetailsHeaderVisibility, Mode=OneWay}">

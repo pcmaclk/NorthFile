@@ -341,3 +341,23 @@ pub trait PathEngine {
 - 这意味着当前引擎线的主瓶颈已进一步缩小为：
   - 第一次冷构建目录结果集
   - 持久结果集后续更精确的失效与来源传播
+## 持久目录结果集缓存补充（2026-03-23）
+
+- 当前 `MemoryFallback` 已不再只是会话内热目录快照：
+  - `list_directory_page_memory(...)` 会先尝试命中目录级持久结果集缓存
+  - 命中时直接恢复排序后的 `MemoryDirItem` 快照
+- 当前 memory path 已显式区分三种来源：
+  - `reload`
+  - `hit`
+  - `persistent-hit`
+- FFI 已把 `persistent-hit` 显式映射为 `PersistentDirectoryCache`
+  - WinUI 首屏来源不再靠耗时阈值或 cursor 特征推断
+- 当前已补第一版持久缓存运维能力：
+  - `hit / miss / write / evict / invalidate / clear` 专门 perf 日志
+  - 简单文件数淘汰
+  - `invalidate_directory_cache(dir_path)` 时同步删除对应持久结果集文件
+  - `clear_memory_cache()` 时同步清空整个持久结果集目录
+- 当前仍未做：
+  - watcher / USN 驱动的自动失效
+  - 基于 FRN/USN 的增量动态更新
+  - NTFS INDEX/MFT 路径与持久结果集缓存的统一来源模型

@@ -10,7 +10,7 @@ use crate::core::types::FileEntry;
 use crate::engine::classify_path;
 use crate::core::types::VolumeKind;
 use crate::memory::{
-    clear_memory_cache, get_or_probe_ntfs_meta, invalidate_directory_cache,
+    MemoryCacheMode, clear_memory_cache, get_or_probe_ntfs_meta, invalidate_directory_cache,
     list_directory_entries_ntfs_cached, list_directory_page_memory, list_directory_page_ntfs_cached,
 };
 use crate::ntfs::{
@@ -533,7 +533,7 @@ pub extern "C" fn fe_list_dir_batch_memory(
     }
 
     let fetch_sw = Instant::now();
-    let (items, next_cursor, has_more, total_entries) =
+    let (items, next_cursor, has_more, total_entries, cache_mode) =
         match list_directory_page_memory(path, cursor, limit as usize, sort_mode) {
             Ok(v) => v,
             Err(e) => return FfiBatchResult::err(e.code as i32, &e.message),
@@ -573,10 +573,9 @@ pub extern "C" fn fe_list_dir_batch_memory(
         encode_sw.elapsed().as_millis()
     ));
 
-    let source_kind = if fetch_ms <= 32 && cursor == 0 {
-        SOURCE_PERSISTENT_DIRECTORY_CACHE
-    } else {
-        SOURCE_MEMORY_FALLBACK
+    let source_kind = match cache_mode {
+        MemoryCacheMode::PersistentHit => SOURCE_PERSISTENT_DIRECTORY_CACHE,
+        MemoryCacheMode::Hit | MemoryCacheMode::Reload => SOURCE_MEMORY_FALLBACK,
     };
     let suggested_next_limit = suggest_next_limit(limit, items.len(), has_more, last_fetch_ms);
     FfiBatchResult::ok(

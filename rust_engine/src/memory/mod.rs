@@ -130,6 +130,23 @@ const NTFS_DIR_CACHE_MAX_ENTRIES: usize = 96;
 const PERSISTENT_DIRECTORY_CACHE_SCHEMA: u32 = 1;
 const PERSISTENT_DIRECTORY_CACHE_MAX_FILES: usize = 160;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemoryCacheMode {
+    Reload,
+    Hit,
+    PersistentHit,
+}
+
+impl MemoryCacheMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Reload => "reload",
+            Self::Hit => "hit",
+            Self::PersistentHit => "persistent-hit",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PersistentDirectoryItem {
     name: String,
@@ -283,6 +300,68 @@ fn prune_persistent_directory_cache() {
             ));
         }
     }
+}
+
+fn remove_persistent_directory_snapshots_for_path(dir_path: &Path) -> bool {
+    let Some(root) = persistent_directory_cache_root() else {
+        return false;
+    };
+
+    let Ok(read_dir) = fs::read_dir(&root) else {
+        return false;
+    };
+
+    let expected_path = dir_path.to_string_lossy();
+    let mut removed = false;
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+
+        let Ok(bytes) = fs::read(&path) else {
+            continue;
+        };
+        let Ok(snapshot) = serde_json::from_slice::<PersistentDirectorySnapshot>(&bytes) else {
+            continue;
+        };
+
+        if snapshot.path == expected_path {
+            if fs::remove_file(&path).is_ok() {
+                removed = true;
+                append_range_perf_log(&format!(
+                    "[RUST-RANGE] kind=persistent-cache stage=invalidate path=\"{}\" file=\"{}\"",
+                    dir_path.display(),
+                    path.display()
+                ));
+            }
+        }
+    }
+
+    removed
+}
+
+fn clear_persistent_directory_cache() -> bool {
+    let Some(root) = persistent_directory_cache_root() else {
+        return false;
+    };
+
+    let Ok(read_dir) = fs::read_dir(&root) else {
+        return false;
+    };
+
+    let mut removed_any = false;
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if path.is_file() && fs::remove_file(&path).is_ok() {
+            removed_any = true;
+        }
+    }
+
+    if removed_any {
+        append_range_perf_log("[RUST-RANGE] kind=persistent-cache stage=clear");
+    }
+    removed_any
 }
 
 fn load_persistent_directory_snapshot(
@@ -479,7 +558,8 @@ pub fn invalidate_directory_cache(dir_path: &Path) -> Result<bool, FsError> {
     let ntfs_before = ntfs_table.len();
     ntfs_table.retain(|key, _| !key.starts_with(&key_prefix));
     let removed_ntfs = ntfs_table.len() != ntfs_before;
-    Ok(removed_mem || removed_ntfs)
+    let removed_persistent = remove_persistent_directory_snapshots_for_path(dir_path);
+    Ok(removed_mem || removed_ntfs || removed_persistent)
 }
 
 pub fn clear_memory_cache() -> Result<(), FsError> {
@@ -506,6 +586,8 @@ pub fn clear_memory_cache() -> Result<(), FsError> {
         )
     })?;
     ntfs_dir.clear();
+
+    let _ = clear_persistent_directory_cache();
 
     Ok(())
 }
@@ -591,7 +673,7 @@ pub fn list_directory_page_memory(
     cursor: u64,
     limit: usize,
     sort_mode: u8,
-) -> Result<(Vec<MemoryDirItem>, u64, bool, usize), FsError> {
+) -> Result<(Vec<MemoryDirItem>, u64, bool, usize, MemoryCacheMode), FsError> {
     let total_sw = Instant::now();
     if limit == 0 || limit > 2000 {
         return Err(FsError::new(
@@ -624,7 +706,7 @@ pub fn list_directory_page_memory(
     if needs_reload {
         let persistent_sw = Instant::now();
         if let Some(loaded) = load_persistent_directory_snapshot(dir_path, sort_mode, current_modified) {
-            cache_mode = "persistent-hit";
+            cache_mode = MemoryCacheMode::PersistentHit;
             let now = Instant::now();
             let total_items = loaded.len();
             table.insert(
@@ -641,7 +723,7 @@ pub fn list_directory_page_memory(
                 dir_path.display(),
                 cursor,
                 limit,
-                cache_mode,
+                cache_mode.as_str(),
                 metadata_ms,
                 persistent_sw.elapsed().as_millis(),
                 total_items
@@ -652,7 +734,7 @@ pub fn list_directory_page_memory(
                 dir_path.display(),
                 normalize_sort_mode(sort_mode)
             ));
-            cache_mode = "reload";
+            cache_mode = MemoryCacheMode::Reload;
             let read_sw = Instant::now();
             let mut loaded: Vec<MemoryDirItem> = Vec::new();
             let entries = fs::read_dir(dir_path).map_err(|e| {
@@ -698,7 +780,7 @@ pub fn list_directory_page_memory(
                 dir_path.display(),
                 cursor,
                 limit,
-                cache_mode,
+                cache_mode.as_str(),
                 metadata_ms,
                 read_ms,
                 sort_ms,
@@ -707,7 +789,7 @@ pub fn list_directory_page_memory(
             ));
         }
     } else {
-        cache_mode = "hit";
+        cache_mode = MemoryCacheMode::Hit;
         match table.get_mut(&key) {
             Some(cached) => {
                 cached.last_accessed_at = Instant::now();
@@ -716,7 +798,7 @@ pub fn list_directory_page_memory(
                     dir_path.display(),
                     cursor,
                     limit,
-                    cache_mode,
+                    cache_mode.as_str(),
                     metadata_ms,
                     cached.items.len()
                 ));
@@ -736,7 +818,7 @@ pub fn list_directory_page_memory(
     let total_items = cached.items.len();
     let start = cursor as usize;
     if start >= total_items {
-        return Ok((Vec::new(), cursor, false, total_items));
+        return Ok((Vec::new(), cursor, false, total_items, cache_mode));
     }
 
     let end = (start + limit).min(total_items);
@@ -760,7 +842,7 @@ pub fn list_directory_page_memory(
         dir_path.display(),
         cursor,
         limit,
-        cache_mode,
+        cache_mode.as_str(),
         hydrate_sw.elapsed().as_millis(),
         hydrated,
         slice_sw.elapsed().as_millis(),
@@ -769,7 +851,7 @@ pub fn list_directory_page_memory(
         total_sw.elapsed().as_millis()
     ));
 
-    Ok((page, next_cursor, has_more, total_items))
+    Ok((page, next_cursor, has_more, total_items, cache_mode))
 }
 
 pub fn list_directory_entries_ntfs_cached(
