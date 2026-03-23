@@ -2333,7 +2333,6 @@ namespace FileExplorerUI
                 perf?.Mark("load-page.fetch-completed", $"rows={page.Rows.Count} total={page.TotalEntries} source={_explorerService.DescribeBatchSource(page.SourceKind)}");
                 _lastFetchMs = (uint)Math.Clamp(sw.ElapsedMilliseconds, 0, int.MaxValue);
                 _totalEntries = page.TotalEntries;
-                InvalidateEntriesLayouts();
 
                 if (!append)
                 {
@@ -2349,6 +2348,11 @@ namespace FileExplorerUI
                     FillPageRows((int)cursor, page.Rows, path);
                     perf?.Mark("load-page.visible-entries-updated", $"count={_entries.Count}");
                 }
+                InvalidateEntriesLayouts();
+                if (!append && perf is not null)
+                {
+                    ScheduleNavigationPerfFirstFrameMark(perf, "load-page.first-frame");
+                }
                 if (!append)
                 {
                     RestoreListSelectionByPath(ensureVisible: false);
@@ -2358,50 +2362,61 @@ namespace FileExplorerUI
                     }
                     perf?.Mark("load-page.selection-restored");
                 }
-                UpdateFileCommandStates();
-                if (_currentViewMode == EntryViewMode.Details)
-                {
-                    CancelPendingViewportMetadataWork();
-                }
-                else if (!append)
-                {
-                    RequestMetadataForCurrentViewportDeferred(48);
-                    perf?.Mark("load-page.viewport-metadata-deferred");
-                }
-                else
-                {
-                    RequestMetadataForCurrentViewport();
-                    perf?.Mark("load-page.viewport-metadata-requested");
-                }
-
                 _nextCursor = page.NextCursor;
                 _hasMore = page.HasMore;
                 _currentPageSize = ClampPageSize(page.SuggestedNextLimit, requestedPageSize);
                 string source = _explorerService.DescribeBatchSource(page.SourceKind);
-
-                _lastTitleWasReadFailed = false;
-                UpdateWindowTitle();
-                UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
-                LogPerfSnapshot(
-                    mode: string.IsNullOrWhiteSpace(_currentQuery) ? "browse" : "search",
-                    path: path,
-                    query: _currentQuery,
-                    source: source,
-                    loaded: page.Rows.Count,
-                    total: page.TotalEntries,
-                    scanned: page.ScannedEntries,
-                    matched: page.MatchedEntries,
-                    fetchMs: sw.ElapsedMilliseconds,
-                    batch: _currentPageSize,
-                    hasMore: _hasMore,
-                    nextCursor: _nextCursor,
-                    usn: DescribeUsnCapability(_usnCapability)
-                );
-                if (!append && perf is not null)
-                {
-                    ScheduleNavigationPerfFirstFrameMark(perf, "load-page.first-frame");
-                }
                 perf?.Mark("load-page.bind-completed", $"visible={_entries.Count} hasMore={_hasMore}");
+
+                void FinalizeLoadedPageUi()
+                {
+                    perf?.Mark("load-page.ui-finalize.begin");
+                    UpdateFileCommandStates();
+                    if (_currentViewMode == EntryViewMode.Details)
+                    {
+                        CancelPendingViewportMetadataWork();
+                    }
+                    else if (!append)
+                    {
+                        RequestMetadataForCurrentViewportDeferred(48);
+                        perf?.Mark("load-page.viewport-metadata-deferred");
+                    }
+                    else
+                    {
+                        RequestMetadataForCurrentViewport();
+                        perf?.Mark("load-page.viewport-metadata-requested");
+                    }
+
+                    _lastTitleWasReadFailed = false;
+                    UpdateWindowTitle();
+                    UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
+                    LogPerfSnapshot(
+                        mode: string.IsNullOrWhiteSpace(_currentQuery) ? "browse" : "search",
+                        path: path,
+                        query: _currentQuery,
+                        source: source,
+                        loaded: page.Rows.Count,
+                        total: page.TotalEntries,
+                        scanned: page.ScannedEntries,
+                        matched: page.MatchedEntries,
+                        fetchMs: sw.ElapsedMilliseconds,
+                        batch: _currentPageSize,
+                        hasMore: _hasMore,
+                        nextCursor: _nextCursor,
+                        usn: DescribeUsnCapability(_usnCapability)
+                    );
+                    perf?.Mark("load-page.ui-finalize.end");
+                }
+
+                if (!append)
+                {
+                    perf?.Mark("load-page.ui-finalize.deferred");
+                    ScheduleAfterNextFrame(FinalizeLoadedPageUi);
+                }
+                else
+                {
+                    FinalizeLoadedPageUi();
+                }
             }
             catch (Exception ex)
             {
@@ -2417,7 +2432,6 @@ namespace FileExplorerUI
                 NextButton.IsEnabled = _hasMore;
                 SidebarNavView.IsEnabled = true;
                 StyledSidebarView.IsEnabled = true;
-                UpdateFileCommandStates();
                 perf?.Mark("load-page.exit");
             }
         }
@@ -2606,6 +2620,17 @@ namespace FileExplorerUI
             {
                 CompositionTarget.Rendering -= OnRendering;
                 perf.Mark(stage);
+            }
+
+            CompositionTarget.Rendering += OnRendering;
+        }
+
+        private void ScheduleAfterNextFrame(Action action)
+        {
+            void OnRendering(object? sender, object args)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+                _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => action());
             }
 
             CompositionTarget.Rendering += OnRendering;
