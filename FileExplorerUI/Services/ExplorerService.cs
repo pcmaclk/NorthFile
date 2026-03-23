@@ -238,6 +238,11 @@ public sealed class ExplorerService
         RustBatchInterop.InvalidateMemoryDirectory(path);
     }
 
+    public void InvalidateMemorySessionDirectory(string path)
+    {
+        RustBatchInterop.InvalidateMemorySessionDirectory(path);
+    }
+
     public RustUsnCapability ProbeUsnCapability(string path)
     {
         return RustBatchInterop.ProbeUsnCapability(path);

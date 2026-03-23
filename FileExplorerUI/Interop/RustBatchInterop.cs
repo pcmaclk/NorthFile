@@ -149,6 +149,9 @@ public static partial class RustBatchInterop
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_memory_invalidate_dir", StringMarshalling = StringMarshalling.Utf8)]
     private static partial int MemoryInvalidateDir(string path);
 
+    [LibraryImport("rust_engine.dll", EntryPoint = "fe_memory_invalidate_session_dir", StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int MemoryInvalidateSessionDir(string path);
+
     [LibraryImport("rust_engine.dll", EntryPoint = "fe_memory_clear_cache")]
     private static partial int MemoryClearCache();
 
@@ -321,6 +324,19 @@ public static partial class RustBatchInterop
         lock (NativeCallGate)
         {
             code = MemoryInvalidateDir(path);
+        }
+        if (code != 0)
+        {
+            throw new InvalidOperationException(SF("InteropMemoryInvalidateDirFailed", code));
+        }
+    }
+
+    public static void InvalidateMemorySessionDirectory(string path)
+    {
+        int code;
+        lock (NativeCallGate)
+        {
+            code = MemoryInvalidateSessionDir(path);
         }
         if (code != 0)
         {

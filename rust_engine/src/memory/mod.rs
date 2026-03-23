@@ -370,29 +370,57 @@ fn load_persistent_directory_snapshot(
     dir_modified: Option<SystemTime>,
 ) -> Option<Vec<MemoryDirItem>> {
     let path = persistent_directory_cache_path(dir_path, sort_mode)?;
-    let bytes = fs::read(path).ok()?;
+    let bytes = fs::read(&path).ok()?;
     let snapshot: PersistentDirectorySnapshot = serde_json::from_slice(&bytes).ok()?;
     if snapshot.schema_version != PERSISTENT_DIRECTORY_CACHE_SCHEMA {
+        append_range_perf_log(&format!(
+            "[RUST-RANGE] kind=persistent-cache stage=stale-schema path=\"{}\" file=\"{}\" expected={} actual={}",
+            dir_path.display(),
+            path.display(),
+            PERSISTENT_DIRECTORY_CACHE_SCHEMA,
+            snapshot.schema_version
+        ));
         return None;
     }
 
     if snapshot.path != dir_path.to_string_lossy() {
+        append_range_perf_log(&format!(
+            "[RUST-RANGE] kind=persistent-cache stage=stale-path path=\"{}\" file=\"{}\" snapshot_path=\"{}\"",
+            dir_path.display(),
+            path.display(),
+            snapshot.path
+        ));
         return None;
     }
 
-    if snapshot.sort_mode != normalize_sort_mode(sort_mode) {
+    let normalized_sort = normalize_sort_mode(sort_mode);
+    if snapshot.sort_mode != normalized_sort {
+        append_range_perf_log(&format!(
+            "[RUST-RANGE] kind=persistent-cache stage=stale-sort path=\"{}\" file=\"{}\" expected_sort={} actual_sort={}",
+            dir_path.display(),
+            path.display(),
+            normalized_sort,
+            snapshot.sort_mode
+        ));
         return None;
     }
 
     let current_modified_unix_ms = dir_modified.and_then(system_time_to_unix_ms_u64);
     if snapshot.dir_modified_unix_ms != current_modified_unix_ms {
+        append_range_perf_log(&format!(
+            "[RUST-RANGE] kind=persistent-cache stage=stale-signature path=\"{}\" file=\"{}\" expected_modified={:?} actual_modified={:?}",
+            dir_path.display(),
+            path.display(),
+            current_modified_unix_ms,
+            snapshot.dir_modified_unix_ms
+        ));
         return None;
     }
 
     append_range_perf_log(&format!(
         "[RUST-RANGE] kind=persistent-cache stage=hit path=\"{}\" sort={} items={}",
         dir_path.display(),
-        normalize_sort_mode(sort_mode),
+        normalized_sort,
         snapshot.items.len()
     ));
 
@@ -537,7 +565,7 @@ fn populate_memory_item_metadata(dir_path: &Path, item: &mut MemoryDirItem) {
     }
 }
 
-pub fn invalidate_directory_cache(dir_path: &Path) -> Result<bool, FsError> {
+pub fn invalidate_session_directory_cache(dir_path: &Path) -> Result<bool, FsError> {
     let key_prefix = format!("{}|", dir_path.to_string_lossy());
     let mut table = memory_table().lock().map_err(|_| {
         FsError::new(
@@ -558,8 +586,13 @@ pub fn invalidate_directory_cache(dir_path: &Path) -> Result<bool, FsError> {
     let ntfs_before = ntfs_table.len();
     ntfs_table.retain(|key, _| !key.starts_with(&key_prefix));
     let removed_ntfs = ntfs_table.len() != ntfs_before;
+    Ok(removed_mem || removed_ntfs)
+}
+
+pub fn invalidate_directory_cache(dir_path: &Path) -> Result<bool, FsError> {
+    let removed_session = invalidate_session_directory_cache(dir_path)?;
     let removed_persistent = remove_persistent_directory_snapshots_for_path(dir_path);
-    Ok(removed_mem || removed_ntfs || removed_persistent)
+    Ok(removed_session || removed_persistent)
 }
 
 pub fn clear_memory_cache() -> Result<(), FsError> {

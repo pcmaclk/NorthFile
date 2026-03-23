@@ -1772,7 +1772,7 @@ namespace FileExplorerUI
 
                 if (!result.TargetChanged)
                 {
-                    EnsureRefreshFallbackInvalidation(targetDirectoryPath, result.Mode == FileTransferMode.Cut ? "cut-paste" : "copy-paste");
+                    EnsurePersistentRefreshFallbackInvalidation(targetDirectoryPath, result.Mode == FileTransferMode.Cut ? "cut-paste" : "copy-paste");
                 }
 
                 if (selectPastedEntry && appliedCount == 1 && !string.IsNullOrWhiteSpace(firstAppliedPath))
@@ -1822,7 +1822,7 @@ namespace FileExplorerUI
                 CreatedEntryInfo created = await _fileManagementCoordinator.CreateEntryAsync(_currentPath, isDirectory);
                 if (!created.ChangeNotified)
                 {
-                    EnsureRefreshFallbackInvalidation(_currentPath, isDirectory ? "create-folder" : "create-file");
+                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, isDirectory ? "create-folder" : "create-file");
                 }
 
                 EntryViewModel entry = CreateLocalCreatedEntryModel(created.Name, created.IsDirectory);
@@ -2621,6 +2621,23 @@ namespace FileExplorerUI
         private void EnsureRefreshFallbackInvalidation(string path, string reason)
         {
             // Week4 strategy: if USN capability is unavailable, force invalidate to keep consistency.
+            if (_usnCapability.available != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                _explorerService.InvalidateMemorySessionDirectory(path);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusPathInvalidateWarning", path, reason, ex.Message);
+            }
+        }
+
+        private void EnsurePersistentRefreshFallbackInvalidation(string path, string reason)
+        {
             if (_usnCapability.available != 0)
             {
                 return;
@@ -3827,7 +3844,7 @@ namespace FileExplorerUI
                             // Ignore mark failures; background refresh will still attempt to recover.
                         }
 
-                        EnsureRefreshFallbackInvalidation(_currentPath, $"watcher_{reason}");
+                        EnsurePersistentRefreshFallbackInvalidation(_currentPath, $"watcher_{reason}");
                         _ = RefreshCurrentDirectoryInBackgroundAsync();
                     });
                 }
@@ -6716,7 +6733,7 @@ namespace FileExplorerUI
                 }
                 catch
                 {
-                    EnsureRefreshFallbackInvalidation(_currentPath, entry.PendingCreateIsDirectory ? "create-folder" : "create-file");
+                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, entry.PendingCreateIsDirectory ? "create-folder" : "create-file");
                 }
 
                 HideRenameOverlay();
@@ -7748,7 +7765,7 @@ namespace FileExplorerUI
                 CreatedEntryInfo created = await _fileManagementCoordinator.CreateShortcutAsync(_currentPath, target.Path);
                 if (!created.ChangeNotified)
                 {
-                    EnsureRefreshFallbackInvalidation(_currentPath, "create-shortcut");
+                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, "create-shortcut");
                 }
 
                 _selectedEntryPath = created.FullPath;
@@ -8486,7 +8503,7 @@ namespace FileExplorerUI
                 }
                 catch
                 {
-                    EnsureRefreshFallbackInvalidation(parentPath, "tree-rename");
+                    EnsurePersistentRefreshFallbackInvalidation(parentPath, "tree-rename");
                 }
 
                 TreeViewNode? renamedNode = FindSidebarTreeNodeByPath(sourcePath);
@@ -8540,7 +8557,7 @@ namespace FileExplorerUI
                 _selectedEntryPath = renamed.TargetPath;
                 if (!renamed.ChangeNotified)
                 {
-                    EnsureRefreshFallbackInvalidation(_currentPath, "rename");
+                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, "rename");
                 }
                 if (entry.IsDirectory)
                 {
@@ -8582,7 +8599,7 @@ namespace FileExplorerUI
                 if (!changeNotified)
                 {
                     string parentPath = Path.GetDirectoryName(targetPath) ?? _currentPath;
-                    EnsureRefreshFallbackInvalidation(parentPath, "delete");
+                    EnsurePersistentRefreshFallbackInvalidation(parentPath, "delete");
                 }
                 ApplyLocalDelete(selectedIndex);
                 _ = RefreshCurrentDirectoryInBackgroundAsync();

@@ -357,7 +357,16 @@ pub trait PathEngine {
   - 简单文件数淘汰
   - `invalidate_directory_cache(dir_path)` 时同步删除对应持久结果集文件
   - `clear_memory_cache()` 时同步清空整个持久结果集目录
+- 当前已补第一版自动失效语义拆分：
+  - 普通导航/背景刷新只失效会话内 memory/ntfs 快照
+  - watcher 与已确认目录变更路径才失效持久结果集
+- 当前已补隐式过期日志：
+  - `stale-signature`
+  - `stale-schema`
+  - `stale-path`
+  - `stale-sort`
+  - 即使目录变化走的是“签名不匹配 -> miss -> write”，日志里也能明确看出旧快照是怎么失效的
 - 当前仍未做：
-  - watcher / USN 驱动的自动失效
+  - USN 驱动的自动失效
   - 基于 FRN/USN 的增量动态更新
   - NTFS INDEX/MFT 路径与持久结果集缓存的统一来源模型

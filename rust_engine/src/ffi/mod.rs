@@ -11,7 +11,8 @@ use crate::engine::classify_path;
 use crate::core::types::VolumeKind;
 use crate::memory::{
     MemoryCacheMode, clear_memory_cache, get_or_probe_ntfs_meta, invalidate_directory_cache,
-    list_directory_entries_ntfs_cached, list_directory_page_memory, list_directory_page_ntfs_cached,
+    invalidate_session_directory_cache, list_directory_entries_ntfs_cached, list_directory_page_memory,
+    list_directory_page_ntfs_cached,
 };
 use crate::ntfs::{
     inspect_mft_record_with_meta, list_index_root_entries_with_meta, read_mft_record_header_with_meta,
@@ -969,6 +970,25 @@ pub extern "C" fn fe_memory_invalidate_dir(path_utf8: *const c_char) -> i32 {
     };
 
     match invalidate_directory_cache(Path::new(path_str)) {
+        Ok(_) => 0,
+        Err(e) => e.code as i32,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn fe_memory_invalidate_session_dir(path_utf8: *const c_char) -> i32 {
+    if path_utf8.is_null() {
+        return 1001;
+    }
+
+    // SAFETY: path_utf8 must be a valid null-terminated C string from caller.
+    let c_path = unsafe { CStr::from_ptr(path_utf8) };
+    let path_str = match c_path.to_str() {
+        Ok(v) => v,
+        Err(_) => return 1001,
+    };
+
+    match invalidate_session_directory_cache(Path::new(path_str)) {
         Ok(_) => 0,
         Err(e) => e.code as i32,
     }
