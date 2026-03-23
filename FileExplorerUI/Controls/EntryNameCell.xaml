@@ -4,32 +4,27 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid Margin="{x:Bind ContentMargin, Mode=OneWay}" VerticalAlignment="Center">
+    <Grid x:Name="RootGrid" VerticalAlignment="Center">
         <Grid.RenderTransform>
             <TranslateTransform Y="0" />
         </Grid.RenderTransform>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="{x:Bind IconColumnWidthGridLength, Mode=OneWay}" />
-            <ColumnDefinition Width="{x:Bind IconTextSpacingGridLength, Mode=OneWay}" />
+            <ColumnDefinition x:Name="IconColumnDefinition" />
+            <ColumnDefinition x:Name="IconSpacingColumnDefinition" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <TextBlock
+            x:Name="IconTextBlock"
             Grid.Column="0"
-            Width="{x:Bind Metrics.IconColumnWidth, Mode=OneWay}"
             VerticalAlignment="Center"
             FontFamily="Segoe Fluent Icons"
-            FontSize="{x:Bind Metrics.IconFontSize, Mode=OneWay}"
-            Foreground="{x:Bind Entry.IconForeground, Mode=OneWay}"
-            Text="{x:Bind Entry.IconGlyph, Mode=OneWay}" />
+            />
 
         <TextBlock
             x:Name="EntryNameTextBlock"
             Grid.Column="2"
-            Margin="{x:Bind NameTextMargin, Mode=OneWay}"
             VerticalAlignment="Center"
-            FontSize="{x:Bind Metrics.NameFontSize, Mode=OneWay}"
-            Text="{x:Bind Entry.Name, Mode=OneWay}"
             TextTrimming="CharacterEllipsis" />
     </Grid>
 </UserControl>

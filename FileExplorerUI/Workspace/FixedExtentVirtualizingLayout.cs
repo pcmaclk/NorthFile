@@ -1,4 +1,7 @@
 using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation;
@@ -8,6 +11,8 @@ namespace FileExplorerUI.Workspace;
 public sealed class FixedExtentVirtualizingLayout : VirtualizingLayout
 {
     private readonly EntriesRepeaterLayoutProfile _layoutProfile;
+    private static readonly object s_layoutPerfLock = new();
+    private static readonly string s_layoutPerfLogPath = Path.Combine(AppContext.BaseDirectory, "layout-perf.log");
     private int _realizationStartIndex = -1;
     private int _realizationEndIndex = -1;
 
@@ -18,6 +23,7 @@ public sealed class FixedExtentVirtualizingLayout : VirtualizingLayout
 
     protected override Size MeasureOverride(VirtualizingLayoutContext context, Size availableSize)
     {
+        long start = Stopwatch.GetTimestamp();
         int loadedItemCount = context.ItemCount;
         int logicalItemCount = Math.Max(loadedItemCount, _layoutProfile.TotalItemCountProvider());
         double itemExtent = Math.Max(1, _layoutProfile.PrimaryItemExtentProvider());
@@ -28,14 +34,22 @@ public sealed class FixedExtentVirtualizingLayout : VirtualizingLayout
         {
             _realizationStartIndex = -1;
             _realizationEndIndex = -1;
+            AppendLayoutPerfLog(
+                $"stage=measure loaded=0 logical={logicalItemCount} rect=({realizationRect.X:F1},{realizationRect.Y:F1},{realizationRect.Width:F1},{realizationRect.Height:F1}) extent={itemExtent:F1}");
             return BuildExtent(logicalItemCount, itemExtent, crossAxisExtent);
         }
 
-        double viewportStart = _layoutProfile.IsVertical ? realizationRect.Y : realizationRect.X;
+        double viewportStart = Math.Max(0, _layoutProfile.IsVertical ? realizationRect.Y : realizationRect.X);
         double viewportLength = _layoutProfile.IsVertical ? realizationRect.Height : realizationRect.Width;
+        double visibleLength = Math.Max(1, _layoutProfile.ViewportPrimaryExtentProvider());
+        double maxRealizationLength = Math.Max(itemExtent * 12, visibleLength + (itemExtent * 8));
         if (viewportLength <= 0)
         {
             viewportLength = itemExtent * 8;
+        }
+        else
+        {
+            viewportLength = Math.Min(viewportLength, maxRealizationLength);
         }
 
         const int overscanItems = 4;
@@ -55,13 +69,19 @@ public sealed class FixedExtentVirtualizingLayout : VirtualizingLayout
             element.Measure(measureSize);
         }
 
+        long elapsedMs = (long)((Stopwatch.GetTimestamp() - start) * 1000.0 / Stopwatch.Frequency);
+        AppendLayoutPerfLog(
+            $"stage=measure loaded={loadedItemCount} logical={logicalItemCount} first={firstIndex} last={lastIndex} realized={lastIndex - firstIndex + 1} rect=({realizationRect.X:F1},{realizationRect.Y:F1},{realizationRect.Width:F1},{realizationRect.Height:F1}) elapsed={elapsedMs}ms");
+
         return BuildExtent(logicalItemCount, itemExtent, crossAxisExtent);
     }
 
     protected override Size ArrangeOverride(VirtualizingLayoutContext context, Size finalSize)
     {
+        long start = Stopwatch.GetTimestamp();
         if (_realizationStartIndex < 0 || _realizationEndIndex < _realizationStartIndex)
         {
+            AppendLayoutPerfLog("stage=arrange realized=0");
             return finalSize;
         }
 
@@ -77,6 +97,10 @@ public sealed class FixedExtentVirtualizingLayout : VirtualizingLayout
             element.Arrange(bounds);
         }
 
+        long elapsedMs = (long)((Stopwatch.GetTimestamp() - start) * 1000.0 / Stopwatch.Frequency);
+        AppendLayoutPerfLog(
+            $"stage=arrange first={_realizationStartIndex} last={_realizationEndIndex} realized={_realizationEndIndex - _realizationStartIndex + 1} final=({finalSize.Width:F1},{finalSize.Height:F1}) elapsed={elapsedMs}ms");
+
         return finalSize;
     }
 
@@ -86,5 +110,14 @@ public sealed class FixedExtentVirtualizingLayout : VirtualizingLayout
         return _layoutProfile.IsVertical
             ? new Size(crossAxisExtent, primaryExtent)
             : new Size(primaryExtent, crossAxisExtent);
+    }
+
+    private static void AppendLayoutPerfLog(string message)
+    {
+        string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [LAYOUT] {message}{Environment.NewLine}";
+        lock (s_layoutPerfLock)
+        {
+            File.AppendAllText(s_layoutPerfLogPath, line, Encoding.UTF8);
+        }
     }
 }

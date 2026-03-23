@@ -29,6 +29,7 @@ public sealed partial class EntryNameCell : UserControl
     public EntryNameCell()
     {
         this.InitializeComponent();
+        ApplyBindings();
     }
 
     public FileExplorerUI.EntryViewModel? Entry
@@ -51,14 +52,32 @@ public sealed partial class EntryNameCell : UserControl
 
     public FrameworkElement NameTextElement => EntryNameTextBlock;
 
-    public GridLength IconColumnWidthGridLength => new(Metrics.IconColumnWidth);
-
-    public GridLength IconTextSpacingGridLength => new(Metrics.IconTextSpacing);
-
-    public Thickness NameTextMargin => new(0, 0, Metrics.NameTrailingSpacing, 0);
-
     private static void OnBindablePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        ((EntryNameCell)d).Bindings.Update();
+        ((EntryNameCell)d).ApplyBindings();
+    }
+
+    private void ApplyBindings()
+    {
+        if (RootGrid is null || IconColumnDefinition is null || IconSpacingColumnDefinition is null || IconTextBlock is null || EntryNameTextBlock is null)
+        {
+            return;
+        }
+
+        EntryItemMetrics metrics = Metrics ?? new EntryItemMetrics();
+        FileExplorerUI.EntryViewModel? entry = Entry;
+
+        RootGrid.Margin = ContentMargin;
+        IconColumnDefinition.Width = new GridLength(metrics.IconColumnWidth);
+        IconSpacingColumnDefinition.Width = new GridLength(metrics.IconTextSpacing);
+
+        IconTextBlock.Width = metrics.IconColumnWidth;
+        IconTextBlock.FontSize = metrics.IconFontSize;
+        IconTextBlock.Foreground = entry?.IconForeground;
+        IconTextBlock.Text = entry?.IconGlyph ?? string.Empty;
+
+        EntryNameTextBlock.Margin = new Thickness(0, 0, metrics.NameTrailingSpacing, 0);
+        EntryNameTextBlock.FontSize = metrics.NameFontSize;
+        EntryNameTextBlock.Text = entry?.Name ?? string.Empty;
     }
 }

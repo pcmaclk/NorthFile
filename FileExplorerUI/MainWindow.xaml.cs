@@ -645,7 +645,14 @@ namespace FileExplorerUI
                 isVertical: true,
                 primaryItemExtentProvider: () => Math.Max(32.0, EntryItemMetrics.RowHeight + 4),
                 totalItemCountProvider: () => checked((int)Math.Max((uint)_entries.Count, _totalEntries)),
-                crossAxisExtentProvider: () => Math.Max(1, DetailsRowWidth));
+                crossAxisExtentProvider: () => Math.Max(1, DetailsRowWidth),
+                viewportPrimaryExtentProvider: () =>
+                {
+                    double viewportHeight = DetailsEntriesScrollViewer.ViewportHeight > 0
+                        ? DetailsEntriesScrollViewer.ViewportHeight
+                        : DetailsEntriesScrollViewer.ActualHeight;
+                    return Math.Max(1, viewportHeight);
+                });
             _detailsVirtualizingLayout = new FixedExtentVirtualizingLayout(_detailsRepeaterLayoutProfile);
             _workspaceLayoutHost = new WorkspaceLayoutHost(_workspaceShellState);
             _fileManagementCoordinator = new FileManagementCoordinator(_explorerService);
@@ -2349,16 +2356,22 @@ namespace FileExplorerUI
                     perf?.Mark("load-page.visible-entries-updated", $"count={_entries.Count}");
                 }
                 InvalidateEntriesLayouts();
+                perf?.Mark("load-page.layouts-invalidated");
                 if (!append && perf is not null)
                 {
                     ScheduleNavigationPerfFirstFrameMark(perf, "load-page.first-frame");
                 }
                 if (!append)
                 {
+                    perf?.Mark("load-page.selection-restore.begin");
                     RestoreListSelectionByPath(ensureVisible: false);
-                    if (!RestoreHistoryViewStateIfPending())
+                    bool historyRestored = RestoreHistoryViewStateIfPending();
+                    perf?.Mark(historyRestored ? "load-page.history-state-restored" : "load-page.history-state-skip");
+                    if (!historyRestored)
                     {
+                        perf?.Mark("load-page.parent-anchor-restore.begin");
                         RestoreParentReturnAnchorIfPending();
+                        perf?.Mark("load-page.parent-anchor-restore.end");
                     }
                     perf?.Mark("load-page.selection-restored");
                 }
