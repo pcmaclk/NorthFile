@@ -20,6 +20,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -28,6 +29,8 @@ using System.Text;
 using System.Windows.Input;
 using Windows.Foundation;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
+using WinRT;
 using WinRT.Interop;
 
 namespace FileExplorerUI
@@ -510,6 +513,8 @@ namespace FileExplorerUI
         private readonly Dictionary<string, bool> _groupExpansionStates = new(StringComparer.Ordinal);
         private readonly WorkspaceShellState _workspaceShellState = new();
         private readonly WorkspaceLayoutHost _workspaceLayoutHost;
+        private DataTransferManager? _shareDataTransferManager;
+        private FileCommandTarget? _pendingShareTarget;
         private IntPtr _windowHandle;
         private IntPtr _originalWndProc;
         private WndProcDelegate? _wndProcDelegate;
@@ -5727,6 +5732,31 @@ namespace FileExplorerUI
             SelectEntryByPath(_selectedEntryPath, ensureVisible);
         }
 
+        private void RestoreListSelectionByPathRespectingViewport()
+        {
+            if (string.IsNullOrWhiteSpace(_selectedEntryPath))
+            {
+                return;
+            }
+
+            ScrollViewer viewer = _currentViewMode == EntryViewMode.Details
+                ? DetailsEntriesScrollViewer
+                : GroupedEntriesScrollViewer;
+
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                EntryViewModel entry = _entries[i];
+                if (!string.Equals(entry.FullPath, _selectedEntryPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                bool ensureVisible = !IsEntryFullyVisible(entry, viewer);
+                SelectEntryInList(entry, ensureVisible);
+                return;
+            }
+        }
+
         private void CaptureCurrentDirectoryViewState()
         {
             if (string.IsNullOrWhiteSpace(_currentPath) ||
@@ -7309,7 +7339,7 @@ namespace FileExplorerUI
             UpdateFileCommandStates();
         }
 
-        private async Task RefreshCurrentDirectoryInBackgroundAsync()
+        private async Task RefreshCurrentDirectoryInBackgroundAsync(bool preserveViewport = false)
         {
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
@@ -7317,12 +7347,31 @@ namespace FileExplorerUI
                 return;
             }
 
+            double detailsVerticalOffset = DetailsEntriesScrollViewer.VerticalOffset;
+            double groupedHorizontalOffset = GroupedEntriesScrollViewer.HorizontalOffset;
+
             try
             {
                 UpdateUsnCapability(_currentPath);
                 ConfigureDirectoryWatcher(_currentPath);
                 EnsureRefreshFallbackInvalidation(_currentPath, "background_refresh");
                 await LoadPageAsync(_currentPath, cursor: 0, append: false);
+                if (preserveViewport)
+                {
+                    _ = DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (_currentViewMode == EntryViewMode.Details)
+                        {
+                            double maxOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableHeight);
+                            DetailsEntriesScrollViewer.ChangeView(null, Math.Min(maxOffset, detailsVerticalOffset), null, disableAnimation: true);
+                        }
+                        else
+                        {
+                            double maxOffset = Math.Max(0, GroupedEntriesScrollViewer.ScrollableWidth);
+                            GroupedEntriesScrollViewer.ChangeView(Math.Min(maxOffset, groupedHorizontalOffset), null, null, disableAnimation: true);
+                        }
+                    });
+                }
             }
             catch
             {
@@ -7611,8 +7660,14 @@ namespace FileExplorerUI
                 case FileCommandIds.CopyPath:
                     ExecuteCopyPathCommand(target);
                     break;
+                case FileCommandIds.Share:
+                    ExecuteShareCommand(target);
+                    break;
                 case FileCommandIds.CreateShortcut:
                     await ExecuteCreateShortcutCommandAsync(target);
+                    break;
+                case FileCommandIds.CompressZip:
+                    await ExecuteCompressZipCommandAsync(target);
                     break;
                 case FileCommandIds.OpenWith:
                     ExecuteOpenWithCommand(target);
@@ -7669,9 +7724,14 @@ namespace FileExplorerUI
                     string.Equals(target.Path, _currentPath, StringComparison.OrdinalIgnoreCase) &&
                     !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
                 FileCommandIds.CopyPath => !string.IsNullOrWhiteSpace(target.Path),
+                FileCommandIds.Share => !string.IsNullOrWhiteSpace(target.Path) &&
+                    target.Kind is FileCommandTargetKind.FileEntry or FileCommandTargetKind.DirectoryEntry,
                 FileCommandIds.CreateShortcut => !string.IsNullOrWhiteSpace(target.Path) &&
                     !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
                     _explorerService.DirectoryExists(_currentPath),
+                FileCommandIds.CompressZip => !string.IsNullOrWhiteSpace(target.Path) &&
+                    target.Kind is FileCommandTargetKind.FileEntry or FileCommandTargetKind.DirectoryEntry &&
+                    _explorerService.PathExists(target.Path),
                 FileCommandIds.OpenWith => !string.IsNullOrWhiteSpace(target.Path) &&
                     !target.IsDirectory,
                 FileCommandIds.OpenTarget => !string.IsNullOrWhiteSpace(target.Path) &&
@@ -7784,6 +7844,35 @@ namespace FileExplorerUI
             }
         }
 
+        private void ExecuteShareCommand(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                if (!EnsureShareDataTransferManager())
+                {
+                    UpdateStatusKey("StatusShareFailed", S("ErrorCurrentFolderUnavailable"));
+                    return;
+                }
+
+                _pendingShareTarget = target;
+                IntPtr ownerHandle = _windowHandle != IntPtr.Zero
+                    ? _windowHandle
+                    : WindowNative.GetWindowHandle(this);
+                NativeMethods.ShowShareUIForWindow(ownerHandle);
+                UpdateStatusKey("StatusShareOpened", target.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                _pendingShareTarget = null;
+                UpdateStatusKey("StatusShareFailed", ex.Message);
+            }
+        }
+
         private async Task ExecuteCreateShortcutCommandAsync(FileCommandTarget target)
         {
             if (string.IsNullOrWhiteSpace(target.Path))
@@ -7815,6 +7904,69 @@ namespace FileExplorerUI
             catch (Exception ex)
             {
                 UpdateStatusKey("StatusCreateShortcutFailed", ex.Message);
+            }
+        }
+
+        private async Task ExecuteCompressZipCommandAsync(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                string sourcePath = target.Path;
+                string destinationDirectory = Path.GetDirectoryName(sourcePath.TrimEnd('\\')) ?? _currentPath;
+                if (string.IsNullOrWhiteSpace(destinationDirectory) || !_explorerService.DirectoryExists(destinationDirectory))
+                {
+                    UpdateStatusKey("StatusCompressZipFailed", S("ErrorCurrentFolderUnavailable"));
+                    return;
+                }
+
+                string archiveName = _explorerService.GenerateUniqueZipArchiveName(destinationDirectory, sourcePath);
+                string archivePath = Path.Combine(destinationDirectory, archiveName);
+
+                bool destinationIsCurrentDirectory =
+                    string.Equals(destinationDirectory, _currentPath, StringComparison.OrdinalIgnoreCase);
+                double detailsVerticalOffset = DetailsEntriesScrollViewer.VerticalOffset;
+                double groupedHorizontalOffset = GroupedEntriesScrollViewer.HorizontalOffset;
+                if (destinationIsCurrentDirectory)
+                {
+                    SuppressNextWatcherRefresh(_currentPath);
+                }
+
+                await _explorerService.CreateZipArchiveAsync(sourcePath, archivePath);
+
+                if (destinationIsCurrentDirectory)
+                {
+                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, "compress-zip");
+                    _selectedEntryPath = archivePath;
+                    await LoadFirstPageAsync();
+                    _ = DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (_currentViewMode == EntryViewMode.Details)
+                        {
+                            double maxOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableHeight);
+                            DetailsEntriesScrollViewer.ChangeView(null, Math.Min(maxOffset, detailsVerticalOffset), null, disableAnimation: true);
+                        }
+                        else
+                        {
+                            double maxOffset = Math.Max(0, GroupedEntriesScrollViewer.ScrollableWidth);
+                            GroupedEntriesScrollViewer.ChangeView(Math.Min(maxOffset, groupedHorizontalOffset), null, null, disableAnimation: true);
+                        }
+
+                        RestoreListSelectionByPathRespectingViewport();
+                        FocusEntriesList();
+                    });
+                    UpdateFileCommandStates();
+                }
+
+                UpdateStatusKey("StatusCompressZipSuccess", archiveName);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusCompressZipFailed", ex.Message);
             }
         }
 
@@ -7972,6 +8124,61 @@ namespace FileExplorerUI
             }
         }
 
+        private bool EnsureShareDataTransferManager()
+        {
+            if (_shareDataTransferManager is not null)
+            {
+                return true;
+            }
+
+            IntPtr ownerHandle = _windowHandle != IntPtr.Zero
+                ? _windowHandle
+                : WindowNative.GetWindowHandle(this);
+            if (ownerHandle == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            _shareDataTransferManager = NativeMethods.GetDataTransferManagerForWindow(ownerHandle);
+            _shareDataTransferManager.DataRequested += ShareDataTransferManager_DataRequested;
+            return true;
+        }
+
+        private async void ShareDataTransferManager_DataRequested(DataTransferManager sender, DataRequestedEventArgs args)
+        {
+            FileCommandTarget? target = _pendingShareTarget;
+            _pendingShareTarget = null;
+
+            if (target is null || string.IsNullOrWhiteSpace(target.Path))
+            {
+                args.Request.FailWithDisplayText("Share target is unavailable.");
+                return;
+            }
+
+            DataRequestDeferral deferral = args.Request.GetDeferral();
+            try
+            {
+                DataRequest request = args.Request;
+                request.Data.Properties.Title = target.DisplayName;
+                request.Data.Properties.Description = target.Path;
+
+                IStorageItem storageItem = target.IsDirectory
+                    ? (IStorageItem)await StorageFolder.GetFolderFromPathAsync(target.Path)
+                    : await StorageFile.GetFileFromPathAsync(target.Path);
+
+                request.Data.SetStorageItems(new[] { storageItem });
+            }
+            catch (Exception ex)
+            {
+                args.Request.FailWithDisplayText(ex.Message);
+                UpdateStatusKey("StatusShareFailed", ex.Message);
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        }
+
         private void UpdateConditionalCommandVisibility(CommandMenuFlyout flyout, string commandId, string label, int insertIndex, bool shouldShow)
         {
             int existingIndex = -1;
@@ -8011,6 +8218,12 @@ namespace FileExplorerUI
             var availableCommandIds = _fileCommandCatalog.BuildCommands(target)
                 .Select(descriptor => descriptor.Id)
                 .ToHashSet(StringComparer.Ordinal);
+
+            if (target.Kind is FileCommandTargetKind.FileEntry or FileCommandTargetKind.DirectoryEntry)
+            {
+                availableCommandIds.Add(FileCommandIds.CompressZip);
+                availableCommandIds.Add(FileCommandIds.Share);
+            }
 
             foreach (MenuFlyoutItemBase item in flyout.Items)
             {
@@ -8640,7 +8853,7 @@ namespace FileExplorerUI
                     EnsurePersistentRefreshFallbackInvalidation(parentPath, "delete");
                 }
                 ApplyLocalDelete(selectedIndex);
-                _ = RefreshCurrentDirectoryInBackgroundAsync();
+                _ = RefreshCurrentDirectoryInBackgroundAsync(preserveViewport: true);
                 UpdateStatusKey("StatusDeleteSuccess", entry.Name, recursive);
             }
             catch (Exception ex)
@@ -9696,6 +9909,15 @@ namespace FileExplorerUI
             internal uint Flags;
         }
 
+        [ComImport]
+        [Guid("3A3DCD6C-3EAB-43DC-BCDE-45671CE800C8")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        internal interface IDataTransferManagerInterop
+        {
+            IntPtr GetForWindow(IntPtr appWindow, in Guid riid);
+            void ShowShareUIForWindow(IntPtr appWindow);
+        }
+
         [LibraryImport("user32.dll", EntryPoint = "LoadCursorW", SetLastError = true)]
         internal static partial IntPtr LoadCursor(IntPtr hInstance, int lpCursorName);
 
@@ -9710,6 +9932,24 @@ namespace FileExplorerUI
 
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
         internal static extern int SHOpenWithDialog(IntPtr hwndParent, ref OpenAsInfo openAsInfo);
+
+        internal static DataTransferManager GetDataTransferManagerForWindow(IntPtr hwnd)
+        {
+            const string runtimeClassName = "Windows.ApplicationModel.DataTransfer.DataTransferManager";
+            Guid iid = new("A5CAEE9B-8708-49D1-8D36-67D25A8DA00C");
+            using var factory = ActivationFactory.Get(runtimeClassName);
+            var interop = (IDataTransferManagerInterop)Marshal.GetObjectForIUnknown(factory.ThisPtr);
+            IntPtr result = interop.GetForWindow(hwnd, iid);
+            return MarshalInterface<DataTransferManager>.FromAbi(result);
+        }
+
+        internal static void ShowShareUIForWindow(IntPtr hwnd)
+        {
+            const string runtimeClassName = "Windows.ApplicationModel.DataTransfer.DataTransferManager";
+            using var factory = ActivationFactory.Get(runtimeClassName);
+            var interop = (IDataTransferManagerInterop)Marshal.GetObjectForIUnknown(factory.ThisPtr);
+            interop.ShowShareUIForWindow(hwnd);
+        }
     }
 
 }

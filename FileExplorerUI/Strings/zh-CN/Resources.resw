@@ -963,4 +963,16 @@
   <data name="InteropOperationUnknownError" xml:space="preserve">
     <value>未知错误</value>
   </data>
+  <data name="StatusShareOpened" xml:space="preserve">
+    <value>已打开分享窗口：{0}</value>
+  </data>
+  <data name="StatusShareFailed" xml:space="preserve">
+    <value>分享失败：{0}</value>
+  </data>
+  <data name="StatusCompressZipSuccess" xml:space="preserve">
+    <value>已创建 ZIP 压缩包：{0}</value>
+  </data>
+  <data name="StatusCompressZipFailed" xml:space="preserve">
+    <value>创建 ZIP 压缩包失败：{0}</value>
+  </data>
 </root>

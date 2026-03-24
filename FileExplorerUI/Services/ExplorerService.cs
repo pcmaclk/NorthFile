@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -69,6 +70,27 @@ public sealed class ExplorerService
         {
             candidate = $"{candidateBaseName} ({disambiguator}).lnk";
             disambiguator++;
+        }
+
+        return candidate;
+    }
+
+    public string GenerateUniqueZipArchiveName(string directoryPath, string sourcePath)
+    {
+        string normalizedSourcePath = sourcePath.TrimEnd('\\');
+        string baseName = Path.GetFileName(normalizedSourcePath);
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+            baseName = "Archive";
+        }
+
+        string candidate = baseName + ".zip";
+        int suffix = 2;
+
+        while (PathExists(Path.Combine(directoryPath, candidate)))
+        {
+            candidate = $"{baseName} ({suffix}).zip";
+            suffix++;
         }
 
         return candidate;
@@ -613,6 +635,33 @@ public sealed class ExplorerService
             });
     }
 
+    public Task CreateZipArchiveAsync(string sourcePath, string archivePath)
+    {
+        return Task.Run(
+            () =>
+            {
+                string? archiveDirectory = Path.GetDirectoryName(archivePath);
+                if (!string.IsNullOrWhiteSpace(archiveDirectory))
+                {
+                    Directory.CreateDirectory(archiveDirectory);
+                }
+
+                if (Directory.Exists(sourcePath))
+                {
+                    CreateZipArchiveFromDirectory(sourcePath, archivePath);
+                    return;
+                }
+
+                if (File.Exists(sourcePath))
+                {
+                    CreateZipArchiveFromFile(sourcePath, archivePath);
+                    return;
+                }
+
+                throw new FileNotFoundException("Source path does not exist.", sourcePath);
+            });
+    }
+
     private static void CopyDirectory(string sourcePath, string targetPath)
     {
         Directory.CreateDirectory(targetPath);
@@ -648,6 +697,45 @@ public sealed class ExplorerService
             CopyDirectory(sourcePath, targetPath);
             Directory.Delete(sourcePath, recursive: true);
         }
+    }
+
+    private static void CreateZipArchiveFromDirectory(string sourcePath, string archivePath)
+    {
+        string rootName = Path.GetFileName(sourcePath.TrimEnd('\\'));
+        if (string.IsNullOrWhiteSpace(rootName))
+        {
+            rootName = "Archive";
+        }
+
+        using FileStream stream = new(archivePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
+
+        bool hasEntries = false;
+        foreach (string directory in Directory.EnumerateDirectories(sourcePath, "*", SearchOption.AllDirectories))
+        {
+            string relativePath = Path.GetRelativePath(sourcePath, directory).Replace('\\', '/');
+            archive.CreateEntry($"{rootName}/{relativePath}/");
+            hasEntries = true;
+        }
+
+        foreach (string file in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
+        {
+            string relativePath = Path.GetRelativePath(sourcePath, file).Replace('\\', '/');
+            archive.CreateEntryFromFile(file, $"{rootName}/{relativePath}", CompressionLevel.Optimal);
+            hasEntries = true;
+        }
+
+        if (!hasEntries)
+        {
+            archive.CreateEntry($"{rootName}/");
+        }
+    }
+
+    private static void CreateZipArchiveFromFile(string sourcePath, string archivePath)
+    {
+        using FileStream stream = new(archivePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
+        archive.CreateEntryFromFile(sourcePath, Path.GetFileName(sourcePath), CompressionLevel.Optimal);
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

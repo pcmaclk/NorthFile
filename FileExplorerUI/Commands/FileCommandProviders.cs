@@ -64,7 +64,7 @@ public sealed class FileEntryMenuCommandProvider : IFileCommandProvider
         {
             new FileCommandDescriptor(FileCommandIds.OpenWith, S("CommonOpenWith"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.Share, S("CommonShare"), FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.Compress, S("CommonCompress"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.CompressZip, S("CommonCompressZip"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.CreateShortcut, S("CommonCreateShortcut"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.CopyPath, S("CommonCopyFilePath"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.SetTag, S("CommonSetTag"), FileCommandCapabilities.None)
@@ -88,8 +88,9 @@ public sealed class DirectoryMenuCommandProvider : IFileCommandProvider
         {
             new FileCommandDescriptor(FileCommandIds.OpenInNewWindow, LocalizedStrings.Instance.Get("CommonOpenInNewWindow"), FileCommandCapabilities.None),
             new FileCommandDescriptor(pinCommandId, pinText, FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.Share, LocalizedStrings.Instance.Get("CommonShare"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.CreateShortcut, LocalizedStrings.Instance.Get("CommonCreateShortcut"), FileCommandCapabilities.None),
-            new FileCommandDescriptor(FileCommandIds.Compress, LocalizedStrings.Instance.Get("CommonCompress"), FileCommandCapabilities.None),
+            new FileCommandDescriptor(FileCommandIds.CompressZip, LocalizedStrings.Instance.Get("CommonCompressZip"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.CopyPath, LocalizedStrings.Instance.Get("CommonCopyFolderPath"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.SetTag, LocalizedStrings.Instance.Get("CommonSetTag"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.OpenInTerminal, LocalizedStrings.Instance.Get("CommonOpenInTerminal"), FileCommandCapabilities.None)
