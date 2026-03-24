@@ -1,6 +1,6 @@
 # NorthFile File Management Task Board
 
-Last updated: 2026-03-22
+Last updated: 2026-03-24
 Phase: post-`0.1.1`
 
 ## Scope
@@ -23,6 +23,17 @@ Deferred:
 
 ## Current Progress
 
+- 2026-03-24: verified and fixed a details-row recycle regression introduced during first-frame optimization; `EntryNameCell` now listens to `EntryViewModel.PropertyChanged` for `Name`, `IconGlyph`, and `IconForeground`, so recycled rows no longer show blank name cells while type/size columns still update
+- 2026-03-24: confirmed that the recent details scrolling correctness regression was not caused by the earlier `readRange` / sparse-loading refactor (`263e3f5`), but by later first-frame/layout experiments around the details repeater; the stable scrolling path has been restored and re-committed before continuing performance work
+- 2026-03-24: completed a first external UI-automation smoke test with `WinUI_MCP` through OpenCode; the server can now attach to the running `NorthFile` window, read window info, and capture a WinUI accessibility snapshot, which gives a second verification path besides internal perf logs
+- 2026-03-24: small-directory browse performance has now split into two separate concerns:
+  - data fetch is already fast enough on the current result-set/cache path
+  - remaining latency is dominated by details-mode first-frame layout/measure cost, especially for compact root/system folders such as `C:\` and `C:\Windows`
+- 2026-03-24: item-level perf diagnostics showed that neither `EntryNameCell` nor `EntryItemHost` is the primary first-frame hotspot; the remaining bottleneck is the batch first-layout cost of the details row template as a whole, not a single cell update path
+- 2026-03-24: first-frame optimization experiments have been partially validated:
+  - useful: removing `Bindings.Update()` from `EntryNameCell`, deferring non-critical UI finalize work, and narrowing initial details layout realization
+  - not useful enough by itself: flattening `EntryItemHost`
+  - too risky in its last form: over-aggressive layout/viewport trimming that reintroduced blank holes or partially refreshed rows
 - 2026-03-22: wired the first real placeholder context-menu commands; `Open in new window` now opens a second `MainWindow` with the target folder path, and `Open with` now goes through the system `SHOpenWithDialog` path instead of staying as a disabled placeholder
 - 2026-03-22: documented the next follow-up for file context actions: `Open with` may later need an app-owned recent/recommended-program list, while `Create shortcut` still remains an unimplemented placeholder and should be split into `.lnk` creation, naming, refresh, and post-create selection work
 - 2026-03-23: aligned current large-directory browse work with the longer-term result-set plan; the UI browse path is starting to move from direct directory paging calls toward a `readRange(startIndex, count)`-style result-set abstraction so future local/global index backends can plug into the same scrolling host
@@ -355,6 +366,13 @@ Reason:
   - details now routes scrolling through viewport-range reads
   - small moves prefetch near the loaded tail
   - large jumps read the current viewport block directly
+- The current details-mode UX/perf state should be treated as:
+  - scrolling correctness restored and no longer the active blocker
+  - small-directory first-frame cost still open
+  - future optimization work must not modify the stable sparse/recycle path without an explicit UI regression check
+- `WinUI_MCP` is now available as an optional external verification path for WinUI UI state:
+  - attachment to a running `NorthFile` window is already validated outside the codebase
+  - use it for screenshot/UIA verification when layout or interaction issues are ambiguous from logs alone
 ## 2026-03-23 全局索引前置设计
 
 - 新增《全局索引数据结构与演进方案》：
