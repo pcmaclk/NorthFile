@@ -39,17 +39,11 @@ public sealed class FixedExtentVirtualizingLayout : VirtualizingLayout
             return BuildExtent(logicalItemCount, itemExtent, crossAxisExtent);
         }
 
-        double viewportStart = Math.Max(0, _layoutProfile.IsVertical ? realizationRect.Y : realizationRect.X);
+        double viewportStart = _layoutProfile.IsVertical ? realizationRect.Y : realizationRect.X;
         double viewportLength = _layoutProfile.IsVertical ? realizationRect.Height : realizationRect.Width;
-        double visibleLength = Math.Max(1, _layoutProfile.ViewportPrimaryExtentProvider());
-        double maxRealizationLength = Math.Max(itemExtent * 12, visibleLength + (itemExtent * 8));
         if (viewportLength <= 0)
         {
             viewportLength = itemExtent * 8;
-        }
-        else
-        {
-            viewportLength = Math.Min(viewportLength, maxRealizationLength);
         }
 
         const int overscanItems = 4;

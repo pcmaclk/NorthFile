@@ -1,10 +1,13 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.ComponentModel;
 
 namespace FileExplorerUI.Controls;
 
 public sealed partial class EntryNameCell : UserControl
 {
+    private FileExplorerUI.EntryViewModel? _subscribedEntry;
+
     public static readonly DependencyProperty EntryProperty =
         DependencyProperty.Register(
             nameof(Entry),
@@ -29,6 +32,7 @@ public sealed partial class EntryNameCell : UserControl
     public EntryNameCell()
     {
         this.InitializeComponent();
+        Unloaded += EntryNameCell_Unloaded;
         ApplyBindings();
     }
 
@@ -54,7 +58,44 @@ public sealed partial class EntryNameCell : UserControl
 
     private static void OnBindablePropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
-        ((EntryNameCell)d).ApplyBindings();
+        var control = (EntryNameCell)d;
+        if (e.Property == EntryProperty)
+        {
+            control.UpdateEntrySubscription(e.OldValue as FileExplorerUI.EntryViewModel, e.NewValue as FileExplorerUI.EntryViewModel);
+        }
+
+        control.ApplyBindings();
+    }
+
+    private void UpdateEntrySubscription(FileExplorerUI.EntryViewModel? oldEntry, FileExplorerUI.EntryViewModel? newEntry)
+    {
+        if (ReferenceEquals(oldEntry, newEntry))
+        {
+            return;
+        }
+
+        if (oldEntry is not null)
+        {
+            oldEntry.PropertyChanged -= Entry_PropertyChanged;
+        }
+
+        _subscribedEntry = newEntry;
+        if (newEntry is not null)
+        {
+            newEntry.PropertyChanged += Entry_PropertyChanged;
+        }
+    }
+
+    private void Entry_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(FileExplorerUI.EntryViewModel.Name)
+            or nameof(FileExplorerUI.EntryViewModel.IconGlyph)
+            or nameof(FileExplorerUI.EntryViewModel.IconForeground)))
+        {
+            return;
+        }
+
+        _ = DispatcherQueue.TryEnqueue(ApplyBindings);
     }
 
     private void ApplyBindings()
@@ -79,5 +120,10 @@ public sealed partial class EntryNameCell : UserControl
         EntryNameTextBlock.Margin = new Thickness(0, 0, metrics.NameTrailingSpacing, 0);
         EntryNameTextBlock.FontSize = metrics.NameFontSize;
         EntryNameTextBlock.Text = entry?.Name ?? string.Empty;
+    }
+
+    private void EntryNameCell_Unloaded(object sender, RoutedEventArgs e)
+    {
+        UpdateEntrySubscription(_subscribedEntry, null);
     }
 }
