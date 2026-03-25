@@ -35,6 +35,7 @@ namespace FileExplorerUI
         private bool _compactButtonsAttached;
 
         public event EventHandler<SidebarNavigateRequestedEventArgs>? NavigateRequested;
+        public event EventHandler? SettingsRequested;
 
         public SidebarView()
         {
@@ -186,12 +187,22 @@ namespace FileExplorerUI
         private void ApplyCompactVisibility(bool compact)
         {
             SidebarScrollViewer.Padding = compact ? new Thickness(0) : new Thickness(0, 0, 12, 0);
+            UpdateSettingsButtonLayout(compact);
             CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             SetVisibility(_fullOnlySections, compact ? Visibility.Collapsed : Visibility.Visible);
             TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             SetTextVisibility(_labelBlocks, compact);
             SetTextVisibility(_headerBlocks, compact);
             SetVisibility(_groupChevrons, compact ? Visibility.Collapsed : Visibility.Visible);
+        }
+
+        private void UpdateSettingsButtonLayout(bool compact)
+        {
+            SettingsFooterHost.Margin = compact ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 12, 2);
+            SidebarSettingsButton.Width = compact ? 32 : double.NaN;
+            SidebarSettingsButton.Padding = compact ? new Thickness(0) : new Thickness(9, 0, 0, 0);
+            SidebarSettingsButton.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+            SidebarSettingsButton.HorizontalContentAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
         }
 
         private void ApplyHeaderLayout(bool compact)
@@ -529,6 +540,11 @@ namespace FileExplorerUI
 
             SetSelectedPath(item.Path);
             NavigateRequested?.Invoke(this, new SidebarNavigateRequestedEventArgs(item.Path));
+        }
+
+        private void SidebarSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            SettingsRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void ClearSelection()

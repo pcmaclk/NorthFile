@@ -1029,4 +1029,214 @@
   <data name="StatusExtractZipFailed" xml:space="preserve">
     <value>解压 ZIP 压缩包失败：{0}</value>
   </data>
+  <data name="SettingsPageTitle" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="SettingsNavBack" xml:space="preserve">
+    <value>返回</value>
+  </data>
+  <data name="SettingsSectionGeneral" xml:space="preserve">
+    <value>通用</value>
+  </data>
+  <data name="SettingsSectionGeneralDescription" xml:space="preserve">
+    <value>基础应用行为和启动方式。当前仅提供界面占位。</value>
+  </data>
+  <data name="SettingsLanguageTitle" xml:space="preserve">
+    <value>语言</value>
+  </data>
+  <data name="SettingsLanguageDescription" xml:space="preserve">
+    <value>应用显示语言。后续将支持使用系统设置和手动选择。</value>
+  </data>
+  <data name="SettingsUseSystem" xml:space="preserve">
+    <value>使用系统设置</value>
+  </data>
+  <data name="SettingsLanguageChineseSimplified" xml:space="preserve">
+    <value>简体中文</value>
+  </data>
+  <data name="SettingsStartupTitle" xml:space="preserve">
+    <value>启动设置</value>
+  </data>
+  <data name="SettingsStartupDescription" xml:space="preserve">
+    <value>应用启动后默认进入的位置。</value>
+  </data>
+  <data name="SettingsStartupLastLocation" xml:space="preserve">
+    <value>上次关闭位置</value>
+  </data>
+  <data name="SettingsStartupSpecifiedLocation" xml:space="preserve">
+    <value>指定位置</value>
+  </data>
+  <data name="SettingsFavoritesTitle" xml:space="preserve">
+    <value>收藏</value>
+  </data>
+  <data name="SettingsFavoritesDescription" xml:space="preserve">
+    <value>控制收藏分组是否显示。</value>
+  </data>
+  <data name="SettingsCloudTitle" xml:space="preserve">
+    <value>云</value>
+  </data>
+  <data name="SettingsCloudDescription" xml:space="preserve">
+    <value>控制云盘分组是否显示。</value>
+  </data>
+  <data name="SettingsNetworkTitle" xml:space="preserve">
+    <value>网络</value>
+  </data>
+  <data name="SettingsNetworkDescription" xml:space="preserve">
+    <value>控制网络分组是否显示。</value>
+  </data>
+  <data name="SettingsTagsTitle" xml:space="preserve">
+    <value>标签</value>
+  </data>
+  <data name="SettingsTagsDescription" xml:space="preserve">
+    <value>控制标签分组是否显示。</value>
+  </data>
+  <data name="SettingsSectionAppearance" xml:space="preserve">
+    <value>外观</value>
+  </data>
+  <data name="SettingsSectionAppearanceDescription" xml:space="preserve">
+    <value>应用主题和默认展示方式。当前仅提供界面占位。</value>
+  </data>
+  <data name="SettingsThemeTitle" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="SettingsThemeDescription" xml:space="preserve">
+    <value>控制 NorthFile 的浅色、深色或跟随系统外观。</value>
+  </data>
+  <data name="SettingsThemeLight" xml:space="preserve">
+    <value>浅色</value>
+  </data>
+  <data name="SettingsThemeDark" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="SettingsSortTitle" xml:space="preserve">
+    <value>默认排序方式</value>
+  </data>
+  <data name="SettingsSortDescription" xml:space="preserve">
+    <value>为新窗口和新标签页准备的默认排序。</value>
+  </data>
+  <data name="SettingsGroupTitle" xml:space="preserve">
+    <value>默认分组方式</value>
+  </data>
+  <data name="SettingsGroupDescription" xml:space="preserve">
+    <value>控制新窗口进入目录时的初始分组状态。</value>
+  </data>
+  <data name="SettingsSectionFilesAndFolders" xml:space="preserve">
+    <value>文件和文件夹</value>
+  </data>
+  <data name="SettingsSectionFilesAndFoldersDescription" xml:space="preserve">
+    <value>目录显示规则和删除体验。当前仅提供界面占位。</value>
+  </data>
+  <data name="SettingsShowHiddenTitle" xml:space="preserve">
+    <value>显示隐藏文件和文件夹</value>
+  </data>
+  <data name="SettingsShowHiddenDescription" xml:space="preserve">
+    <value>控制隐藏项目是否显示在文件列表中。</value>
+  </data>
+  <data name="SettingsShowProtectedSystemTitle" xml:space="preserve">
+    <value>显示受保护的系统文件</value>
+  </data>
+  <data name="SettingsShowProtectedSystemDescription" xml:space="preserve">
+    <value>控制受保护系统文件是否显示。</value>
+  </data>
+  <data name="SettingsShowDotFilesTitle" xml:space="preserve">
+    <value>显示以 . 开头的文件和文件夹</value>
+  </data>
+  <data name="SettingsShowDotFilesDescription" xml:space="preserve">
+    <value>控制以点开头的项目是否显示。</value>
+  </data>
+  <data name="SettingsShowExtensionsTitle" xml:space="preserve">
+    <value>显示文件的扩展名</value>
+  </data>
+  <data name="SettingsShowExtensionsDescription" xml:space="preserve">
+    <value>控制文件扩展名是否显示在名称后方。</value>
+  </data>
+  <data name="SettingsDeleteConfirmTitle" xml:space="preserve">
+    <value>删除时显示确认对话框</value>
+  </data>
+  <data name="SettingsDeleteConfirmDescription" xml:space="preserve">
+    <value>应用层预确认对话框的视觉入口。当前未接真实删除策略。</value>
+  </data>
+  <data name="SettingsSectionShortcuts" xml:space="preserve">
+    <value>快捷键</value>
+  </data>
+  <data name="SettingsSectionShortcutsDescription" xml:space="preserve">
+    <value>第一阶段仅提供占位内容，后续再接真正的快捷键自定义。</value>
+  </data>
+  <data name="SettingsShortcutsTitle" xml:space="preserve">
+    <value>快捷键设置</value>
+  </data>
+  <data name="SettingsShortcutsDescription" xml:space="preserve">
+    <value>后续这里会接入快捷键列表、冲突检测和自定义绑定。</value>
+  </data>
+  <data name="SettingsComingSoon" xml:space="preserve">
+    <value>即将提供</value>
+  </data>
+  <data name="SettingsSectionTags" xml:space="preserve">
+    <value>标签</value>
+  </data>
+  <data name="SettingsSectionTagsDescription" xml:space="preserve">
+    <value>第一阶段仅提供占位内容，后续再接标签模型和管理界面。</value>
+  </data>
+  <data name="SettingsTagsFeatureTitle" xml:space="preserve">
+    <value>标签功能</value>
+  </data>
+  <data name="SettingsTagsFeatureDescription" xml:space="preserve">
+    <value>后续这里会接入默认标签、颜色、显示策略和筛选规则。</value>
+  </data>
+  <data name="SettingsSectionAdvanced" xml:space="preserve">
+    <value>高级</value>
+  </data>
+  <data name="SettingsSectionAdvancedDescription" xml:space="preserve">
+    <value>系统级行为与迁移能力。当前仅提供界面占位。</value>
+  </data>
+  <data name="SettingsMigrationTitle" xml:space="preserve">
+    <value>设置迁移</value>
+  </data>
+  <data name="SettingsMigrationDescription" xml:space="preserve">
+    <value>导入和导出设置将在后续版本接入。</value>
+  </data>
+  <data name="SettingsExport" xml:space="preserve">
+    <value>导出设置</value>
+  </data>
+  <data name="SettingsImport" xml:space="preserve">
+    <value>导入设置</value>
+  </data>
+  <data name="SettingsAutoStartTitle" xml:space="preserve">
+    <value>开机自启动</value>
+  </data>
+  <data name="SettingsAutoStartDescription" xml:space="preserve">
+    <value>控制应用是否在开机后自动启动。</value>
+  </data>
+  <data name="SettingsMinimizeToTrayTitle" xml:space="preserve">
+    <value>关闭窗口收缩到托盘</value>
+  </data>
+  <data name="SettingsMinimizeToTrayDescription" xml:space="preserve">
+    <value>控制关闭主窗口时是否收缩到系统托盘。</value>
+  </data>
+  <data name="SettingsDefaultManagerTitle" xml:space="preserve">
+    <value>将 NorthFile 设为默认文件管理器</value>
+  </data>
+  <data name="SettingsDefaultManagerDescription" xml:space="preserve">
+    <value>第一阶段只展示入口，不执行系统注册。</value>
+  </data>
+  <data name="SettingsSetDefault" xml:space="preserve">
+    <value>设置默认</value>
+  </data>
+  <data name="SettingsSectionAbout" xml:space="preserve">
+    <value>关于</value>
+  </data>
+  <data name="SettingsSectionAboutDescription" xml:space="preserve">
+    <value>应用信息与当前构建摘要。</value>
+  </data>
+  <data name="SettingsAboutAppName" xml:space="preserve">
+    <value>NorthFile</value>
+  </data>
+  <data name="SettingsAboutAppDescription" xml:space="preserve">
+    <value>面向大目录和现代交互的 WinUI 文件管理器。</value>
+  </data>
+  <data name="SettingsAboutEngineVersion" xml:space="preserve">
+    <value>引擎版本：{0}</value>
+  </data>
+  <data name="SettingsAboutAppVersion" xml:space="preserve">
+    <value>应用版本：{0}</value>
+  </data>
 </root>

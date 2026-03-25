@@ -543,15 +543,17 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Grid Grid.Row="1" Height="32">
+        <Grid x:Name="SettingsFooterHost" Grid.Row="1" Height="32" Margin="0,0,12,2">
             <Button
                 x:Name="SidebarSettingsButton"
-                Width="32"
+                Width="Auto"
                 Height="32"
-                Padding="0"
-                HorizontalAlignment="Left"
+                Padding="9,0,0,0"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Left"
                 VerticalAlignment="Center"
-                Style="{ThemeResource SubtleButtonStyle}">
+                Style="{ThemeResource SubtleButtonStyle}"
+                Click="SidebarSettingsButton_Click">
                 <ToolTipService.ToolTip>
                     <ToolTip x:Uid="SidebarSettingsButtonToolTip" />
                 </ToolTipService.ToolTip>

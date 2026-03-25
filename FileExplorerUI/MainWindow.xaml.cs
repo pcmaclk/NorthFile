@@ -2,6 +2,7 @@ using FileExplorerUI.Commands;
 using FileExplorerUI.Collections;
 using FileExplorerUI.Controls;
 using FileExplorerUI.Interop;
+using FileExplorerUI.Settings;
 using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Windowing;
@@ -80,12 +81,19 @@ namespace FileExplorerUI
             DataRefresh
         }
 
+        private enum ShellMode
+        {
+            Explorer,
+            Settings
+        }
+
         private static int s_navigationPerfSequence;
         private static readonly object s_navigationPerfLogLock = new();
         private static readonly string s_navigationPerfLogPath = Path.Combine(
             AppContext.BaseDirectory,
             "navigation-perf.log");
         private static int s_detailsViewportPerfSequence;
+        private const int SettingsShellMinWindowWidth = 1024;
 
         private sealed record EntriesContextRequest(
             UIElement Anchor,
@@ -279,7 +287,23 @@ namespace FileExplorerUI
         private const double SidebarTreeRenameRightMargin = 8;
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
         private static string S(string key) => LocalizedStrings.Instance.Get(key);
-        private static string SF(string key, params object[] args) => string.Format(S(key), args);
+        private static string SF(string key, params object[] args)
+        {
+            string? format = S(key);
+            if (string.IsNullOrEmpty(format))
+            {
+                return key;
+            }
+
+            try
+            {
+                return string.Format(format, args);
+            }
+            catch (FormatException)
+            {
+                return format;
+            }
+        }
         private void UpdateStatusKey(string key, params object[] args) => UpdateStatus(SF(key, args));
         private static string CreateKindLabel(bool isDirectory) => S(isDirectory ? "CreateKindFolder" : "CreateKindFile");
 
@@ -324,6 +348,18 @@ namespace FileExplorerUI
             : Visibility.Collapsed;
 
         public Visibility ListEntryVisibility => _currentViewMode == EntryViewMode.List
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public Visibility ExplorerChromeVisibility => _shellMode == ShellMode.Explorer
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public Visibility ExplorerShellVisibility => _shellMode == ShellMode.Explorer
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public Visibility SettingsShellVisibility => _shellMode == ShellMode.Settings
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -469,6 +505,9 @@ namespace FileExplorerUI
         private EntrySortField _currentSortField = EntrySortField.Name;
         private SortDirection _currentSortDirection = SortDirection.Ascending;
         private EntryGroupField _currentGroupField = EntryGroupField.None;
+        private ShellMode _shellMode = ShellMode.Explorer;
+        private SettingsSection _currentSettingsSection = SettingsSection.General;
+        private bool _suppressSettingsNavigationSelection;
         private EntryViewDensityMode _currentEntryViewDensityMode = EntryViewDensityMode.Normal;
         private double _lastDetailsHorizontalOffset = double.NaN;
         private double _lastDetailsVerticalOffset = double.NaN;
@@ -709,6 +748,8 @@ namespace FileExplorerUI
             UpdateWindowTitle();
             ApplyTitleBarTheme();
             StyledSidebarView.NavigateRequested += StyledSidebarView_NavigateRequested;
+            StyledSidebarView.SettingsRequested += StyledSidebarView_SettingsRequested;
+            SettingsViewControl.VisibleSectionChanged += SettingsViewControl_VisibleSectionChanged;
             BuildSidebarItems();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
@@ -720,6 +761,84 @@ namespace FileExplorerUI
             _workspaceLayoutHost.LayoutMode = WorkspaceLayoutMode.Single;
             _workspaceLayoutHost.ActivatePanel(WorkspacePanelId.Primary);
             SyncActivePanelPresentationState();
+        }
+
+        private void RaisePropertyChanged(params string[] propertyNames)
+        {
+            foreach (string propertyName in propertyNames)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
+
+        private void EnterSettingsShell(SettingsSection section = SettingsSection.General)
+        {
+            _shellMode = ShellMode.Settings;
+            ApplyWindowMinimumWidthForShellMode();
+            SetCurrentSettingsSection(section, updateSelection: true);
+            RaisePropertyChanged(
+                nameof(ExplorerChromeVisibility),
+                nameof(ExplorerShellVisibility),
+                nameof(SettingsShellVisibility));
+        }
+
+        private void ExitSettingsShell()
+        {
+            _shellMode = ShellMode.Explorer;
+            ApplyWindowMinimumWidthForShellMode();
+            RaisePropertyChanged(
+                nameof(ExplorerChromeVisibility),
+                nameof(ExplorerShellVisibility),
+                nameof(SettingsShellVisibility));
+        }
+
+        private void SetCurrentSettingsSection(SettingsSection section, bool updateSelection)
+        {
+            _currentSettingsSection = section;
+
+            if (updateSelection && SettingsNavigationView is not null)
+            {
+                _suppressSettingsNavigationSelection = true;
+                foreach (object item in SettingsNavigationView.MenuItems)
+                {
+                    if (item is NavigationViewItem navigationViewItem
+                        && navigationViewItem.Tag is string tag
+                        && TryParseSettingsSection(tag, out SettingsSection parsed)
+                        && parsed == section)
+                    {
+                        SettingsNavigationView.SelectedItem = navigationViewItem;
+                        break;
+                    }
+                }
+                _suppressSettingsNavigationSelection = false;
+            }
+
+            if (updateSelection)
+            {
+                SettingsViewControl?.ScrollToSection(section);
+            }
+        }
+
+        private void ApplyWindowMinimumWidthForShellMode()
+        {
+            if (AppWindow.Presenter is not OverlappedPresenter presenter)
+            {
+                return;
+            }
+
+            if (_shellMode == ShellMode.Settings)
+            {
+                presenter.PreferredMinimumWidth = SettingsShellMinWindowWidth;
+            }
+            else
+            {
+                presenter.PreferredMinimumWidth = 0;
+            }
+        }
+
+        private static bool TryParseSettingsSection(string? tag, out SettingsSection section)
+        {
+            return Enum.TryParse(tag, ignoreCase: true, out section);
         }
 
         private bool UsesClientPresentationPipeline()
@@ -965,6 +1084,11 @@ namespace FileExplorerUI
 
         private void UpdateWindowTitle()
         {
+            if (AppWindow is null)
+            {
+                return;
+            }
+
             if (_lastTitleWasReadFailed)
             {
                 this.AppWindow.Title = SF("WindowTitleReadFailedFormat", _engineVersion);
@@ -3558,6 +3682,67 @@ namespace FileExplorerUI
                 UpdateStatusKey("StatusSidebarNavFailed", FileOperationErrors.ToUserMessage(ex));
                 StyledSidebarView.SetSelectedPath(_currentPath);
             }
+        }
+
+        private void StyledSidebarView_SettingsRequested(object? sender, EventArgs e)
+        {
+            EnterSettingsShell();
+        }
+
+        private void SettingsNavigationView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs e)
+        {
+            if (_suppressSettingsNavigationSelection)
+            {
+                return;
+            }
+
+            if (e.SelectedItemContainer is not NavigationViewItem item
+                || item.Tag is not string tag)
+            {
+                return;
+            }
+
+            if (string.Equals(tag, "Back", StringComparison.OrdinalIgnoreCase))
+            {
+                ExitSettingsShell();
+                SetCurrentSettingsSection(_currentSettingsSection, updateSelection: true);
+                return;
+            }
+
+            if (!TryParseSettingsSection(tag, out SettingsSection section))
+            {
+                return;
+            }
+
+            SetCurrentSettingsSection(section, updateSelection: true);
+        }
+
+        private void SettingsViewControl_VisibleSectionChanged(SettingsSection section)
+        {
+            if (_currentSettingsSection == section)
+            {
+                return;
+            }
+
+            _currentSettingsSection = section;
+            if (SettingsNavigationView is null)
+            {
+                return;
+            }
+
+            _suppressSettingsNavigationSelection = true;
+            foreach (object item in SettingsNavigationView.MenuItems)
+            {
+                if (item is NavigationViewItem navigationViewItem
+                    && navigationViewItem.Tag is string tag
+                    && TryParseSettingsSection(tag, out SettingsSection parsed)
+                    && parsed == section)
+                {
+                    SettingsNavigationView.SelectedItem = navigationViewItem;
+                    break;
+                }
+            }
+            _suppressSettingsNavigationSelection = false;
         }
 
         private void SidebarSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
