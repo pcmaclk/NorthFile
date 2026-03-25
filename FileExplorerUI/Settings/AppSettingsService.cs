@@ -8,6 +8,7 @@ public sealed class AppSettingsService
     private const string ShowCloudKey = "Settings.ShowCloud";
     private const string ShowNetworkKey = "Settings.ShowNetwork";
     private const string ShowTagsKey = "Settings.ShowTags";
+    private const string ConfirmDeleteKey = "Settings.ConfirmDelete";
 
     private readonly ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
 
@@ -18,7 +19,8 @@ public sealed class AppSettingsService
             ShowFavorites = ReadBool(ShowFavoritesKey, true),
             ShowCloud = ReadBool(ShowCloudKey, true),
             ShowNetwork = ReadBool(ShowNetworkKey, true),
-            ShowTags = ReadBool(ShowTagsKey, true)
+            ShowTags = ReadBool(ShowTagsKey, true),
+            ConfirmDelete = ReadBool(ConfirmDeleteKey, true)
         };
     }
 
@@ -28,6 +30,7 @@ public sealed class AppSettingsService
         _localSettings.Values[ShowCloudKey] = settings.ShowCloud;
         _localSettings.Values[ShowNetworkKey] = settings.ShowNetwork;
         _localSettings.Values[ShowTagsKey] = settings.ShowTags;
+        _localSettings.Values[ConfirmDeleteKey] = settings.ConfirmDelete;
     }
 
     private bool ReadBool(string key, bool fallback)

@@ -9,4 +9,6 @@ public sealed class AppSettings
     public bool ShowNetwork { get; set; } = true;
 
     public bool ShowTags { get; set; } = true;
+
+    public bool ConfirmDelete { get; set; } = true;
 }

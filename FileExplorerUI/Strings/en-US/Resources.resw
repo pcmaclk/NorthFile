@@ -1153,7 +1153,7 @@
     <value>Show confirmation when deleting</value>
   </data>
   <data name="SettingsDeleteConfirmDescription" xml:space="preserve">
-    <value>This is the visual entry for an app-level confirmation dialog. Real delete behavior is not wired yet.</value>
+    <value>Show an app-level confirmation dialog before continuing with the system delete flow.</value>
   </data>
   <data name="SettingsSectionShortcuts" xml:space="preserve">
     <value>Shortcuts</value>

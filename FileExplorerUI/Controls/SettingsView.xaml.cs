@@ -22,6 +22,7 @@ public sealed partial class SettingsView : UserControl
 
     public event Action<SettingsSection>? VisibleSectionChanged;
     public event Action<bool, bool, bool, bool>? SidebarSectionVisibilityChanged;
+    public event Action<bool>? DeleteConfirmationChanged;
 
     public SettingsView()
     {
@@ -65,6 +66,13 @@ public sealed partial class SettingsView : UserControl
         CloudToggleSwitch.IsOn = showCloud;
         NetworkToggleSwitch.IsOn = showNetwork;
         TagsToggleSwitch.IsOn = showTags;
+        _suppressSidebarSectionEvents = false;
+    }
+
+    public void SetDeleteConfirmationEnabled(bool enabled)
+    {
+        _suppressSidebarSectionEvents = true;
+        DeleteConfirmToggleSwitch.IsOn = enabled;
         _suppressSidebarSectionEvents = false;
     }
 
@@ -158,5 +166,15 @@ public sealed partial class SettingsView : UserControl
             CloudToggleSwitch.IsOn,
             NetworkToggleSwitch.IsOn,
             TagsToggleSwitch.IsOn);
+    }
+
+    private void DeleteConfirmToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressSidebarSectionEvents)
+        {
+            return;
+        }
+
+        DeleteConfirmationChanged?.Invoke(DeleteConfirmToggleSwitch.IsOn);
     }
 }

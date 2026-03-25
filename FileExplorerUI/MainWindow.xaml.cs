@@ -754,6 +754,7 @@ namespace FileExplorerUI
             StyledSidebarView.SettingsRequested += StyledSidebarView_SettingsRequested;
             SettingsViewControl.VisibleSectionChanged += SettingsViewControl_VisibleSectionChanged;
             SettingsViewControl.SidebarSectionVisibilityChanged += SettingsViewControl_SidebarSectionVisibilityChanged;
+            SettingsViewControl.DeleteConfirmationChanged += SettingsViewControl_DeleteConfirmationChanged;
             BuildSidebarItems();
             ApplyAppSettingsToUi();
             _sidebarInitialized = true;
@@ -2933,6 +2934,7 @@ namespace FileExplorerUI
                 _appSettings.ShowCloud,
                 _appSettings.ShowNetwork,
                 _appSettings.ShowTags);
+            SettingsViewControl.SetDeleteConfirmationEnabled(_appSettings.ConfirmDelete);
 
             StyledSidebarView.SetSectionVisibility(
                 _appSettings.ShowFavorites,
@@ -3779,6 +3781,12 @@ namespace FileExplorerUI
 
             _appSettingsService.Save(_appSettings);
             StyledSidebarView.SetSectionVisibility(showFavorites, showCloud, showNetwork, showTags);
+        }
+
+        private void SettingsViewControl_DeleteConfirmationChanged(bool enabled)
+        {
+            _appSettings.ConfirmDelete = enabled;
+            _appSettingsService.Save(_appSettings);
         }
 
         private void SidebarSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -9320,6 +9328,12 @@ namespace FileExplorerUI
         {
             try
             {
+                if (_appSettings.ConfirmDelete && !await ConfirmDeleteAsync(entry.Name, recursive))
+                {
+                    UpdateStatusKey("StatusDeleteCanceled");
+                    return;
+                }
+
                 FileOperationResult<bool> deleteResult = await _fileManagementCoordinator.TryDeleteEntryAsync(targetPath, recursive);
                 if (!deleteResult.Succeeded)
                 {

@@ -1153,7 +1153,7 @@
     <value>删除时显示确认对话框</value>
   </data>
   <data name="SettingsDeleteConfirmDescription" xml:space="preserve">
-    <value>应用层预确认对话框的视觉入口。当前未接真实删除策略。</value>
+    <value>删除前显示应用层确认对话框，再继续执行系统删除流程。</value>
   </data>
   <data name="SettingsSectionShortcuts" xml:space="preserve">
     <value>快捷键</value>
