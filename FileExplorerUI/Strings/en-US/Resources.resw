@@ -168,7 +168,9 @@
   <data name="CommonOpenWith" xml:space="preserve"><value>Open with</value></data>
   <data name="CommonShare" xml:space="preserve"><value>Share</value></data>
   <data name="CommonCompress" xml:space="preserve"><value>Compress to</value></data>
+  <data name="CommonArchiveActions" xml:space="preserve"><value>Archive</value></data>
   <data name="CommonCompressZip" xml:space="preserve"><value>ZIP</value></data>
+  <data name="CommonCompressZipAction" xml:space="preserve"><value>Compress to ZIP</value></data>
   <data name="CommonCompress7z" xml:space="preserve"><value>7z</value></data>
   <data name="CommonCreateShortcut" xml:space="preserve"><value>Create shortcut</value></data>
   <data name="ShortcutNameSuffix" xml:space="preserve"><value> - Shortcut</value></data>
@@ -211,8 +213,11 @@
   <data name="CommonDelete" xml:space="preserve"><value>Delete</value></data>
   <data name="CommonRefresh" xml:space="preserve"><value>Refresh</value></data>
   <data name="CommonRunAsAdministrator" xml:space="preserve"><value>Run as administrator</value></data>
+  <data name="CommonExtract" xml:space="preserve"><value>Extract</value></data>
+  <data name="CommonExtractSmart" xml:space="preserve"><value>Smart extract</value></data>
   <data name="CommonExtractHere" xml:space="preserve"><value>Extract here</value></data>
   <data name="CommonExtractToFolder" xml:space="preserve"><value>Extract to folder</value></data>
+  <data name="CommonExtractToNamedFolder" xml:space="preserve"><value>Extract to {0}</value></data>
   <data name="CommonPreview" xml:space="preserve"><value>Preview</value></data>
   <data name="CommonEmpty" xml:space="preserve"><value>(empty)</value></data>
   <data name="GroupTypeFolder" xml:space="preserve"><value>Folders</value></data>
@@ -286,8 +291,21 @@
   <data name="InteropOperationNotSupported" xml:space="preserve"><value>operation is not supported</value></data>
   <data name="InteropOperationGenericIoFailure" xml:space="preserve"><value>generic I/O failure</value></data>
   <data name="InteropOperationUnknownError" xml:space="preserve"><value>unknown error</value></data>
+  <data name="ErrorFileOperationNotFound" xml:space="preserve"><value>The item could not be found.</value></data>
+  <data name="ErrorFileOperationCanceled" xml:space="preserve"><value>The operation was canceled.</value></data>
+  <data name="ErrorFileOperationAccessDenied" xml:space="preserve"><value>Access was denied.</value></data>
+  <data name="ErrorFileOperationAlreadyExists" xml:space="preserve"><value>The target item already exists.</value></data>
+  <data name="ErrorFileOperationInvalidName" xml:space="preserve"><value>The name or path is invalid.</value></data>
+  <data name="ErrorFileOperationPathTooLong" xml:space="preserve"><value>The path is too long.</value></data>
+  <data name="ErrorFileOperationInUse" xml:space="preserve"><value>The item is currently in use.</value></data>
+  <data name="ErrorFileOperationDiskFull" xml:space="preserve"><value>There is not enough disk space.</value></data>
+  <data name="ErrorFileOperationNotSupported" xml:space="preserve"><value>This operation is not supported.</value></data>
+  <data name="ErrorFileOperationInvalidArchive" xml:space="preserve"><value>The archive is invalid or corrupted.</value></data>
+  <data name="ErrorFileOperationUnknown" xml:space="preserve"><value>An unknown file operation error occurred.</value></data>
   <data name="StatusShareOpened" xml:space="preserve"><value>Opened share UI for: {0}</value></data>
   <data name="StatusShareFailed" xml:space="preserve"><value>Share failed: {0}</value></data>
   <data name="StatusCompressZipSuccess" xml:space="preserve"><value>Created zip archive: {0}</value></data>
   <data name="StatusCompressZipFailed" xml:space="preserve"><value>Failed to create zip archive: {0}</value></data>
+  <data name="StatusExtractZipSuccess" xml:space="preserve"><value>Extracted zip archive: {0}</value></data>
+  <data name="StatusExtractZipFailed" xml:space="preserve"><value>Failed to extract zip archive: {0}</value></data>
 </root>

@@ -93,5 +93,6 @@ public static class FileCommandIds
     public const string RunAsAdministrator = "run-as-administrator";
     public const string ExtractHere = "extract-here";
     public const string ExtractToFolder = "extract-to-folder";
+    public const string ExtractSmart = "extract-smart";
     public const string Preview = "preview";
 }

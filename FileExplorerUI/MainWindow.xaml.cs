@@ -1727,7 +1727,14 @@ namespace FileExplorerUI
 
             try
             {
-                FilePasteResult result = await _fileManagementCoordinator.PasteAsync(targetDirectoryPath);
+                FilePasteOperationResult pasteOperation = await _fileManagementCoordinator.TryPasteAsync(targetDirectoryPath);
+                if (!pasteOperation.Succeeded || pasteOperation.PasteResult is null)
+                {
+                    UpdateStatusKey("StatusPasteFailedWithReason", pasteOperation.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    return;
+                }
+
+                FilePasteResult result = pasteOperation.PasteResult;
                 int appliedCount = 0;
                 int conflictCount = 0;
                 int samePathCount = 0;
@@ -1809,7 +1816,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusPasteFailedWithReason", ex.Message);
+                UpdateStatusKey("StatusPasteFailedWithReason", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -1831,7 +1838,13 @@ namespace FileExplorerUI
             try
             {
                 SuppressNextWatcherRefresh(_currentPath);
-                CreatedEntryInfo created = await _fileManagementCoordinator.CreateEntryAsync(_currentPath, isDirectory);
+                FileOperationResult<CreatedEntryInfo> createResult = await _fileManagementCoordinator.TryCreateEntryAsync(_currentPath, isDirectory);
+                if (!createResult.Succeeded)
+                {
+                    UpdateStatusKey("StatusCreateFailed", createResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    return;
+                }
+                CreatedEntryInfo created = createResult.Value!;
                 if (!created.ChangeNotified)
                 {
                     EnsurePersistentRefreshFallbackInvalidation(_currentPath, isDirectory ? "create-folder" : "create-file");
@@ -1851,7 +1864,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusCreateFailed", ex.Message);
+                UpdateStatusKey("StatusCreateFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -2440,7 +2453,7 @@ namespace FileExplorerUI
             {
                 _lastTitleWasReadFailed = true;
                 UpdateWindowTitle();
-                UpdateStatusKey("StatusPathError", path, ex.Message);
+                UpdateStatusKey("StatusPathError", path, FileOperationErrors.ToUserMessage(ex));
                 perf?.Mark("load-page.failed", ex.Message);
             }
             finally
@@ -2540,7 +2553,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusLoadFailedWithReason", ex.Message);
+                UpdateStatusKey("StatusLoadFailedWithReason", FileOperationErrors.ToUserMessage(ex));
                 perf?.Mark("load-all.failed", ex.Message);
             }
             finally
@@ -2675,7 +2688,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusPathInvalidateWarning", path, reason, ex.Message);
+                UpdateStatusKey("StatusPathInvalidateWarning", path, reason, FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -2692,7 +2705,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusPathInvalidateWarning", path, reason, ex.Message);
+                UpdateStatusKey("StatusPathInvalidateWarning", path, reason, FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -3189,7 +3202,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusPathError", path, ex.Message);
+                UpdateStatusKey("StatusPathError", path, FileOperationErrors.ToUserMessage(ex));
                 return false;
             }
         }
@@ -3268,7 +3281,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusSidebarTreeExpandFailed", ex.Message);
+                UpdateStatusKey("StatusSidebarTreeExpandFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -3416,7 +3429,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusSidebarTreeNavFailed", ex.Message);
+                UpdateStatusKey("StatusSidebarTreeNavFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -3510,7 +3523,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusSidebarNavFailed", ex.Message);
+                UpdateStatusKey("StatusSidebarNavFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -3542,7 +3555,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusSidebarNavFailed", ex.Message);
+                UpdateStatusKey("StatusSidebarNavFailed", FileOperationErrors.ToUserMessage(ex));
                 StyledSidebarView.SetSelectedPath(_currentPath);
             }
         }
@@ -6839,7 +6852,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusCreateFailed", ex.Message);
+                UpdateStatusKey("StatusCreateFailed", FileOperationErrors.ToUserMessage(ex));
                 RenameOverlayTextBox.Focus(FocusState.Programmatic);
                 SelectRenameTargetText(RenameOverlayTextBox, entry);
             }
@@ -7669,6 +7682,15 @@ namespace FileExplorerUI
                 case FileCommandIds.CompressZip:
                     await ExecuteCompressZipCommandAsync(target);
                     break;
+                case FileCommandIds.ExtractSmart:
+                    await ExecuteExtractZipSmartCommandAsync(target);
+                    break;
+                case FileCommandIds.ExtractHere:
+                    await ExecuteExtractZipHereCommandAsync(target);
+                    break;
+                case FileCommandIds.ExtractToFolder:
+                    await ExecuteExtractZipToFolderCommandAsync(target);
+                    break;
                 case FileCommandIds.OpenWith:
                     ExecuteOpenWithCommand(target);
                     break;
@@ -7732,6 +7754,11 @@ namespace FileExplorerUI
                 FileCommandIds.CompressZip => !string.IsNullOrWhiteSpace(target.Path) &&
                     target.Kind is FileCommandTargetKind.FileEntry or FileCommandTargetKind.DirectoryEntry &&
                     _explorerService.PathExists(target.Path),
+                FileCommandIds.ExtractSmart or FileCommandIds.ExtractHere or FileCommandIds.ExtractToFolder =>
+                    !string.IsNullOrWhiteSpace(target.Path) &&
+                    target.Kind == FileCommandTargetKind.FileEntry &&
+                    string.Equals(Path.GetExtension(target.Path), ".zip", StringComparison.OrdinalIgnoreCase) &&
+                    _explorerService.PathExists(target.Path),
                 FileCommandIds.OpenWith => !string.IsNullOrWhiteSpace(target.Path) &&
                     !target.IsDirectory,
                 FileCommandIds.OpenTarget => !string.IsNullOrWhiteSpace(target.Path) &&
@@ -7773,7 +7800,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusOpenFailed", ex.Message);
+                UpdateStatusKey("StatusOpenFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -7812,7 +7839,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusOpenFailed", ex.Message);
+                UpdateStatusKey("StatusOpenFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -7840,7 +7867,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusCopyPathFailed", ex.Message);
+                UpdateStatusKey("StatusCopyPathFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -7869,7 +7896,7 @@ namespace FileExplorerUI
             catch (Exception ex)
             {
                 _pendingShareTarget = null;
-                UpdateStatusKey("StatusShareFailed", ex.Message);
+                UpdateStatusKey("StatusShareFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -7889,7 +7916,13 @@ namespace FileExplorerUI
             try
             {
                 SuppressNextWatcherRefresh(_currentPath);
-                CreatedEntryInfo created = await _fileManagementCoordinator.CreateShortcutAsync(_currentPath, target.Path);
+                FileOperationResult<CreatedEntryInfo> createResult = await _fileManagementCoordinator.TryCreateShortcutAsync(_currentPath, target.Path);
+                if (!createResult.Succeeded)
+                {
+                    UpdateStatusKey("StatusCreateShortcutFailed", createResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    return;
+                }
+                CreatedEntryInfo created = createResult.Value!;
                 if (!created.ChangeNotified)
                 {
                     EnsurePersistentRefreshFallbackInvalidation(_currentPath, "create-shortcut");
@@ -7903,7 +7936,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusCreateShortcutFailed", ex.Message);
+                UpdateStatusKey("StatusCreateShortcutFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -7936,7 +7969,12 @@ namespace FileExplorerUI
                     SuppressNextWatcherRefresh(_currentPath);
                 }
 
-                await _explorerService.CreateZipArchiveAsync(sourcePath, archivePath);
+                FileOperationResult<string> zipResult = await _fileManagementCoordinator.TryCreateZipArchiveAsync(sourcePath, archivePath);
+                if (!zipResult.Succeeded)
+                {
+                    UpdateStatusKey("StatusCompressZipFailed", zipResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    return;
+                }
 
                 if (destinationIsCurrentDirectory)
                 {
@@ -7966,7 +8004,112 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusCompressZipFailed", ex.Message);
+                UpdateStatusKey("StatusCompressZipFailed", FileOperationErrors.ToUserMessage(ex));
+            }
+        }
+
+        private Task ExecuteExtractZipSmartCommandAsync(FileCommandTarget target)
+        {
+            return ExecuteExtractZipCommandCoreAsync(
+                target,
+                archivePath => _fileManagementCoordinator.TryExtractZipSmartAsync(archivePath),
+                "extract-smart");
+        }
+
+        private Task ExecuteExtractZipHereCommandAsync(FileCommandTarget target)
+        {
+            return ExecuteExtractZipCommandCoreAsync(
+                target,
+                archivePath => _fileManagementCoordinator.TryExtractZipHereAsync(archivePath),
+                "extract-here");
+        }
+
+        private Task ExecuteExtractZipToFolderCommandAsync(FileCommandTarget target)
+        {
+            return ExecuteExtractZipCommandCoreAsync(
+                target,
+                archivePath => _fileManagementCoordinator.TryExtractZipToFolderAsync(archivePath),
+                "extract-to-folder");
+        }
+
+        private async Task ExecuteExtractZipCommandCoreAsync(
+            FileCommandTarget target,
+            Func<string, Task<FileOperationResult<ZipExtractionInfo>>> extractAsync,
+            string invalidationReason)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                return;
+            }
+
+            try
+            {
+                string archivePath = target.Path;
+                string destinationDirectory = Path.GetDirectoryName(archivePath.TrimEnd('\\')) ?? _currentPath;
+                if (string.IsNullOrWhiteSpace(destinationDirectory) || !_explorerService.DirectoryExists(destinationDirectory))
+                {
+                    UpdateStatusKey("StatusExtractZipFailed", S("ErrorCurrentFolderUnavailable"));
+                    return;
+                }
+
+                bool destinationIsCurrentDirectory =
+                    string.Equals(destinationDirectory, _currentPath, StringComparison.OrdinalIgnoreCase);
+                double detailsVerticalOffset = DetailsEntriesScrollViewer.VerticalOffset;
+                double groupedHorizontalOffset = GroupedEntriesScrollViewer.HorizontalOffset;
+                if (destinationIsCurrentDirectory)
+                {
+                    SuppressNextWatcherRefresh(_currentPath);
+                }
+
+                FileOperationResult<ZipExtractionInfo> extractResult = await extractAsync(archivePath);
+                if (!extractResult.Succeeded)
+                {
+                    UpdateStatusKey("StatusExtractZipFailed", extractResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    return;
+                }
+
+                ZipExtractionInfo extracted = extractResult.Value!;
+                string? extractedName = string.IsNullOrWhiteSpace(extracted.PrimarySelectionPath)
+                    ? null
+                    : Path.GetFileName(extracted.PrimarySelectionPath.TrimEnd('\\'));
+
+                if (destinationIsCurrentDirectory)
+                {
+                    if (!extracted.ChangeNotified)
+                    {
+                        EnsurePersistentRefreshFallbackInvalidation(_currentPath, invalidationReason);
+                    }
+
+                    _selectedEntryPath = extracted.PrimarySelectionPath;
+                    await LoadFirstPageAsync();
+                    _ = DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (_currentViewMode == EntryViewMode.Details)
+                        {
+                            double maxOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableHeight);
+                            DetailsEntriesScrollViewer.ChangeView(null, Math.Min(maxOffset, detailsVerticalOffset), null, disableAnimation: true);
+                        }
+                        else
+                        {
+                            double maxOffset = Math.Max(0, GroupedEntriesScrollViewer.ScrollableWidth);
+                            GroupedEntriesScrollViewer.ChangeView(Math.Min(maxOffset, groupedHorizontalOffset), null, null, disableAnimation: true);
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(_selectedEntryPath))
+                        {
+                            RestoreListSelectionByPathRespectingViewport();
+                        }
+
+                        FocusEntriesList();
+                    });
+                    UpdateFileCommandStates();
+                }
+
+                UpdateStatusKey("StatusExtractZipSuccess", extractedName ?? target.DisplayName);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusExtractZipFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -7987,7 +8130,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusOpenInNewWindowFailed", ex.Message);
+                UpdateStatusKey("StatusOpenInNewWindowFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -8034,7 +8177,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusOpenTargetFailed", ex.Message);
+                UpdateStatusKey("StatusOpenTargetFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -8052,7 +8195,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusRunAsAdministratorFailed", ex.Message);
+                UpdateStatusKey("StatusRunAsAdministratorFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -8084,7 +8227,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusOpenWithFailed", ex.Message);
+                UpdateStatusKey("StatusOpenWithFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -8102,7 +8245,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusOpenTerminalFailed", ex.Message);
+                UpdateStatusKey("StatusOpenTerminalFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -8120,7 +8263,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusPropertiesFailed", ex.Message);
+                UpdateStatusKey("StatusPropertiesFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -8170,8 +8313,9 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                args.Request.FailWithDisplayText(ex.Message);
-                UpdateStatusKey("StatusShareFailed", ex.Message);
+                string message = FileOperationErrors.ToUserMessage(ex);
+                args.Request.FailWithDisplayText(message);
+                UpdateStatusKey("StatusShareFailed", message);
             }
             finally
             {
@@ -8230,6 +8374,13 @@ namespace FileExplorerUI
                 UpdateEntriesContextMenuItemState(item, target, availableCommandIds);
             }
 
+            if (ReferenceEquals(flyout, FileEntriesContextFlyout))
+            {
+                UpdateFileArchiveActionsSubMenuState(target, availableCommandIds);
+            }
+
+            RefreshEntriesContextDynamicLabels(flyout, target);
+
             foreach (CommandMenuFlyoutItem item in flyout.Commands)
             {
                 string commandId = item.CommandId;
@@ -8244,6 +8395,49 @@ namespace FileExplorerUI
             _entriesContextCommand.RaiseCanExecuteChanged();
         }
 
+        private void UpdateFileArchiveActionsSubMenuState(FileCommandTarget target, HashSet<string> availableCommandIds)
+        {
+            bool showExtractSmart = availableCommandIds.Contains(FileCommandIds.ExtractSmart);
+            bool showExtractHere = availableCommandIds.Contains(FileCommandIds.ExtractHere);
+            bool showExtractToFolder = availableCommandIds.Contains(FileCommandIds.ExtractToFolder);
+            bool showAnyExtract = showExtractSmart || showExtractHere || showExtractToFolder;
+            bool showCompress = availableCommandIds.Contains(FileCommandIds.CompressZip);
+
+            FileExtractSmartMenuItem.Visibility = showExtractSmart ? Visibility.Visible : Visibility.Collapsed;
+            FileExtractHereMenuItem.Visibility = showExtractHere ? Visibility.Visible : Visibility.Collapsed;
+            FileExtractToFolderMenuItem.Visibility = showExtractToFolder ? Visibility.Visible : Visibility.Collapsed;
+            FileArchiveExtractSeparator.Visibility = showAnyExtract && showCompress ? Visibility.Visible : Visibility.Collapsed;
+            FileCompressZipMenuItem.Visibility = showCompress ? Visibility.Visible : Visibility.Collapsed;
+            FileArchiveActionsSubMenu.Visibility = showAnyExtract || showCompress ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void RefreshEntriesContextDynamicLabels(CommandMenuFlyout flyout, FileCommandTarget target)
+        {
+            foreach (MenuFlyoutItemBase item in EnumerateMenuItemsRecursive(flyout.Items))
+            {
+                if (item is MenuFlyoutItem menuItem && menuItem.Tag is string commandId)
+                {
+                    menuItem.Text = GetEntriesContextMenuItemLabel(commandId, target, menuItem.Text);
+                }
+            }
+        }
+
+        private static IEnumerable<MenuFlyoutItemBase> EnumerateMenuItemsRecursive(IList<MenuFlyoutItemBase> items)
+        {
+            foreach (MenuFlyoutItemBase item in items)
+            {
+                yield return item;
+
+                if (item is MenuFlyoutSubItem subItem)
+                {
+                    foreach (MenuFlyoutItemBase child in EnumerateMenuItemsRecursive(subItem.Items))
+                    {
+                        yield return child;
+                    }
+                }
+            }
+        }
+
         private void UpdateEntriesContextMenuItemState(
             MenuFlyoutItemBase item,
             FileCommandTarget target,
@@ -8252,6 +8446,7 @@ namespace FileExplorerUI
             switch (item)
             {
                 case MenuFlyoutItem menuItem when menuItem.Tag is string commandId:
+                    menuItem.Text = GetEntriesContextMenuItemLabel(commandId, target, menuItem.Text);
                     bool visible = availableCommandIds.Contains(commandId);
                     menuItem.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
                     menuItem.IsEnabled = visible && CanExecuteEntriesContextCommand(commandId, target);
@@ -8277,6 +8472,39 @@ namespace FileExplorerUI
                     }
                     break;
             }
+        }
+
+        private string GetEntriesContextMenuItemLabel(string commandId, FileCommandTarget target, string currentLabel)
+        {
+            if (string.Equals(commandId, FileCommandIds.ExtractToFolder, StringComparison.Ordinal))
+            {
+                return SF("CommonExtractToNamedFolder", GetDefaultExtractedFolderDisplayName(target));
+            }
+
+            return commandId switch
+            {
+                FileCommandIds.ExtractSmart => S("CommonExtractSmart"),
+                FileCommandIds.ExtractHere => S("CommonExtractHere"),
+                _ => currentLabel
+            };
+        }
+
+        private string GetDefaultExtractedFolderDisplayName(FileCommandTarget target)
+        {
+            string? sourcePath = target.Path;
+            if (!string.IsNullOrWhiteSpace(sourcePath))
+            {
+                string fileName = Path.GetFileName(sourcePath.TrimEnd('\\'));
+                string withoutExtension = Path.GetFileNameWithoutExtension(fileName);
+                if (!string.IsNullOrWhiteSpace(withoutExtension))
+                {
+                    return withoutExtension;
+                }
+            }
+
+            string displayName = target.DisplayName ?? string.Empty;
+            string fallback = Path.GetFileNameWithoutExtension(displayName);
+            return string.IsNullOrWhiteSpace(fallback) ? displayName : fallback;
         }
 
         private CommandMenuFlyoutItem CreateCommandBarItem(string commandId, string label)
@@ -8367,6 +8595,14 @@ namespace FileExplorerUI
             _activeEntriesContextFlyout = sender as CommandMenuFlyout;
             ResetColumnSplitterCursorState();
             UpdateViewCommandStates();
+
+            if (ReferenceEquals(sender, FileEntriesContextFlyout) &&
+                _entriesContextRequest?.Entry is EntryViewModel fileEntry &&
+                !fileEntry.IsDirectory)
+            {
+                string displayName = GetDefaultExtractedFolderDisplayName(FileCommandTargetResolver.ResolveEntry(fileEntry.FullPath, isDirectory: false));
+                FileExtractToFolderMenuItem.Text = SF("CommonExtractToNamedFolder", displayName);
+            }
 
             if (ReferenceEquals(sender, FolderEntriesContextFlyout))
             {
@@ -8747,7 +8983,14 @@ namespace FileExplorerUI
                 string.Equals(selectedEntry.FullPath, sourcePath, StringComparison.OrdinalIgnoreCase);
             try
             {
-                await _explorerService.RenamePathAsync(sourcePath, targetPath);
+                FileOperationResult<RenamedEntryInfo> renameResult = await _fileManagementCoordinator.TryRenameEntryAsync(parentPath, entry.Name, newName);
+                if (!renameResult.Succeeded)
+                {
+                    UpdateStatusKey("StatusRenameFailedWithReason", renameResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    return;
+                }
+
+                RenamedEntryInfo renamed = renameResult.Value!;
                 try
                 {
                     _explorerService.MarkPathChanged(parentPath);
@@ -8760,19 +9003,19 @@ namespace FileExplorerUI
                 TreeViewNode? renamedNode = FindSidebarTreeNodeByPath(sourcePath);
                 if (renamedNode is not null)
                 {
-                    UpdateSidebarTreeNodePath(renamedNode, sourcePath, targetPath, newName);
+                    UpdateSidebarTreeNodePath(renamedNode, renamed.SourcePath, renamed.TargetPath, newName);
                 }
                 else if (FindSidebarTreeNodeByPath(parentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
                 {
                     await PopulateSidebarTreeChildrenAsync(parentNode, parentPath, CancellationToken.None, expandAfterLoad: true);
                 }
 
-                if (IsPathWithin(_currentPath, sourcePath))
+                if (IsPathWithin(_currentPath, renamed.SourcePath))
                 {
-                    string suffix = _currentPath.Length > sourcePath.Length
-                        ? _currentPath[sourcePath.Length..]
+                    string suffix = _currentPath.Length > renamed.SourcePath.Length
+                        ? _currentPath[renamed.SourcePath.Length..]
                         : string.Empty;
-                    _currentPath = targetPath + suffix;
+                    _currentPath = renamed.TargetPath + suffix;
                     PathTextBox.Text = _currentPath;
                     UpdateBreadcrumbs(_currentPath);
                     UpdateNavButtonsState();
@@ -8781,17 +9024,17 @@ namespace FileExplorerUI
                 }
                 else if (wasSelectedInTree)
                 {
-                    await SelectSidebarTreePathAsync(targetPath);
+                    await SelectSidebarTreePathAsync(renamed.TargetPath);
                 }
 
-                UpdateListEntryNameForCurrentDirectory(sourcePath, newName);
+                UpdateListEntryNameForCurrentDirectory(renamed.SourcePath, newName);
 
                 UpdateStatusKey("StatusRenameSuccess", entry.Name, newName);
                 _ = DispatcherQueue.TryEnqueue(FocusSidebarSurface);
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusRenameFailedWithReason", ex.Message);
+                UpdateStatusKey("StatusRenameFailedWithReason", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -8802,7 +9045,17 @@ namespace FileExplorerUI
             TreeViewNode? renamedTreeNode = entry.IsDirectory ? FindSidebarTreeNodeByPath(src) : null;
             try
             {
-                RenamedEntryInfo renamed = await _fileManagementCoordinator.RenameEntryAsync(_currentPath, entry.Name, newName);
+                FileOperationResult<RenamedEntryInfo> renameResult = await _fileManagementCoordinator.TryRenameEntryAsync(_currentPath, entry.Name, newName);
+                if (!renameResult.Succeeded)
+                {
+                    if (ReferenceEquals(_pendingCreatedEntrySelection, entry))
+                    {
+                        CompleteCreatedEntrySelectionIfPending(entry, ensureVisible: false);
+                    }
+                    UpdateStatusKey("StatusRenameFailedWithReason", renameResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    return;
+                }
+                RenamedEntryInfo renamed = renameResult.Value!;
                 RenameTextBox.Text = string.Empty;
                 HideRenameOverlay();
                 _selectedEntryPath = renamed.TargetPath;
@@ -8838,7 +9091,7 @@ namespace FileExplorerUI
                 {
                     CompleteCreatedEntrySelectionIfPending(entry, ensureVisible: false);
                 }
-                UpdateStatusKey("StatusRenameFailedWithReason", ex.Message);
+                UpdateStatusKey("StatusRenameFailedWithReason", FileOperationErrors.ToUserMessage(ex));
             }
         }
 
@@ -8846,7 +9099,19 @@ namespace FileExplorerUI
         {
             try
             {
-                bool changeNotified = await _fileManagementCoordinator.DeleteEntryAsync(targetPath, recursive);
+                FileOperationResult<bool> deleteResult = await _fileManagementCoordinator.TryDeleteEntryAsync(targetPath, recursive);
+                if (!deleteResult.Succeeded)
+                {
+                    if (deleteResult.Failure?.Error == FileOperationError.Canceled)
+                    {
+                        UpdateStatusKey("StatusDeleteCanceled");
+                        return;
+                    }
+
+                    UpdateStatusKey("StatusDeleteFailedWithReason", deleteResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    return;
+                }
+                bool changeNotified = deleteResult.Value;
                 if (!changeNotified)
                 {
                     string parentPath = Path.GetDirectoryName(targetPath) ?? _currentPath;
@@ -8858,7 +9123,7 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusDeleteFailedWithReason", ex.Message);
+                UpdateStatusKey("StatusDeleteFailedWithReason", FileOperationErrors.ToUserMessage(ex));
             }
         }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 namespace FileExplorerUI.Commands;
 
@@ -177,7 +178,17 @@ public sealed class ArchiveFileCommandProvider : IFileCommandProvider
 
     public IReadOnlyList<FileCommandDescriptor> GetCommands(FileCommandTarget target)
     {
+        if (!string.Equals(Path.GetExtension(target.Path), ".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            return Array.Empty<FileCommandDescriptor>();
+        }
+
         var commands = new List<FileCommandDescriptor>();
+        if ((target.Capabilities & FileCommandCapabilities.ExtractHere) != 0)
+        {
+            commands.Add(new FileCommandDescriptor(FileCommandIds.ExtractSmart, S("CommonExtractSmart"), FileCommandCapabilities.ExtractHere));
+        }
+
         if ((target.Capabilities & FileCommandCapabilities.ExtractHere) != 0)
         {
             commands.Add(new FileCommandDescriptor(FileCommandIds.ExtractHere, S("CommonExtractHere"), FileCommandCapabilities.ExtractHere));

@@ -171,8 +171,14 @@
   <data name="CommonCompress" xml:space="preserve">
     <value>压缩为</value>
   </data>
+  <data name="CommonArchiveActions" xml:space="preserve">
+    <value>压缩/解压</value>
+  </data>
   <data name="CommonCompressZip" xml:space="preserve">
     <value>ZIP</value>
+  </data>
+  <data name="CommonCompressZipAction" xml:space="preserve">
+    <value>压缩为 ZIP</value>
   </data>
   <data name="CommonCompress7z" xml:space="preserve">
     <value>7z</value>
@@ -852,11 +858,20 @@
   <data name="CommonRunAsAdministrator" xml:space="preserve">
     <value>以管理员身份运行</value>
   </data>
+  <data name="CommonExtract" xml:space="preserve">
+    <value>解压</value>
+  </data>
+  <data name="CommonExtractSmart" xml:space="preserve">
+    <value>智能解压</value>
+  </data>
   <data name="CommonExtractHere" xml:space="preserve">
-    <value>解压到此处</value>
+    <value>解压到当前位置</value>
   </data>
   <data name="CommonExtractToFolder" xml:space="preserve">
     <value>解压到文件夹</value>
+  </data>
+  <data name="CommonExtractToNamedFolder" xml:space="preserve">
+    <value>解压到 {0}</value>
   </data>
   <data name="CommonPreview" xml:space="preserve">
     <value>预览</value>
@@ -963,6 +978,39 @@
   <data name="InteropOperationUnknownError" xml:space="preserve">
     <value>未知错误</value>
   </data>
+  <data name="ErrorFileOperationNotFound" xml:space="preserve">
+    <value>找不到目标项目。</value>
+  </data>
+  <data name="ErrorFileOperationCanceled" xml:space="preserve">
+    <value>操作已取消。</value>
+  </data>
+  <data name="ErrorFileOperationAccessDenied" xml:space="preserve">
+    <value>没有足够权限。</value>
+  </data>
+  <data name="ErrorFileOperationAlreadyExists" xml:space="preserve">
+    <value>目标项目已存在。</value>
+  </data>
+  <data name="ErrorFileOperationInvalidName" xml:space="preserve">
+    <value>名称或路径无效。</value>
+  </data>
+  <data name="ErrorFileOperationPathTooLong" xml:space="preserve">
+    <value>路径过长。</value>
+  </data>
+  <data name="ErrorFileOperationInUse" xml:space="preserve">
+    <value>目标项目正被其他程序使用。</value>
+  </data>
+  <data name="ErrorFileOperationDiskFull" xml:space="preserve">
+    <value>磁盘空间不足。</value>
+  </data>
+  <data name="ErrorFileOperationNotSupported" xml:space="preserve">
+    <value>当前操作不受支持。</value>
+  </data>
+  <data name="ErrorFileOperationInvalidArchive" xml:space="preserve">
+    <value>压缩包无效或已损坏。</value>
+  </data>
+  <data name="ErrorFileOperationUnknown" xml:space="preserve">
+    <value>发生了未知的文件操作错误。</value>
+  </data>
   <data name="StatusShareOpened" xml:space="preserve">
     <value>已打开分享窗口：{0}</value>
   </data>
@@ -974,5 +1022,11 @@
   </data>
   <data name="StatusCompressZipFailed" xml:space="preserve">
     <value>创建 ZIP 压缩包失败：{0}</value>
+  </data>
+  <data name="StatusExtractZipSuccess" xml:space="preserve">
+    <value>已解压 ZIP 压缩包：{0}</value>
+  </data>
+  <data name="StatusExtractZipFailed" xml:space="preserve">
+    <value>解压 ZIP 压缩包失败：{0}</value>
   </data>
 </root>
