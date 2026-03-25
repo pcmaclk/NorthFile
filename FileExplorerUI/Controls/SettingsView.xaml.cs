@@ -13,6 +13,7 @@ namespace FileExplorerUI.Controls;
 
 public sealed partial class SettingsView : UserControl
 {
+    private bool _suppressSidebarSectionEvents;
     private readonly Dictionary<SettingsSection, FrameworkElement> _sectionAnchors;
     private readonly DispatcherQueueTimer _sectionSyncTimer;
     private bool _suppressSectionChanged;
@@ -20,6 +21,7 @@ public sealed partial class SettingsView : UserControl
     private double _lastObservedVerticalOffset = double.NaN;
 
     public event Action<SettingsSection>? VisibleSectionChanged;
+    public event Action<bool, bool, bool, bool>? SidebarSectionVisibilityChanged;
 
     public SettingsView()
     {
@@ -54,6 +56,16 @@ public sealed partial class SettingsView : UserControl
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
             return string.Format(LocalizedStrings.Instance.Get("SettingsAboutAppVersion"), version);
         }
+    }
+
+    public void SetSidebarSectionVisibility(bool showFavorites, bool showCloud, bool showNetwork, bool showTags)
+    {
+        _suppressSidebarSectionEvents = true;
+        FavoritesToggleSwitch.IsOn = showFavorites;
+        CloudToggleSwitch.IsOn = showCloud;
+        NetworkToggleSwitch.IsOn = showNetwork;
+        TagsToggleSwitch.IsOn = showTags;
+        _suppressSidebarSectionEvents = false;
     }
 
     public void ScrollToSection(SettingsSection section)
@@ -132,5 +144,19 @@ public sealed partial class SettingsView : UserControl
 
         _lastReportedSection = activeSection;
         VisibleSectionChanged?.Invoke(activeSection);
+    }
+
+    private void SidebarSectionToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressSidebarSectionEvents)
+        {
+            return;
+        }
+
+        SidebarSectionVisibilityChanged?.Invoke(
+            FavoritesToggleSwitch.IsOn,
+            CloudToggleSwitch.IsOn,
+            NetworkToggleSwitch.IsOn,
+            TagsToggleSwitch.IsOn);
     }
 }

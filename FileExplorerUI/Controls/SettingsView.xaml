@@ -155,7 +155,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsFavoritesTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsFavoritesDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="True" />
+                        <ToggleSwitch
+                            x:Name="FavoritesToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="True"
+                            Toggled="SidebarSectionToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -168,7 +173,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsCloudTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsCloudDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="True" />
+                        <ToggleSwitch
+                            x:Name="CloudToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="True"
+                            Toggled="SidebarSectionToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -181,7 +191,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsNetworkTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsNetworkDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="True" />
+                        <ToggleSwitch
+                            x:Name="NetworkToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="True"
+                            Toggled="SidebarSectionToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -194,7 +209,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsTagsTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsTagsDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="True" />
+                        <ToggleSwitch
+                            x:Name="TagsToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="True"
+                            Toggled="SidebarSectionToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 

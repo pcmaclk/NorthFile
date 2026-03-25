@@ -28,6 +28,10 @@ namespace FileExplorerUI
         private bool _isNetworkExpanded = true;
         private bool _isTagsExpanded = true;
         private bool _isCompact;
+        private bool _showFavoritesSection = true;
+        private bool _showCloudSection = true;
+        private bool _showNetworkSection = true;
+        private bool _showTagsSection = true;
         private string? _selectedPath;
         private bool _isSelectionActive = true;
         private TreeView? _attachedTreeView;
@@ -131,6 +135,17 @@ namespace FileExplorerUI
             SetSelectedPath(_selectedPath);
         }
 
+        public void SetSectionVisibility(bool showFavorites, bool showCloud, bool showNetwork, bool showTags)
+        {
+            _showFavoritesSection = showFavorites;
+            _showCloudSection = showCloud;
+            _showNetworkSection = showNetwork;
+            _showTagsSection = showTags;
+
+            ApplyCompactVisibility(_isCompact);
+            UpdateExpandedSectionVisibility(_isCompact);
+        }
+
         private void UpdateCompactButtonPlacement(bool compact)
         {
             if (compact)
@@ -191,6 +206,14 @@ namespace FileExplorerUI
             CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             SetVisibility(_fullOnlySections, compact ? Visibility.Collapsed : Visibility.Visible);
             TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            PinnedGroupBorder.Visibility = _showFavoritesSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
+            PinnedSectionPanel.Visibility = _showFavoritesSection && !compact ? Visibility.Visible : Visibility.Collapsed;
+            CloudGroupBorder.Visibility = _showCloudSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
+            CloudSectionPanel.Visibility = _showCloudSection && !compact ? Visibility.Visible : Visibility.Collapsed;
+            NetworkGroupBorder.Visibility = _showNetworkSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
+            NetworkSectionPanel.Visibility = _showNetworkSection && !compact ? Visibility.Visible : Visibility.Collapsed;
+            TagsGroupBorder.Visibility = _showTagsSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
+            TagsSectionPanel.Visibility = _showTagsSection && !compact ? Visibility.Visible : Visibility.Collapsed;
             SetTextVisibility(_labelBlocks, compact);
             SetTextVisibility(_headerBlocks, compact);
             SetVisibility(_groupChevrons, compact ? Visibility.Collapsed : Visibility.Visible);
@@ -215,12 +238,13 @@ namespace FileExplorerUI
 
         private void UpdateExpandedSectionVisibility(bool compact)
         {
-            PinnedItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isPinnedExpanded ? Visibility.Visible : Visibility.Collapsed);
-            CloudItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isCloudExpanded ? Visibility.Visible : Visibility.Collapsed);
+            PinnedItemsPanel.Visibility = compact || !_showFavoritesSection ? Visibility.Collapsed : (_isPinnedExpanded ? Visibility.Visible : Visibility.Collapsed);
+            CloudItemsPanel.Visibility = compact || !_showCloudSection ? Visibility.Collapsed : (_isCloudExpanded ? Visibility.Visible : Visibility.Collapsed);
             NetworkItemsPanel.Visibility = compact
+                || !_showNetworkSection
                 ? Visibility.Collapsed
                 : (_isNetworkExpanded && NetworkItemsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed);
-            TagsItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isTagsExpanded ? Visibility.Visible : Visibility.Collapsed);
+            TagsItemsPanel.Visibility = compact || !_showTagsSection ? Visibility.Collapsed : (_isTagsExpanded ? Visibility.Visible : Visibility.Collapsed);
         }
 
         private static void SetTextVisibility(IEnumerable<TextBlock> blocks, bool compact)

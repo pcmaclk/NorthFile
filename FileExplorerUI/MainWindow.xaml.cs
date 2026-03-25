@@ -508,6 +508,8 @@ namespace FileExplorerUI
         private ShellMode _shellMode = ShellMode.Explorer;
         private SettingsSection _currentSettingsSection = SettingsSection.General;
         private bool _suppressSettingsNavigationSelection;
+        private readonly AppSettingsService _appSettingsService = new();
+        private AppSettings _appSettings = new();
         private EntryViewDensityMode _currentEntryViewDensityMode = EntryViewDensityMode.Normal;
         private double _lastDetailsHorizontalOffset = double.NaN;
         private double _lastDetailsVerticalOffset = double.NaN;
@@ -738,6 +740,7 @@ namespace FileExplorerUI
             this.Activated += MainWindow_Activated;
             _pathDefaultBorderBrush = PathTextBox.BorderBrush;
             _engineVersion = _explorerService.GetEngineVersion();
+            _appSettings = _appSettingsService.Load();
             LocalizedStrings.Instance.PropertyChanged += LocalizedStrings_PropertyChanged;
             InitializeWorkspaceShellState();
 #if !DEBUG
@@ -750,7 +753,9 @@ namespace FileExplorerUI
             StyledSidebarView.NavigateRequested += StyledSidebarView_NavigateRequested;
             StyledSidebarView.SettingsRequested += StyledSidebarView_SettingsRequested;
             SettingsViewControl.VisibleSectionChanged += SettingsViewControl_VisibleSectionChanged;
+            SettingsViewControl.SidebarSectionVisibilityChanged += SettingsViewControl_SidebarSectionVisibilityChanged;
             BuildSidebarItems();
+            ApplyAppSettingsToUi();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
             _ = LoadFirstPageAsync();
@@ -2912,8 +2917,28 @@ namespace FileExplorerUI
                 _ = PopulateSidebarTreeRootsAsync();
             }
 
+            StyledSidebarView.SetSectionVisibility(
+                _appSettings.ShowFavorites,
+                _appSettings.ShowCloud,
+                _appSettings.ShowNetwork,
+                _appSettings.ShowTags);
             ApplySidebarCompactState(_isSidebarCompact);
             UpdateSidebarSelectionOnly();
+        }
+
+        private void ApplyAppSettingsToUi()
+        {
+            SettingsViewControl.SetSidebarSectionVisibility(
+                _appSettings.ShowFavorites,
+                _appSettings.ShowCloud,
+                _appSettings.ShowNetwork,
+                _appSettings.ShowTags);
+
+            StyledSidebarView.SetSectionVisibility(
+                _appSettings.ShowFavorites,
+                _appSettings.ShowCloud,
+                _appSettings.ShowNetwork,
+                _appSettings.ShowTags);
         }
 
         private void EnsureSidebarTreeView()
@@ -3743,6 +3768,17 @@ namespace FileExplorerUI
                 }
             }
             _suppressSettingsNavigationSelection = false;
+        }
+
+        private void SettingsViewControl_SidebarSectionVisibilityChanged(bool showFavorites, bool showCloud, bool showNetwork, bool showTags)
+        {
+            _appSettings.ShowFavorites = showFavorites;
+            _appSettings.ShowCloud = showCloud;
+            _appSettings.ShowNetwork = showNetwork;
+            _appSettings.ShowTags = showTags;
+
+            _appSettingsService.Save(_appSettings);
+            StyledSidebarView.SetSectionVisibility(showFavorites, showCloud, showNetwork, showTags);
         }
 
         private void SidebarSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
