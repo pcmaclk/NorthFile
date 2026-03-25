@@ -317,12 +317,7 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowDotFilesTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowDotFilesDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch
-                            x:Name="DeleteConfirmToggleSwitch"
-                            Grid.Column="2"
-                            Style="{StaticResource SettingsToggleSwitchStyle}"
-                            IsOn="True"
-                            Toggled="DeleteConfirmToggleSwitch_Toggled" />
+                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="True" />
                     </Grid>
                 </Border>
 
@@ -348,7 +343,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsDeleteConfirmTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsDeleteConfirmDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="True" />
+                        <ToggleSwitch
+                            x:Name="DeleteConfirmToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="True"
+                            Toggled="DeleteConfirmToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
             </StackPanel>

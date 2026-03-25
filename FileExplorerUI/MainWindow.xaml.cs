@@ -9624,10 +9624,11 @@ namespace FileExplorerUI
 
         private async Task<bool> ConfirmDeleteAsync(string name, bool recursive)
         {
+            string contentKey = recursive ? "DialogDeleteFolderContent" : "DialogDeleteFileContent";
             var dialog = new ContentDialog
             {
                 Title = S("DialogDeleteTitle"),
-                Content = SF("DialogDeleteContent", name, recursive),
+                Content = SF(contentKey, name),
                 PrimaryButtonText = S("DialogDeletePrimaryButton"),
                 CloseButtonText = S("DialogCancelButton"),
                 DefaultButton = ContentDialogButton.Close

@@ -762,6 +762,12 @@
   <data name="DialogDeleteContent" xml:space="preserve">
     <value>删除“{0}”？递归删除：{1}</value>
   </data>
+  <data name="DialogDeleteFileContent" xml:space="preserve">
+    <value>删除“{0}”？</value>
+  </data>
+  <data name="DialogDeleteFolderContent" xml:space="preserve">
+    <value>删除文件夹“{0}”及其内容？</value>
+  </data>
   <data name="DialogDeletePrimaryButton" xml:space="preserve">
     <value>删除</value>
   </data>

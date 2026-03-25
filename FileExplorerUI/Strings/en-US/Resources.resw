@@ -762,6 +762,12 @@
   <data name="DialogDeleteContent" xml:space="preserve">
     <value>Delete '{0}'? Recursive: {1}</value>
   </data>
+  <data name="DialogDeleteFileContent" xml:space="preserve">
+    <value>Delete '{0}'?</value>
+  </data>
+  <data name="DialogDeleteFolderContent" xml:space="preserve">
+    <value>Delete folder '{0}' and its contents?</value>
+  </data>
   <data name="DialogDeletePrimaryButton" xml:space="preserve">
     <value>Delete</value>
   </data>
