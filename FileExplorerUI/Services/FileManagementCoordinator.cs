@@ -35,6 +35,18 @@ public sealed record FilePasteResult(
     bool TargetChanged,
     bool SourceChanged);
 
+public sealed record FilePasteOperationResult(
+    FilePasteResult? PasteResult,
+    FileOperationFailure? Failure)
+{
+    public bool Succeeded => Failure is null;
+}
+
+public readonly record struct ZipExtractionInfo(
+    string DestinationDirectory,
+    string? PrimarySelectionPath,
+    bool ChangeNotified);
+
 public sealed class FileManagementCoordinator
 {
     private readonly ExplorerService _explorerService;
@@ -80,6 +92,18 @@ public sealed class FileManagementCoordinator
         return new CreatedEntryInfo(name, fullPath, isDirectory, changeNotified);
     }
 
+    public async Task<FileOperationResult<CreatedEntryInfo>> TryCreateEntryAsync(string directoryPath, bool isDirectory)
+    {
+        try
+        {
+            return FileOperationResult<CreatedEntryInfo>.Success(await CreateEntryAsync(directoryPath, isDirectory));
+        }
+        catch (Exception ex)
+        {
+            return FileOperationResult<CreatedEntryInfo>.Fail(ex);
+        }
+    }
+
     public async Task<CreatedEntryInfo> CreateShortcutAsync(string directoryPath, string targetPath)
     {
         string name = _explorerService.GenerateUniqueShortcutName(directoryPath, targetPath);
@@ -90,6 +114,18 @@ public sealed class FileManagementCoordinator
         return new CreatedEntryInfo(name, fullPath, IsDirectory: false, changeNotified);
     }
 
+    public async Task<FileOperationResult<CreatedEntryInfo>> TryCreateShortcutAsync(string directoryPath, string targetPath)
+    {
+        try
+        {
+            return FileOperationResult<CreatedEntryInfo>.Success(await CreateShortcutAsync(directoryPath, targetPath));
+        }
+        catch (Exception ex)
+        {
+            return FileOperationResult<CreatedEntryInfo>.Fail(ex);
+        }
+    }
+
     public async Task<RenamedEntryInfo> RenameEntryAsync(string directoryPath, string currentName, string newName)
     {
         string sourcePath = Path.Combine(directoryPath, currentName);
@@ -97,6 +133,18 @@ public sealed class FileManagementCoordinator
         await _explorerService.RenamePathAsync(sourcePath, targetPath);
         bool changeNotified = TryMarkPathChanged(directoryPath);
         return new RenamedEntryInfo(sourcePath, targetPath, changeNotified);
+    }
+
+    public async Task<FileOperationResult<RenamedEntryInfo>> TryRenameEntryAsync(string directoryPath, string currentName, string newName)
+    {
+        try
+        {
+            return FileOperationResult<RenamedEntryInfo>.Success(await RenameEntryAsync(directoryPath, currentName, newName));
+        }
+        catch (Exception ex)
+        {
+            return FileOperationResult<RenamedEntryInfo>.Fail(ex);
+        }
     }
 
     public async Task<bool> DeleteEntryAsync(string targetPath, bool recursive)
@@ -109,6 +157,76 @@ public sealed class FileManagementCoordinator
         }
 
         return false;
+    }
+
+    public async Task<FileOperationResult<bool>> TryDeleteEntryAsync(string targetPath, bool recursive)
+    {
+        try
+        {
+            return FileOperationResult<bool>.Success(await DeleteEntryAsync(targetPath, recursive));
+        }
+        catch (Exception ex)
+        {
+            return FileOperationResult<bool>.Fail(ex);
+        }
+    }
+
+    public async Task<FileOperationResult<string>> TryCreateZipArchiveAsync(string sourcePath, string archivePath)
+    {
+        try
+        {
+            await _explorerService.CreateZipArchiveAsync(sourcePath, archivePath);
+            return FileOperationResult<string>.Success(archivePath);
+        }
+        catch (Exception ex)
+        {
+            return FileOperationResult<string>.Fail(ex);
+        }
+    }
+
+    public async Task<FileOperationResult<ZipExtractionInfo>> TryExtractZipHereAsync(string archivePath)
+    {
+        try
+        {
+            string destinationDirectory = RequireArchiveParentDirectory(archivePath);
+            ZipExtractionPlan plan = await _explorerService.ExtractZipHereAsync(archivePath, destinationDirectory);
+            bool changeNotified = TryMarkPathChanged(destinationDirectory);
+            return FileOperationResult<ZipExtractionInfo>.Success(new ZipExtractionInfo(destinationDirectory, plan.PrimarySelectionPath, changeNotified));
+        }
+        catch (Exception ex)
+        {
+            return FileOperationResult<ZipExtractionInfo>.Fail(ex);
+        }
+    }
+
+    public async Task<FileOperationResult<ZipExtractionInfo>> TryExtractZipToFolderAsync(string archivePath)
+    {
+        try
+        {
+            string destinationDirectory = RequireArchiveParentDirectory(archivePath);
+            ZipExtractionPlan plan = await _explorerService.ExtractZipToFolderAsync(archivePath, destinationDirectory);
+            bool changeNotified = TryMarkPathChanged(destinationDirectory);
+            return FileOperationResult<ZipExtractionInfo>.Success(new ZipExtractionInfo(destinationDirectory, plan.PrimarySelectionPath, changeNotified));
+        }
+        catch (Exception ex)
+        {
+            return FileOperationResult<ZipExtractionInfo>.Fail(ex);
+        }
+    }
+
+    public async Task<FileOperationResult<ZipExtractionInfo>> TryExtractZipSmartAsync(string archivePath)
+    {
+        try
+        {
+            string destinationDirectory = RequireArchiveParentDirectory(archivePath);
+            ZipExtractionPlan plan = await _explorerService.ExtractZipSmartAsync(archivePath, destinationDirectory);
+            bool changeNotified = TryMarkPathChanged(destinationDirectory);
+            return FileOperationResult<ZipExtractionInfo>.Success(new ZipExtractionInfo(destinationDirectory, plan.PrimarySelectionPath, changeNotified));
+        }
+        catch (Exception ex)
+        {
+            return FileOperationResult<ZipExtractionInfo>.Fail(ex);
+        }
     }
 
     public bool TryValidateName(string directoryPath, string currentName, string proposedName, out string error)
@@ -234,7 +352,7 @@ public sealed class FileManagementCoordinator
             }
             catch (Exception ex)
             {
-                results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: false, SamePath: false, IsDirectory: item.IsDirectory, ErrorMessage: ex.Message));
+                results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: false, SamePath: false, IsDirectory: item.IsDirectory, ErrorMessage: FileOperationErrors.ToUserMessage(ex)));
                 allApplied = false;
             }
         }
@@ -251,6 +369,18 @@ public sealed class FileManagementCoordinator
             SourceChanged: sourceChanged);
     }
 
+    public async Task<FilePasteOperationResult> TryPasteAsync(string targetDirectoryPath)
+    {
+        try
+        {
+            return new FilePasteOperationResult(await PasteAsync(targetDirectoryPath), Failure: null);
+        }
+        catch (Exception ex)
+        {
+            return new FilePasteOperationResult(PasteResult: null, new FileOperationFailure(FileOperationErrors.Classify(ex), FileOperationErrors.ToUserMessage(ex)));
+        }
+    }
+
     private bool TryMarkPathChanged(string path)
     {
         try
@@ -262,5 +392,16 @@ public sealed class FileManagementCoordinator
         {
             return false;
         }
+    }
+
+    private static string RequireArchiveParentDirectory(string archivePath)
+    {
+        string? parentPath = Path.GetDirectoryName(archivePath.TrimEnd('\\'));
+        if (string.IsNullOrWhiteSpace(parentPath))
+        {
+            throw new DirectoryNotFoundException(archivePath);
+        }
+
+        return parentPath;
     }
 }

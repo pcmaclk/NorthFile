@@ -162,6 +162,9 @@
   <data name="CommonOpen" xml:space="preserve">
     <value>打开</value>
   </data>
+  <data name="TrayMenuExit" xml:space="preserve">
+    <value>退出</value>
+  </data>
   <data name="CommonOpenWith" xml:space="preserve">
     <value>打开方式</value>
   </data>
@@ -171,8 +174,14 @@
   <data name="CommonCompress" xml:space="preserve">
     <value>压缩为</value>
   </data>
+  <data name="CommonArchiveActions" xml:space="preserve">
+    <value>压缩/解压</value>
+  </data>
   <data name="CommonCompressZip" xml:space="preserve">
     <value>ZIP</value>
+  </data>
+  <data name="CommonCompressZipAction" xml:space="preserve">
+    <value>压缩为 ZIP</value>
   </data>
   <data name="CommonCompress7z" xml:space="preserve">
     <value>7z</value>
@@ -367,6 +376,39 @@
     <value>切换语言</value>
   </data>
   <data name="OverflowBreadcrumbButtonToolTip.Content" xml:space="preserve">
+    <value>显示隐藏的路径层级</value>
+  </data>
+  <data name="ToolTipBack" xml:space="preserve">
+    <value>后退</value>
+  </data>
+  <data name="ToolTipForward" xml:space="preserve">
+    <value>前进</value>
+  </data>
+  <data name="ToolTipUp" xml:space="preserve">
+    <value>上一级</value>
+  </data>
+  <data name="ToolTipRefresh" xml:space="preserve">
+    <value>刷新</value>
+  </data>
+  <data name="ToolTipNewFile" xml:space="preserve">
+    <value>新建文件</value>
+  </data>
+  <data name="ToolTipNewFolder" xml:space="preserve">
+    <value>新建文件夹</value>
+  </data>
+  <data name="ToolTipCopy" xml:space="preserve">
+    <value>复制</value>
+  </data>
+  <data name="ToolTipCut" xml:space="preserve">
+    <value>剪切</value>
+  </data>
+  <data name="ToolTipPaste" xml:space="preserve">
+    <value>粘贴</value>
+  </data>
+  <data name="ToolTipSwitchLanguage" xml:space="preserve">
+    <value>切换语言</value>
+  </data>
+  <data name="ToolTipShowHiddenPathSegments" xml:space="preserve">
     <value>显示隐藏的路径层级</value>
   </data>
   <data name="PathTextBox.PlaceholderText" xml:space="preserve">
@@ -636,6 +678,18 @@
   <data name="StatusCopyPathFailed" xml:space="preserve">
     <value>复制路径失败：{0}</value>
   </data>
+  <data name="StatusSettingsExported" xml:space="preserve">
+    <value>设置已导出：{0}</value>
+  </data>
+  <data name="StatusSettingsExportFailed" xml:space="preserve">
+    <value>导出设置失败：{0}</value>
+  </data>
+  <data name="StatusSettingsImported" xml:space="preserve">
+    <value>设置已导入：{0}</value>
+  </data>
+  <data name="StatusSettingsImportFailed" xml:space="preserve">
+    <value>导入设置失败：{0}</value>
+  </data>
   <data name="StatusCreateShortcutSuccess" xml:space="preserve">
     <value>已创建快捷方式：{0}</value>
   </data>
@@ -756,6 +810,12 @@
   <data name="DialogDeleteContent" xml:space="preserve">
     <value>删除“{0}”？递归删除：{1}</value>
   </data>
+  <data name="DialogDeleteFileContent" xml:space="preserve">
+    <value>删除“{0}”？</value>
+  </data>
+  <data name="DialogDeleteFolderContent" xml:space="preserve">
+    <value>删除文件夹“{0}”及其内容？</value>
+  </data>
   <data name="DialogDeletePrimaryButton" xml:space="preserve">
     <value>删除</value>
   </data>
@@ -852,11 +912,20 @@
   <data name="CommonRunAsAdministrator" xml:space="preserve">
     <value>以管理员身份运行</value>
   </data>
+  <data name="CommonExtract" xml:space="preserve">
+    <value>解压</value>
+  </data>
+  <data name="CommonExtractSmart" xml:space="preserve">
+    <value>智能解压</value>
+  </data>
   <data name="CommonExtractHere" xml:space="preserve">
-    <value>解压到此处</value>
+    <value>解压到当前位置</value>
   </data>
   <data name="CommonExtractToFolder" xml:space="preserve">
     <value>解压到文件夹</value>
+  </data>
+  <data name="CommonExtractToNamedFolder" xml:space="preserve">
+    <value>解压到 {0}</value>
   </data>
   <data name="CommonPreview" xml:space="preserve">
     <value>预览</value>
@@ -963,6 +1032,39 @@
   <data name="InteropOperationUnknownError" xml:space="preserve">
     <value>未知错误</value>
   </data>
+  <data name="ErrorFileOperationNotFound" xml:space="preserve">
+    <value>找不到目标项目。</value>
+  </data>
+  <data name="ErrorFileOperationCanceled" xml:space="preserve">
+    <value>操作已取消。</value>
+  </data>
+  <data name="ErrorFileOperationAccessDenied" xml:space="preserve">
+    <value>没有足够权限。</value>
+  </data>
+  <data name="ErrorFileOperationAlreadyExists" xml:space="preserve">
+    <value>目标项目已存在。</value>
+  </data>
+  <data name="ErrorFileOperationInvalidName" xml:space="preserve">
+    <value>名称或路径无效。</value>
+  </data>
+  <data name="ErrorFileOperationPathTooLong" xml:space="preserve">
+    <value>路径过长。</value>
+  </data>
+  <data name="ErrorFileOperationInUse" xml:space="preserve">
+    <value>目标项目正被其他程序使用。</value>
+  </data>
+  <data name="ErrorFileOperationDiskFull" xml:space="preserve">
+    <value>磁盘空间不足。</value>
+  </data>
+  <data name="ErrorFileOperationNotSupported" xml:space="preserve">
+    <value>当前操作不受支持。</value>
+  </data>
+  <data name="ErrorFileOperationInvalidArchive" xml:space="preserve">
+    <value>压缩包无效或已损坏。</value>
+  </data>
+  <data name="ErrorFileOperationUnknown" xml:space="preserve">
+    <value>发生了未知的文件操作错误。</value>
+  </data>
   <data name="StatusShareOpened" xml:space="preserve">
     <value>已打开分享窗口：{0}</value>
   </data>
@@ -974,5 +1076,239 @@
   </data>
   <data name="StatusCompressZipFailed" xml:space="preserve">
     <value>创建 ZIP 压缩包失败：{0}</value>
+  </data>
+  <data name="StatusExtractZipSuccess" xml:space="preserve">
+    <value>已解压 ZIP 压缩包：{0}</value>
+  </data>
+  <data name="StatusExtractZipFailed" xml:space="preserve">
+    <value>解压 ZIP 压缩包失败：{0}</value>
+  </data>
+  <data name="SettingsPageTitle" xml:space="preserve">
+    <value>设置</value>
+  </data>
+  <data name="SettingsNavBack" xml:space="preserve">
+    <value>返回</value>
+  </data>
+  <data name="SettingsSectionGeneral" xml:space="preserve">
+    <value>通用</value>
+  </data>
+  <data name="SettingsSectionGeneralDescription" xml:space="preserve">
+    <value>基础应用行为和启动方式。</value>
+  </data>
+  <data name="SettingsLanguageTitle" xml:space="preserve">
+    <value>语言</value>
+  </data>
+  <data name="SettingsLanguageDescription" xml:space="preserve">
+    <value>应用显示语言，可选择跟随系统或手动指定。</value>
+  </data>
+  <data name="SettingsUseSystem" xml:space="preserve">
+    <value>使用系统设置</value>
+  </data>
+  <data name="SettingsLanguageChineseSimplified" xml:space="preserve">
+    <value>简体中文</value>
+  </data>
+  <data name="SettingsStartupTitle" xml:space="preserve">
+    <value>启动设置</value>
+  </data>
+  <data name="SettingsStartupDescription" xml:space="preserve">
+    <value>应用启动后默认进入的位置。</value>
+  </data>
+  <data name="SettingsStartupLastLocation" xml:space="preserve">
+    <value>上次关闭位置</value>
+  </data>
+  <data name="SettingsStartupSpecifiedLocation" xml:space="preserve">
+    <value>指定位置</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathTitle" xml:space="preserve">
+    <value>启动文件夹</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathDescription" xml:space="preserve">
+    <value>当启动位置选择为指定位置时，打开这里设置的文件夹。</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathPlaceholder" xml:space="preserve">
+    <value>输入文件夹路径</value>
+  </data>
+  <data name="SettingsBrowseFolder" xml:space="preserve">
+    <value>浏览</value>
+  </data>
+  <data name="SettingsStartupUseThisPc" xml:space="preserve">
+    <value>此电脑</value>
+  </data>
+  <data name="SettingsStartupUseCustomPath" xml:space="preserve">
+    <value>自定义路径</value>
+  </data>
+  <data name="SettingsFavoritesTitle" xml:space="preserve">
+    <value>收藏</value>
+  </data>
+  <data name="SettingsFavoritesDescription" xml:space="preserve">
+    <value>控制收藏分组是否显示。</value>
+  </data>
+  <data name="SettingsCloudTitle" xml:space="preserve">
+    <value>云盘</value>
+  </data>
+  <data name="SettingsCloudDescription" xml:space="preserve">
+    <value>控制侧边栏中的云盘分组是否显示。</value>
+  </data>
+  <data name="SettingsNetworkTitle" xml:space="preserve">
+    <value>网络</value>
+  </data>
+  <data name="SettingsNetworkDescription" xml:space="preserve">
+    <value>控制侧边栏中的网络分组是否显示。</value>
+  </data>
+  <data name="SettingsTagsTitle" xml:space="preserve">
+    <value>标签</value>
+  </data>
+  <data name="SettingsTagsDescription" xml:space="preserve">
+    <value>控制侧边栏中的标签分组是否显示。</value>
+  </data>
+  <data name="SettingsSectionAppearance" xml:space="preserve">
+    <value>外观</value>
+  </data>
+  <data name="SettingsSectionAppearanceDescription" xml:space="preserve">
+    <value>应用主题和默认展示方式。</value>
+  </data>
+  <data name="SettingsThemeTitle" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="SettingsThemeDescription" xml:space="preserve">
+    <value>控制 NorthFile 的浅色、深色或跟随系统外观。</value>
+  </data>
+  <data name="SettingsThemeLight" xml:space="preserve">
+    <value>浅色</value>
+  </data>
+  <data name="SettingsThemeDark" xml:space="preserve">
+    <value>深色</value>
+  </data>
+  <data name="SettingsSortTitle" xml:space="preserve">
+    <value>默认排序方式</value>
+  </data>
+  <data name="SettingsSortDescription" xml:space="preserve">
+    <value>为新窗口准备的默认排序方式。</value>
+  </data>
+  <data name="SettingsGroupTitle" xml:space="preserve">
+    <value>默认分组方式</value>
+  </data>
+  <data name="SettingsGroupDescription" xml:space="preserve">
+    <value>控制新窗口进入目录时的初始分组状态。</value>
+  </data>
+  <data name="SettingsSectionFilesAndFolders" xml:space="preserve">
+    <value>文件和文件夹</value>
+  </data>
+  <data name="SettingsSectionFilesAndFoldersDescription" xml:space="preserve">
+    <value>目录显示规则和删除体验。</value>
+  </data>
+  <data name="SettingsShowHiddenTitle" xml:space="preserve">
+    <value>显示隐藏文件和文件夹</value>
+  </data>
+  <data name="SettingsShowHiddenDescription" xml:space="preserve">
+    <value>控制隐藏项目是否显示在文件列表中。</value>
+  </data>
+  <data name="SettingsShowProtectedSystemTitle" xml:space="preserve">
+    <value>显示受保护的系统文件</value>
+  </data>
+  <data name="SettingsShowProtectedSystemDescription" xml:space="preserve">
+    <value>控制受保护系统文件是否显示。</value>
+  </data>
+  <data name="SettingsShowDotFilesTitle" xml:space="preserve">
+    <value>显示以 . 开头的文件和文件夹</value>
+  </data>
+  <data name="SettingsShowDotFilesDescription" xml:space="preserve">
+    <value>控制以点开头的项目是否显示。</value>
+  </data>
+  <data name="SettingsShowExtensionsTitle" xml:space="preserve">
+    <value>显示文件的扩展名</value>
+  </data>
+  <data name="SettingsShowExtensionsDescription" xml:space="preserve">
+    <value>控制文件扩展名是否显示在名称后方。</value>
+  </data>
+  <data name="SettingsDeleteConfirmTitle" xml:space="preserve">
+    <value>删除时显示确认对话框</value>
+  </data>
+  <data name="SettingsDeleteConfirmDescription" xml:space="preserve">
+    <value>删除前显示应用层确认对话框，再继续执行系统删除流程。</value>
+  </data>
+  <data name="SettingsSectionShortcuts" xml:space="preserve">
+    <value>快捷键</value>
+  </data>
+  <data name="SettingsSectionShortcutsDescription" xml:space="preserve">
+    <value>第一阶段仅提供占位内容，后续再接真正的快捷键自定义。</value>
+  </data>
+  <data name="SettingsShortcutsTitle" xml:space="preserve">
+    <value>快捷键设置</value>
+  </data>
+  <data name="SettingsShortcutsDescription" xml:space="preserve">
+    <value>后续这里会接入快捷键列表、冲突检测和自定义绑定。</value>
+  </data>
+  <data name="SettingsComingSoon" xml:space="preserve">
+    <value>即将提供</value>
+  </data>
+  <data name="SettingsSectionTags" xml:space="preserve">
+    <value>标签</value>
+  </data>
+  <data name="SettingsSectionTagsDescription" xml:space="preserve">
+    <value>第一阶段仅提供占位内容，后续再接标签模型和管理界面。</value>
+  </data>
+  <data name="SettingsTagsFeatureTitle" xml:space="preserve">
+    <value>标签功能</value>
+  </data>
+  <data name="SettingsTagsFeatureDescription" xml:space="preserve">
+    <value>后续这里会接入默认标签、颜色、显示策略和筛选规则。</value>
+  </data>
+  <data name="SettingsSectionAdvanced" xml:space="preserve">
+    <value>高级</value>
+  </data>
+  <data name="SettingsSectionAdvancedDescription" xml:space="preserve">
+    <value>系统级行为与设置迁移能力。</value>
+  </data>
+  <data name="SettingsMigrationTitle" xml:space="preserve">
+    <value>设置迁移</value>
+  </data>
+  <data name="SettingsMigrationDescription" xml:space="preserve">
+    <value>导入和导出当前应用设置。</value>
+  </data>
+  <data name="SettingsExport" xml:space="preserve">
+    <value>导出设置</value>
+  </data>
+  <data name="SettingsImport" xml:space="preserve">
+    <value>导入设置</value>
+  </data>
+  <data name="SettingsAutoStartTitle" xml:space="preserve">
+    <value>开机自启动</value>
+  </data>
+  <data name="SettingsAutoStartDescription" xml:space="preserve">
+    <value>控制应用是否在开机后自动启动。</value>
+  </data>
+  <data name="SettingsMinimizeToTrayTitle" xml:space="preserve">
+    <value>关闭窗口收缩到托盘</value>
+  </data>
+  <data name="SettingsMinimizeToTrayDescription" xml:space="preserve">
+    <value>控制关闭主窗口时是否收缩到系统托盘。</value>
+  </data>
+  <data name="SettingsDefaultManagerTitle" xml:space="preserve">
+    <value>将 NorthFile 设为默认文件管理器</value>
+  </data>
+  <data name="SettingsDefaultManagerDescription" xml:space="preserve">
+    <value>当前仅展示入口，不执行系统注册。</value>
+  </data>
+  <data name="SettingsSetDefault" xml:space="preserve">
+    <value>设置默认</value>
+  </data>
+  <data name="SettingsSectionAbout" xml:space="preserve">
+    <value>关于</value>
+  </data>
+  <data name="SettingsSectionAboutDescription" xml:space="preserve">
+    <value>应用信息与当前构建摘要。</value>
+  </data>
+  <data name="SettingsAboutAppName" xml:space="preserve">
+    <value>NorthFile</value>
+  </data>
+  <data name="SettingsAboutAppDescription" xml:space="preserve">
+    <value>面向大目录和现代交互的 WinUI 文件管理器。</value>
+  </data>
+  <data name="SettingsAboutEngineVersion" xml:space="preserve">
+    <value>引擎版本：{0}</value>
+  </data>
+  <data name="SettingsAboutAppVersion" xml:space="preserve">
+    <value>应用版本：{0}</value>
   </data>
 </root>

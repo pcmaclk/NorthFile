@@ -16,6 +16,8 @@ using System.Threading.Tasks;
 
 namespace FileExplorerUI.Services;
 
+public readonly record struct ZipExtractionPlan(string DestinationDirectory, string? PrimarySelectionPath);
+
 public sealed class ExplorerService
 {
     private const uint SeeMaskInvokeIdList = 0x0000000C;
@@ -78,7 +80,9 @@ public sealed class ExplorerService
     public string GenerateUniqueZipArchiveName(string directoryPath, string sourcePath)
     {
         string normalizedSourcePath = sourcePath.TrimEnd('\\');
-        string baseName = Path.GetFileName(normalizedSourcePath);
+        string baseName = Directory.Exists(sourcePath)
+            ? Path.GetFileName(normalizedSourcePath)
+            : Path.GetFileNameWithoutExtension(normalizedSourcePath);
         if (string.IsNullOrWhiteSpace(baseName))
         {
             baseName = "Archive";
@@ -94,6 +98,12 @@ public sealed class ExplorerService
         }
 
         return candidate;
+    }
+
+    public string GetDefaultZipExtractionFolderName(string archivePath)
+    {
+        string baseName = Path.GetFileNameWithoutExtension(archivePath.TrimEnd('\\'));
+        return string.IsNullOrWhiteSpace(baseName) ? "Archive" : baseName;
     }
 
     public string GetEngineVersion()
@@ -662,6 +672,21 @@ public sealed class ExplorerService
             });
     }
 
+    public Task<ZipExtractionPlan> ExtractZipHereAsync(string archivePath, string destinationDirectory)
+    {
+        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.Here));
+    }
+
+    public Task<ZipExtractionPlan> ExtractZipToFolderAsync(string archivePath, string destinationDirectory)
+    {
+        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.ToFolder));
+    }
+
+    public Task<ZipExtractionPlan> ExtractZipSmartAsync(string archivePath, string destinationDirectory)
+    {
+        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.Smart));
+    }
+
     private static void CopyDirectory(string sourcePath, string targetPath)
     {
         Directory.CreateDirectory(targetPath);
@@ -736,6 +761,247 @@ public sealed class ExplorerService
         using FileStream stream = new(archivePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
         archive.CreateEntryFromFile(sourcePath, Path.GetFileName(sourcePath), CompressionLevel.Optimal);
+    }
+
+    private ZipExtractionPlan ExtractZipCore(string archivePath, string destinationDirectory, ZipExtractionMode mode)
+    {
+        if (!File.Exists(archivePath))
+        {
+            throw new FileNotFoundException("Archive path does not exist.", archivePath);
+        }
+
+        string destinationRoot = Path.GetFullPath(destinationDirectory);
+        if (!Directory.Exists(destinationRoot))
+        {
+            throw new DirectoryNotFoundException(destinationRoot);
+        }
+
+        using FileStream stream = new(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+
+        ZipArchiveInspection inspection = InspectZipArchive(archive);
+        bool extractToNamedFolder = mode switch
+        {
+            ZipExtractionMode.Here => false,
+            ZipExtractionMode.ToFolder => true,
+            _ => !inspection.CanExtractSingleRootDirectoryHere
+        };
+
+        string extractionRoot = extractToNamedFolder
+            ? Path.Combine(destinationRoot, GetDefaultZipExtractionFolderName(archivePath))
+            : destinationRoot;
+        string normalizedExtractionRoot = Path.GetFullPath(extractionRoot).TrimEnd('\\');
+
+        if (extractToNamedFolder && PathExists(normalizedExtractionRoot))
+        {
+            throw CreateAlreadyExistsException(normalizedExtractionRoot);
+        }
+
+        var impliedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var filesToExtract = new List<(ZipArchiveEntry Entry, string DestinationPath)>();
+
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            string relativePath = NormalizeArchiveEntryPath(entry.FullName);
+            if (string.IsNullOrEmpty(relativePath))
+            {
+                continue;
+            }
+
+            string destinationPath = Path.GetFullPath(Path.Combine(
+                normalizedExtractionRoot,
+                relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            EnsurePathWithinRoot(destinationPath, normalizedExtractionRoot);
+
+            if (IsDirectoryEntry(entry))
+            {
+                impliedDirectories.Add(destinationPath.TrimEnd('\\'));
+                continue;
+            }
+
+            string? parentDirectory = Path.GetDirectoryName(destinationPath);
+            while (!string.IsNullOrWhiteSpace(parentDirectory) &&
+                !string.Equals(parentDirectory.TrimEnd('\\'), normalizedExtractionRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                impliedDirectories.Add(parentDirectory.TrimEnd('\\'));
+                parentDirectory = Path.GetDirectoryName(parentDirectory);
+            }
+
+            filesToExtract.Add((entry, destinationPath));
+        }
+
+        foreach (string directoryPath in impliedDirectories)
+        {
+            if (PathExists(directoryPath))
+            {
+                throw CreateAlreadyExistsException(directoryPath);
+            }
+        }
+
+        foreach ((_, string destinationPath) in filesToExtract)
+        {
+            if (PathExists(destinationPath))
+            {
+                throw CreateAlreadyExistsException(destinationPath);
+            }
+        }
+
+        if (!Directory.Exists(normalizedExtractionRoot))
+        {
+            Directory.CreateDirectory(normalizedExtractionRoot);
+        }
+
+        foreach (string directoryPath in SortPathsByLength(impliedDirectories))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
+
+        foreach ((ZipArchiveEntry entry, string destinationPath) in filesToExtract)
+        {
+            string? parentDirectory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrWhiteSpace(parentDirectory))
+            {
+                Directory.CreateDirectory(parentDirectory);
+            }
+
+            using Stream entryStream = entry.Open();
+            using FileStream fileStream = new(destinationPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            entryStream.CopyTo(fileStream);
+            File.SetLastWriteTime(destinationPath, entry.LastWriteTime.LocalDateTime);
+        }
+
+        string? primarySelectionPath = extractToNamedFolder
+            ? normalizedExtractionRoot
+            : inspection.GetPrimarySelectionPath(normalizedExtractionRoot);
+        return new ZipExtractionPlan(normalizedExtractionRoot, primarySelectionPath);
+    }
+
+    private static IOException CreateAlreadyExistsException(string path)
+    {
+        return new IOException($"Destination already exists: {path}", unchecked((int)0x800700B7));
+    }
+
+    private static IEnumerable<string> SortPathsByLength(IEnumerable<string> paths)
+    {
+        var sorted = new List<string>(paths);
+        sorted.Sort((left, right) => left.Length.CompareTo(right.Length));
+        return sorted;
+    }
+
+    private static ZipArchiveInspection InspectZipArchive(ZipArchive archive)
+    {
+        var topLevelNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        bool canExtractSingleRootDirectoryHere = true;
+        bool hasEntries = false;
+        bool singleTopLevelIsDirectory = false;
+        string? singleTopLevelName = null;
+
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            string relativePath = NormalizeArchiveEntryPath(entry.FullName);
+            if (string.IsNullOrEmpty(relativePath))
+            {
+                continue;
+            }
+
+            hasEntries = true;
+            string[] segments = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0)
+            {
+                continue;
+            }
+
+            topLevelNames.Add(segments[0]);
+            if (segments.Length == 1)
+            {
+                singleTopLevelIsDirectory = IsDirectoryEntry(entry);
+                if (!singleTopLevelIsDirectory)
+                {
+                    canExtractSingleRootDirectoryHere = false;
+                }
+            }
+            else
+            {
+                singleTopLevelIsDirectory = true;
+            }
+        }
+
+        if (topLevelNames.Count != 1 || !singleTopLevelIsDirectory)
+        {
+            canExtractSingleRootDirectoryHere = false;
+        }
+
+        foreach (string name in topLevelNames)
+        {
+            singleTopLevelName = name;
+            break;
+        }
+
+        return new ZipArchiveInspection(hasEntries, canExtractSingleRootDirectoryHere, singleTopLevelName, topLevelNames.Count);
+    }
+
+    private static string NormalizeArchiveEntryPath(string entryPath)
+    {
+        string normalized = entryPath.Replace('\\', '/').Trim('/');
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        foreach (string segment in segments)
+        {
+            if (segment is "." or "..")
+            {
+                throw new InvalidDataException("Archive entry contains an unsafe path.");
+            }
+        }
+
+        return string.Join('/', segments);
+    }
+
+    private static void EnsurePathWithinRoot(string path, string rootPath)
+    {
+        string normalizedPath = Path.GetFullPath(path).TrimEnd('\\');
+        if (string.Equals(normalizedPath, rootPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!normalizedPath.StartsWith(rootPath + "\\", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Archive entry escapes extraction root.");
+        }
+    }
+
+    private static bool IsDirectoryEntry(ZipArchiveEntry entry)
+    {
+        return entry.FullName.EndsWith("/", StringComparison.Ordinal) ||
+            entry.FullName.EndsWith("\\", StringComparison.Ordinal);
+    }
+
+    private enum ZipExtractionMode
+    {
+        Smart,
+        Here,
+        ToFolder
+    }
+
+    private readonly record struct ZipArchiveInspection(
+        bool HasEntries,
+        bool CanExtractSingleRootDirectoryHere,
+        string? SingleTopLevelName,
+        int TopLevelCount)
+    {
+        public string? GetPrimarySelectionPath(string extractionRoot)
+        {
+            if (!HasEntries || string.IsNullOrWhiteSpace(SingleTopLevelName) || TopLevelCount != 1)
+            {
+                return null;
+            }
+
+            return Path.Combine(extractionRoot, SingleTopLevelName);
+        }
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

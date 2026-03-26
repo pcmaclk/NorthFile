@@ -1,293 +1,1314 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
-  <resheader name="version"><value>2.0</value></resheader>
-  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, ...</value></resheader>
-  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, ...</value></resheader>
-  <data name="ToolbarBackToolTip" xml:space="preserve"><value>Back</value></data>
-  <data name="ToolbarForwardToolTip" xml:space="preserve"><value>Forward</value></data>
-  <data name="ToolbarUpToolTip" xml:space="preserve"><value>Up</value></data>
-  <data name="ToolbarGoToolTip" xml:space="preserve"><value>Refresh</value></data>
-  <data name="ToolbarNewFileToolTip" xml:space="preserve"><value>New file</value></data>
-  <data name="ToolbarNewFolderToolTip" xml:space="preserve"><value>New folder</value></data>
-  <data name="ToolbarCopyToolTip" xml:space="preserve"><value>Copy</value></data>
-  <data name="ToolbarCutToolTip" xml:space="preserve"><value>Cut</value></data>
-  <data name="ToolbarPasteToolTip" xml:space="preserve"><value>Paste</value></data>
-  <data name="ToolbarContextPrototypeToolTip" xml:space="preserve"><value>Context menu prototype</value></data>
-  <data name="ToolbarToggleLanguageToolTip" xml:space="preserve"><value>Switch language</value></data>
-  <data name="ToolbarBreadcrumbOverflowToolTip" xml:space="preserve"><value>Show hidden path segments</value></data>
-  <data name="ToolbarAddressPlaceholder" xml:space="preserve"><value>Address</value></data>
-  <data name="ToolbarSearchPlaceholder" xml:space="preserve"><value>Search current folder</value></data>
-  <data name="BackButtonToolTip.Content" xml:space="preserve"><value>Back</value></data>
-  <data name="ForwardButtonToolTip.Content" xml:space="preserve"><value>Forward</value></data>
-  <data name="UpButtonToolTip.Content" xml:space="preserve"><value>Up</value></data>
-  <data name="LoadButtonToolTip.Content" xml:space="preserve"><value>Refresh</value></data>
-  <data name="NewFileButtonToolTip.Content" xml:space="preserve"><value>New file</value></data>
-  <data name="NewFolderButtonToolTip.Content" xml:space="preserve"><value>New folder</value></data>
-  <data name="CopyButtonToolTip.Content" xml:space="preserve"><value>Copy</value></data>
-  <data name="CutButtonToolTip.Content" xml:space="preserve"><value>Cut</value></data>
-  <data name="PasteButtonToolTip.Content" xml:space="preserve"><value>Paste</value></data>
-  <data name="LanguageToggleButtonToolTip.Content" xml:space="preserve"><value>Switch language</value></data>
-  <data name="OverflowBreadcrumbButtonToolTip.Content" xml:space="preserve"><value>Show hidden path segments</value></data>
-  <data name="PathTextBox.PlaceholderText" xml:space="preserve"><value>Address</value></data>
-  <data name="SearchTextBox.PlaceholderText" xml:space="preserve"><value>Search current folder</value></data>
-  <data name="ColumnNameHeader" xml:space="preserve"><value>Name</value></data>
-  <data name="ColumnTypeHeader" xml:space="preserve"><value>Type</value></data>
-  <data name="ColumnSizeHeader" xml:space="preserve"><value>Size</value></data>
-  <data name="ColumnModifiedHeader" xml:space="preserve"><value>Modified date</value></data>
-  <data name="NameHeaderTextBlock.Text" xml:space="preserve"><value>Name</value></data>
-  <data name="TypeHeaderTextBlock.Text" xml:space="preserve"><value>Type</value></data>
-  <data name="SizeHeaderTextBlock.Text" xml:space="preserve"><value>Size</value></data>
-  <data name="ModifiedHeaderTextBlock.Text" xml:space="preserve"><value>Modified date</value></data>
-  <data name="ColumnTotalSizeHeader" xml:space="preserve"><value>Total size</value></data>
-  <data name="ColumnFreeSpaceHeader" xml:space="preserve"><value>Free space</value></data>
-  <data name="CommandDockTitle" xml:space="preserve"><value>Command Dock</value></data>
-  <data name="CommandDockLoadMore" xml:space="preserve"><value>Load more</value></data>
-  <data name="RenamePlaceholder" xml:space="preserve"><value>New name</value></data>
-  <data name="RecursiveDeleteLabel" xml:space="preserve"><value>Recursive delete</value></data>
-  <data name="DockTop" xml:space="preserve"><value>Top</value></data>
-  <data name="DockRight" xml:space="preserve"><value>Right</value></data>
-  <data name="DockBottom" xml:space="preserve"><value>Bottom</value></data>
-  <data name="CommandDockAutoHide" xml:space="preserve"><value>Auto hide</value></data>
-  <data name="CommandPeekButtonText" xml:space="preserve"><value>Commands</value></data>
-  <data name="CommandDockTitleTextBlock.Text" xml:space="preserve"><value>Command Dock</value></data>
-  <data name="RenameButton.Content" xml:space="preserve"><value>Rename</value></data>
-  <data name="DeleteButton.Content" xml:space="preserve"><value>Delete</value></data>
-  <data name="NextButton.Content" xml:space="preserve"><value>Load more</value></data>
-  <data name="RenameTextBox.PlaceholderText" xml:space="preserve"><value>New name</value></data>
-  <data name="RecursiveDeleteCheckBox.Content" xml:space="preserve"><value>Recursive delete</value></data>
-  <data name="DockTopRadioButton.Content" xml:space="preserve"><value>Top</value></data>
-  <data name="DockRightRadioButton.Content" xml:space="preserve"><value>Right</value></data>
-  <data name="DockBottomRadioButton.Content" xml:space="preserve"><value>Bottom</value></data>
-  <data name="CommandAutoHideSwitch.Header" xml:space="preserve"><value>Auto hide</value></data>
-  <data name="CommandPeekButton.Content" xml:space="preserve"><value>Commands</value></data>
-  <data name="StatusLoading" xml:space="preserve"><value>Loading...</value></data>
-  <data name="StatusTextBlock.Text" xml:space="preserve"><value>Loading...</value></data>
-  <data name="StatusCurrentFolderItems" xml:space="preserve"><value>{0} item(s) in the current folder</value></data>
-  <data name="StatusDriveCount" xml:space="preserve"><value>{0} drive(s) in This PC</value></data>
-  <data name="StatusLanguageSwitched" xml:space="preserve"><value>Language switched: {0}</value></data>
-  <data name="StatusViewChanged" xml:space="preserve"><value>View changed: {0}</value></data>
-  <data name="StatusSortChanged" xml:space="preserve"><value>Sort changed: {0}, {1}</value></data>
-  <data name="StatusGroupChanged" xml:space="preserve"><value>Group changed: {0}</value></data>
-  <data name="CreateKindFile" xml:space="preserve"><value>file</value></data>
-  <data name="CreateKindFolder" xml:space="preserve"><value>folder</value></data>
-  <data name="ErrorOpenFolderFirst" xml:space="preserve"><value>Open a folder first.</value></data>
-  <data name="ErrorCurrentFolderUnavailable" xml:space="preserve"><value>The current folder is unavailable.</value></data>
-  <data name="OperationMove" xml:space="preserve"><value>Move</value></data>
-  <data name="OperationPaste" xml:space="preserve"><value>Paste</value></data>
-  <data name="StatusNewFailedOpenFolderFirst" xml:space="preserve"><value>New {0} failed: open a folder first.</value></data>
-  <data name="StatusNewFailedWithReason" xml:space="preserve"><value>New {0} failed: {1}</value></data>
-  <data name="StatusRenameFailedSelectLoaded" xml:space="preserve"><value>Rename failed: select a loaded entry first.</value></data>
-  <data name="StatusRenameFailedInvalidIndex" xml:space="preserve"><value>Rename failed: invalid selected index.</value></data>
-  <data name="StatusDeleteFailedSelectLoaded" xml:space="preserve"><value>Delete failed: select a loaded entry first.</value></data>
-  <data name="StatusDeleteFailedInvalidIndex" xml:space="preserve"><value>Delete failed: invalid selected index.</value></data>
-  <data name="StatusDeleteCanceled" xml:space="preserve"><value>Delete canceled by user.</value></data>
-  <data name="StatusCopyFailedSelectLoaded" xml:space="preserve"><value>Copy failed: select a loaded entry first.</value></data>
-  <data name="StatusCutFailedSelectLoaded" xml:space="preserve"><value>Cut failed: select a loaded entry first.</value></data>
-  <data name="StatusCopyFailedDriveRootsUnsupported" xml:space="preserve"><value>Copy failed: drive roots are not supported yet.</value></data>
-  <data name="StatusCutFailedDriveRootsUnsupported" xml:space="preserve"><value>Cut failed: drive roots are not supported yet.</value></data>
-  <data name="StatusCopyReady" xml:space="preserve"><value>Copy ready: {0}</value></data>
-  <data name="StatusCutReady" xml:space="preserve"><value>Cut ready: {0}</value></data>
-  <data name="StatusPasteFailedOpenFolderFirst" xml:space="preserve"><value>Paste failed: open a folder first.</value></data>
-  <data name="StatusPasteFailedWithReason" xml:space="preserve"><value>Paste failed: {0}</value></data>
-  <data name="StatusPasteFailedClipboardEmpty" xml:space="preserve"><value>Paste failed: clipboard is empty.</value></data>
-  <data name="StatusPasteSkippedConflicts" xml:space="preserve"><value>Paste skipped: {0} target item(s) already exist.</value></data>
-  <data name="StatusPasteSkippedSamePath" xml:space="preserve"><value>Paste skipped: source and target are the same.</value></data>
-  <data name="StatusPasteSkippedNothingApplied" xml:space="preserve"><value>Paste skipped: nothing was applied.</value></data>
-  <data name="StatusTransferSuccess" xml:space="preserve"><value>{0} success: {1} item(s), conflicts {2}, same-path {3}, failures {4}.</value></data>
-  <data name="StatusCreateSuccess" xml:space="preserve"><value>Create success: {0}</value></data>
-  <data name="StatusCreateFailed" xml:space="preserve"><value>Create failed: {0}</value></data>
-  <data name="StatusPathNotFound" xml:space="preserve"><value>Path not found: {0}</value></data>
-  <data name="StatusNoMoreEntries" xml:space="preserve"><value>No more entries.</value></data>
-  <data name="StatusPathAccessDeniedSkip" xml:space="preserve"><value>Path: {0} | Access denied. Skip current directory.</value></data>
-  <data name="StatusPathError" xml:space="preserve"><value>Path: {0} | Error: {1}</value></data>
-  <data name="StatusPathInvalidateWarning" xml:space="preserve"><value>Path: {0} | Invalidate warning({1}): {2}</value></data>
-  <data name="StatusPathAccessDenied" xml:space="preserve"><value>Path: {0} | Access denied.</value></data>
-  <data name="StatusPathRustError" xml:space="preserve"><value>Path: {0} | Error: Rust error {1}: {2}</value></data>
-  <data name="StatusSidebarTreeExpandFailed" xml:space="preserve"><value>Sidebar tree expand failed: {0}</value></data>
-  <data name="StatusRenameFailedSelectTreeNode" xml:space="preserve"><value>Rename failed: select a tree node first.</value></data>
-  <data name="StatusSidebarTreeNavIgnoredLoading" xml:space="preserve"><value>Sidebar tree nav ignored: loading in progress.</value></data>
-  <data name="StatusSidebarTreeNavFailed" xml:space="preserve"><value>Sidebar tree nav failed: {0}</value></data>
-  <data name="StatusSidebarNavIgnoredLoading" xml:space="preserve"><value>Sidebar nav ignored: loading in progress.</value></data>
-  <data name="StatusSidebarNavFailed" xml:space="preserve"><value>Sidebar nav failed: {0}</value></data>
-  <data name="StatusRenameFailedCouldNotStartInlineEditor" xml:space="preserve"><value>Rename failed: could not start inline editor.</value></data>
-  <data name="StatusRenameFailedTreeItemUnavailable" xml:space="preserve"><value>Rename failed: tree item is not available.</value></data>
-  <data name="StatusRenameFailedTreeOverlayUnavailable" xml:space="preserve"><value>Rename failed: tree rename overlay is not available.</value></data>
-  <data name="StatusRenameFailedTreeTextAnchorUnavailable" xml:space="preserve"><value>Rename failed: tree text anchor is not available.</value></data>
-  <data name="StatusOpened" xml:space="preserve"><value>Opened: {0}</value></data>
-  <data name="StatusOpenFailed" xml:space="preserve"><value>Open failed: {0}</value></data>
-  <data name="StatusCopyPathReady" xml:space="preserve"><value>Copied path: {0}</value></data>
-  <data name="StatusCopyPathFailed" xml:space="preserve"><value>Copy path failed: {0}</value></data>
-  <data name="StatusCreateShortcutSuccess" xml:space="preserve"><value>Created shortcut: {0}</value></data>
-  <data name="StatusCreateShortcutFailed" xml:space="preserve"><value>Create shortcut failed: {0}</value></data>
-  <data name="StatusOpenTargetFailed" xml:space="preserve"><value>Open target failed: {0}</value></data>
-  <data name="StatusRunAsAdministratorStarted" xml:space="preserve"><value>Run as administrator started: {0}</value></data>
-  <data name="StatusRunAsAdministratorFailed" xml:space="preserve"><value>Run as administrator failed: {0}</value></data>
-  <data name="StatusOpenWithOpened" xml:space="preserve"><value>Opened with dialog: {0}</value></data>
-  <data name="StatusOpenWithFailed" xml:space="preserve"><value>Open with failed: {0}</value></data>
-  <data name="StatusOpenedInNewWindow" xml:space="preserve"><value>Opened in new window: {0}</value></data>
-  <data name="StatusOpenInNewWindowFailed" xml:space="preserve"><value>Open in new window failed: {0}</value></data>
-  <data name="StatusOpenTerminalSuccess" xml:space="preserve"><value>Opened terminal: {0}</value></data>
-  <data name="StatusOpenTerminalFailed" xml:space="preserve"><value>Open terminal failed: {0}</value></data>
-  <data name="StatusPropertiesOpened" xml:space="preserve"><value>Opened properties: {0}</value></data>
-  <data name="StatusPropertiesFailed" xml:space="preserve"><value>Open properties failed: {0}</value></data>
-  <data name="StatusAlreadyAtRoot" xml:space="preserve"><value>Already at root.</value></data>
-  <data name="StatusRenameSuccess" xml:space="preserve"><value>Rename success: {0} -> {1}</value></data>
-  <data name="StatusRenameFailedWithReason" xml:space="preserve"><value>Rename failed: {0}</value></data>
-  <data name="StatusDeleteSuccess" xml:space="preserve"><value>Delete success: {0} (recursive: {1})</value></data>
-  <data name="StatusDeleteFailedWithReason" xml:space="preserve"><value>Delete failed: {0}</value></data>
-  <data name="FileTypeGeneric" xml:space="preserve"><value>File</value></data>
-  <data name="FileTypeWithExtension" xml:space="preserve"><value>{0} File</value></data>
-  <data name="FileTypeFolder" xml:space="preserve"><value>Folder</value></data>
-  <data name="FileTypeFolderLink" xml:space="preserve"><value>Folder link</value></data>
-  <data name="FileTypeFileLink" xml:space="preserve"><value>File link</value></data>
-  <data name="DefaultNewFileBaseName" xml:space="preserve"><value>New File</value></data>
-  <data name="DefaultNewFolderBaseName" xml:space="preserve"><value>New Folder</value></data>
-  <data name="ErrorNameEmpty" xml:space="preserve"><value>Name failed: name is empty.</value></data>
-  <data name="ErrorNameReserved" xml:space="preserve"><value>Name failed: '{0}' is reserved.</value></data>
-  <data name="ErrorNameInvalidChars" xml:space="preserve"><value>Name failed: '{0}' contains invalid characters.</value></data>
-  <data name="ErrorNameAlreadyExists" xml:space="preserve"><value>Name failed: '{0}' already exists.</value></data>
-  <data name="ErrorPasteSameSourceAndTarget" xml:space="preserve"><value>Source and target are the same.</value></data>
-  <data name="ErrorPasteTargetAlreadyExists" xml:space="preserve"><value>The target already exists.</value></data>
-  <data name="ErrorRenameNameEmpty" xml:space="preserve"><value>Rename failed: name is empty.</value></data>
-  <data name="ErrorRenameReservedName" xml:space="preserve"><value>Rename failed: '{0}' is reserved.</value></data>
-  <data name="ErrorRenameInvalidChars" xml:space="preserve"><value>Rename failed: '{0}' contains invalid characters.</value></data>
-  <data name="ErrorRenameAlreadyExists" xml:space="preserve"><value>Rename failed: '{0}' already exists.</value></data>
-  <data name="WindowTitleItemsFormat" xml:space="preserve"><value>NorthFile | Engine {0} | Items: {1}</value></data>
-  <data name="WindowTitleDrivesFormat" xml:space="preserve"><value>NorthFile | Engine {0} | Drives: {1}</value></data>
-  <data name="WindowTitleReadFailedFormat" xml:space="preserve"><value>NorthFile | Engine {0} | Read Failed</value></data>
-  <data name="DriveTypeLocalDisk" xml:space="preserve"><value>Local Disk</value></data>
-  <data name="DriveTypeVolumeFormat" xml:space="preserve"><value>{0} ({1})</value></data>
-  <data name="DialogRenameTitle" xml:space="preserve"><value>Rename</value></data>
-  <data name="DialogRenamePrimaryButton" xml:space="preserve"><value>Rename</value></data>
-  <data name="DialogDeleteTitle" xml:space="preserve"><value>Confirm Delete</value></data>
-  <data name="DialogDeleteContent" xml:space="preserve"><value>Delete '{0}'? Recursive: {1}</value></data>
-  <data name="DialogDeletePrimaryButton" xml:space="preserve"><value>Delete</value></data>
-  <data name="DialogCancelButton" xml:space="preserve"><value>Cancel</value></data>
-  <data name="CommonOpen" xml:space="preserve"><value>Open</value></data>
-  <data name="CommonOpenWith" xml:space="preserve"><value>Open with</value></data>
-  <data name="CommonShare" xml:space="preserve"><value>Share</value></data>
-  <data name="CommonCompress" xml:space="preserve"><value>Compress to</value></data>
-  <data name="CommonCompressZip" xml:space="preserve"><value>ZIP</value></data>
-  <data name="CommonCompress7z" xml:space="preserve"><value>7z</value></data>
-  <data name="CommonCreateShortcut" xml:space="preserve"><value>Create shortcut</value></data>
-  <data name="ShortcutNameSuffix" xml:space="preserve"><value> - Shortcut</value></data>
-  <data name="CommonCopyFilePath" xml:space="preserve"><value>Copy file path</value></data>
-  <data name="CommonCopyFolderPath" xml:space="preserve"><value>Copy folder path</value></data>
-  <data name="CommonCopyPath" xml:space="preserve"><value>Copy path</value></data>
-  <data name="CommonSetTag" xml:space="preserve"><value>Set tag</value></data>
-  <data name="CommonProperties" xml:space="preserve"><value>Properties</value></data>
-  <data name="CommonOpenInNewWindow" xml:space="preserve"><value>Open in new window</value></data>
-  <data name="CommonOpenTarget" xml:space="preserve"><value>Open Target</value></data>
-  <data name="CommonPinToSidebar" xml:space="preserve"><value>Add to favorites</value></data>
-  <data name="CommonPinToggle" xml:space="preserve"><value>Add to favorites / Remove from favorites</value></data>
-  <data name="CommonOpenInTerminal" xml:space="preserve"><value>Open in Terminal</value></data>
-  <data name="CommonView" xml:space="preserve"><value>View</value></data>
-  <data name="CommonViewDetails" xml:space="preserve"><value>Details</value></data>
-  <data name="CommonViewList" xml:space="preserve"><value>List</value></data>
-  <data name="CommonSortBy" xml:space="preserve"><value>Sort by</value></data>
-  <data name="CommonSortByName" xml:space="preserve"><value>Name</value></data>
-  <data name="CommonSortByType" xml:space="preserve"><value>Type</value></data>
-  <data name="CommonSortBySize" xml:space="preserve"><value>Size</value></data>
-  <data name="CommonSortByModifiedDate" xml:space="preserve"><value>Modified Date</value></data>
-  <data name="CommonSortAscending" xml:space="preserve"><value>Ascending</value></data>
-  <data name="CommonSortDescending" xml:space="preserve"><value>Descending</value></data>
-  <data name="CommonGroupBy" xml:space="preserve"><value>Group by</value></data>
-  <data name="CommonGroupByNone" xml:space="preserve"><value>None</value></data>
-  <data name="CommonGroupByName" xml:space="preserve"><value>Name</value></data>
-  <data name="CommonGroupByType" xml:space="preserve"><value>Type</value></data>
-  <data name="CommonGroupByModifiedDate" xml:space="preserve"><value>Modified Date</value></data>
-  <data name="CommonUnknown" xml:space="preserve"><value>Unknown</value></data>
-  <data name="CommonNew" xml:space="preserve"><value>New</value></data>
-  <data name="CommonNewFile" xml:space="preserve"><value>File</value></data>
-  <data name="CommonNewFolder" xml:space="preserve"><value>Folder</value></data>
-  <data name="CommonNotepad" xml:space="preserve"><value>Notepad</value></data>
-  <data name="CommonVSCode" xml:space="preserve"><value>VS Code</value></data>
-  <data name="CommonCompressedFile" xml:space="preserve"><value>Compressed File</value></data>
-  <data name="CommonCut" xml:space="preserve"><value>Cut</value></data>
-  <data name="CommonCopy" xml:space="preserve"><value>Copy</value></data>
-  <data name="CommonPaste" xml:space="preserve"><value>Paste</value></data>
-  <data name="CommonRename" xml:space="preserve"><value>Rename</value></data>
-  <data name="CommonDelete" xml:space="preserve"><value>Delete</value></data>
-  <data name="CommonRefresh" xml:space="preserve"><value>Refresh</value></data>
-  <data name="CommonRunAsAdministrator" xml:space="preserve"><value>Run as administrator</value></data>
-  <data name="CommonExtractHere" xml:space="preserve"><value>Extract here</value></data>
-  <data name="CommonExtractToFolder" xml:space="preserve"><value>Extract to folder</value></data>
-  <data name="CommonPreview" xml:space="preserve"><value>Preview</value></data>
-  <data name="CommonEmpty" xml:space="preserve"><value>(empty)</value></data>
-  <data name="GroupTypeFolder" xml:space="preserve"><value>Folders</value></data>
-  <data name="GroupTypeDocument" xml:space="preserve"><value>Documents</value></data>
-  <data name="GroupTypeImage" xml:space="preserve"><value>Images</value></data>
-  <data name="GroupTypeAudio" xml:space="preserve"><value>Audio</value></data>
-  <data name="GroupTypeVideo" xml:space="preserve"><value>Videos</value></data>
-  <data name="GroupTypeArchive" xml:space="preserve"><value>Archives</value></data>
-  <data name="GroupTypeProgram" xml:space="preserve"><value>Programs</value></data>
-  <data name="GroupTypeOther" xml:space="preserve"><value>Other</value></data>
-  <data name="GroupTypeUnknown" xml:space="preserve"><value>Unknown</value></data>
-  <data name="GroupDateToday" xml:space="preserve"><value>Today</value></data>
-  <data name="GroupDateYesterday" xml:space="preserve"><value>Yesterday</value></data>
-  <data name="GroupDatePast7Days" xml:space="preserve"><value>Past 7 days</value></data>
-  <data name="GroupDateEarlierThisMonth" xml:space="preserve"><value>Earlier this month</value></data>
-  <data name="GroupDateOlder" xml:space="preserve"><value>Older</value></data>
-  <data name="GroupDateUnknown" xml:space="preserve"><value>Unknown date</value></data>
-  <data name="SidebarPinned" xml:space="preserve"><value>Favorites</value></data>
-  <data name="SidebarMyComputer" xml:space="preserve"><value>This PC</value></data>
-  <data name="SidebarCloud" xml:space="preserve"><value>Cloud</value></data>
-  <data name="SidebarNetwork" xml:space="preserve"><value>Network</value></data>
-  <data name="SidebarTags" xml:space="preserve"><value>Tags</value></data>
-  <data name="SidebarDesktop" xml:space="preserve"><value>Desktop</value></data>
-  <data name="SidebarDocuments" xml:space="preserve"><value>Documents</value></data>
-  <data name="SidebarDownloads" xml:space="preserve"><value>Downloads</value></data>
-  <data name="SidebarPictures" xml:space="preserve"><value>Pictures</value></data>
-  <data name="SidebarOneDrive" xml:space="preserve"><value>OneDrive</value></data>
-  <data name="SidebarTagWork" xml:space="preserve"><value>Work</value></data>
-  <data name="SidebarTagFocus" xml:space="preserve"><value>Focus</value></data>
-  <data name="SidebarTagArchive" xml:space="preserve"><value>Archive</value></data>
-  <data name="SidebarNetworkEmpty" xml:space="preserve"><value>No items yet</value></data>
-  <data name="SidebarSettingsToolTip" xml:space="preserve"><value>Settings</value></data>
-  <data name="PinnedGroupTextBlock.Text" xml:space="preserve"><value>Favorites</value></data>
-  <data name="DesktopTextBlock.Text" xml:space="preserve"><value>Desktop</value></data>
-  <data name="DocumentsTextBlock.Text" xml:space="preserve"><value>Documents</value></data>
-  <data name="DownloadsTextBlock.Text" xml:space="preserve"><value>Downloads</value></data>
-  <data name="PicturesTextBlock.Text" xml:space="preserve"><value>Pictures</value></data>
-  <data name="CloudHeaderTextBlock.Text" xml:space="preserve"><value>Cloud</value></data>
-  <data name="OneDriveTextBlock.Text" xml:space="preserve"><value>OneDrive</value></data>
-  <data name="NetworkHeaderTextBlock.Text" xml:space="preserve"><value>Network</value></data>
-  <data name="TagsHeaderTextBlock.Text" xml:space="preserve"><value>Tags</value></data>
-  <data name="TagWorkTextBlock.Text" xml:space="preserve"><value>Work</value></data>
-  <data name="TagFocusTextBlock.Text" xml:space="preserve"><value>Focus</value></data>
-  <data name="TagArchiveTextBlock.Text" xml:space="preserve"><value>Archive</value></data>
-  <data name="SidebarSettingsButtonToolTip.Content" xml:space="preserve"><value>Settings</value></data>
-  <data name="UsnCapabilityError" xml:space="preserve"><value>Error({0})</value></data>
-  <data name="UsnCapabilityAvailable" xml:space="preserve"><value>Available</value></data>
-  <data name="UsnCapabilityNotNtfs" xml:space="preserve"><value>Not NTFS</value></data>
-  <data name="UsnCapabilityDenied" xml:space="preserve"><value>Denied</value></data>
-  <data name="UsnCapabilityUnavailable" xml:space="preserve"><value>Unavailable</value></data>
-  <data name="UsnFallbackProbeError" xml:space="preserve"><value> (NTFS fallback: probe error {0})</value></data>
-  <data name="UsnFallbackNotLocalNtfs" xml:space="preserve"><value> (NTFS fallback: not local NTFS)</value></data>
-  <data name="UsnFallbackAccessDenied" xml:space="preserve"><value> (NTFS fallback: access denied)</value></data>
-  <data name="UsnFallbackBatchUnavailable" xml:space="preserve"><value> (NTFS fallback: probe succeeded, batch path unavailable)</value></data>
-  <data name="UsnFallbackUnavailable" xml:space="preserve"><value> (NTFS fallback: unavailable)</value></data>
-  <data name="InteropUnknown" xml:space="preserve"><value>unknown</value></data>
-  <data name="InteropUnknownRustFfiError" xml:space="preserve"><value>unknown Rust FFI error</value></data>
-  <data name="InteropNtfsProbeFailed" xml:space="preserve"><value>NTFS probe failed ({0})</value></data>
-  <data name="InteropMemoryInvalidateDirFailed" xml:space="preserve"><value>Memory invalidate directory failed: {0}</value></data>
-  <data name="InteropMemoryClearCacheFailed" xml:space="preserve"><value>Memory clear cache failed: {0}</value></data>
-  <data name="InteropDeletePathFailed" xml:space="preserve"><value>Delete path failed ({0}): {1}</value></data>
-  <data name="InteropRenamePathFailed" xml:space="preserve"><value>Rename path failed ({0}): {1}</value></data>
-  <data name="InteropRustErrorWithCode" xml:space="preserve"><value>Rust error {0}: {1}</value></data>
-  <data name="InteropOperationInvalidParameter" xml:space="preserve"><value>invalid parameter</value></data>
-  <data name="InteropOperationPathNotFound" xml:space="preserve"><value>path not found</value></data>
-  <data name="InteropOperationPermissionDenied" xml:space="preserve"><value>permission denied</value></data>
-  <data name="InteropOperationTargetAlreadyExists" xml:space="preserve"><value>target already exists</value></data>
-  <data name="InteropOperationDirectoryNotEmpty" xml:space="preserve"><value>directory is not empty</value></data>
-  <data name="InteropOperationResourceBusyOrTimedOut" xml:space="preserve"><value>resource is busy or timed out</value></data>
-  <data name="InteropOperationInvalidPathOrInput" xml:space="preserve"><value>invalid path or input</value></data>
-  <data name="InteropOperationNotSupported" xml:space="preserve"><value>operation is not supported</value></data>
-  <data name="InteropOperationGenericIoFailure" xml:space="preserve"><value>generic I/O failure</value></data>
-  <data name="InteropOperationUnknownError" xml:space="preserve"><value>unknown error</value></data>
-  <data name="StatusShareOpened" xml:space="preserve"><value>Opened share UI for: {0}</value></data>
-  <data name="StatusShareFailed" xml:space="preserve"><value>Share failed: {0}</value></data>
-  <data name="StatusCompressZipSuccess" xml:space="preserve"><value>Created zip archive: {0}</value></data>
-  <data name="StatusCompressZipFailed" xml:space="preserve"><value>Failed to create zip archive: {0}</value></data>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SidebarNetworkEmpty" xml:space="preserve">
+    <value>No items yet</value>
+  </data>
+  <data name="ToolbarBackToolTip" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="ToolbarForwardToolTip" xml:space="preserve">
+    <value>Forward</value>
+  </data>
+  <data name="ToolbarUpToolTip" xml:space="preserve">
+    <value>Up</value>
+  </data>
+  <data name="ToolbarGoToolTip" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="ToolbarNewFileToolTip" xml:space="preserve">
+    <value>New file</value>
+  </data>
+  <data name="ToolbarNewFolderToolTip" xml:space="preserve">
+    <value>New folder</value>
+  </data>
+  <data name="ToolbarCopyToolTip" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="ToolbarCutToolTip" xml:space="preserve">
+    <value>Cut</value>
+  </data>
+  <data name="ToolbarPasteToolTip" xml:space="preserve">
+    <value>Paste</value>
+  </data>
+  <data name="ToolbarContextPrototypeToolTip" xml:space="preserve">
+    <value>Context menu prototype</value>
+  </data>
+  <data name="ToolbarBreadcrumbOverflowToolTip" xml:space="preserve">
+    <value>Show hidden path segments</value>
+  </data>
+  <data name="ToolbarAddressPlaceholder" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="ToolbarSearchPlaceholder" xml:space="preserve">
+    <value>Search current folder</value>
+  </data>
+  <data name="CommonOpen" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="TrayMenuExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="CommonOpenWith" xml:space="preserve">
+    <value>Open with</value>
+  </data>
+  <data name="CommonShare" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="CommonCompress" xml:space="preserve">
+    <value>Compress to</value>
+  </data>
+  <data name="CommonArchiveActions" xml:space="preserve">
+    <value>Archive</value>
+  </data>
+  <data name="CommonCompressZip" xml:space="preserve">
+    <value>ZIP</value>
+  </data>
+  <data name="CommonCompressZipAction" xml:space="preserve">
+    <value>Compress to ZIP</value>
+  </data>
+  <data name="CommonCompress7z" xml:space="preserve">
+    <value>7z</value>
+  </data>
+  <data name="CommonCreateShortcut" xml:space="preserve">
+    <value>Create shortcut</value>
+  </data>
+  <data name="ShortcutNameSuffix" xml:space="preserve">
+    <value> - Shortcut</value>
+  </data>
+  <data name="CommonCopyFilePath" xml:space="preserve">
+    <value>Copy file path</value>
+  </data>
+  <data name="CommonCopyFolderPath" xml:space="preserve">
+    <value>Copy folder path</value>
+  </data>
+  <data name="CommonCopyPath" xml:space="preserve">
+    <value>Copy path</value>
+  </data>
+  <data name="CommonSetTag" xml:space="preserve">
+    <value>Set tag</value>
+  </data>
+  <data name="CommonProperties" xml:space="preserve">
+    <value>Properties</value>
+  </data>
+  <data name="CommonOpenInNewWindow" xml:space="preserve">
+    <value>Open in new window</value>
+  </data>
+  <data name="CommonPinToggle" xml:space="preserve">
+    <value>Add to favorites / Remove from favorites</value>
+  </data>
+  <data name="CommonOpenInTerminal" xml:space="preserve">
+    <value>Open in Terminal</value>
+  </data>
+  <data name="CommonView" xml:space="preserve">
+    <value>View</value>
+  </data>
+  <data name="CommonViewDetails" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="CommonViewList" xml:space="preserve">
+    <value>List</value>
+  </data>
+  <data name="CommonSortBy" xml:space="preserve">
+    <value>Sort by</value>
+  </data>
+  <data name="CommonSortByName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="CommonSortByType" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="CommonSortBySize" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="CommonSortByModifiedDate" xml:space="preserve">
+    <value>Modified Date</value>
+  </data>
+  <data name="CommonSortAscending" xml:space="preserve">
+    <value>Ascending</value>
+  </data>
+  <data name="CommonSortDescending" xml:space="preserve">
+    <value>Descending</value>
+  </data>
+  <data name="CommonGroupBy" xml:space="preserve">
+    <value>Group by</value>
+  </data>
+  <data name="CommonGroupByNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="CommonGroupByName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="CommonGroupByType" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="CommonGroupByModifiedDate" xml:space="preserve">
+    <value>Modified Date</value>
+  </data>
+  <data name="CommonUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="CommonNew" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="CommonNewFile" xml:space="preserve">
+    <value>File</value>
+  </data>
+  <data name="CommonNewFolder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="CommonNotepad" xml:space="preserve">
+    <value>Notepad</value>
+  </data>
+  <data name="CommonVSCode" xml:space="preserve">
+    <value>VS Code</value>
+  </data>
+  <data name="CommonCompressedFile" xml:space="preserve">
+    <value>Compressed File</value>
+  </data>
+  <data name="CommonCut" xml:space="preserve">
+    <value>Cut</value>
+  </data>
+  <data name="CommonCopy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="CommonPaste" xml:space="preserve">
+    <value>Paste</value>
+  </data>
+  <data name="CommonRename" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="CommonDelete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="CommonRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="SidebarPinned" xml:space="preserve">
+    <value>Favorites</value>
+  </data>
+  <data name="SidebarMyComputer" xml:space="preserve">
+    <value>This PC</value>
+  </data>
+  <data name="SidebarCloud" xml:space="preserve">
+    <value>Cloud</value>
+  </data>
+  <data name="SidebarNetwork" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="SidebarTags" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="SidebarDesktop" xml:space="preserve">
+    <value>Desktop</value>
+  </data>
+  <data name="SidebarDocuments" xml:space="preserve">
+    <value>Documents</value>
+  </data>
+  <data name="SidebarDownloads" xml:space="preserve">
+    <value>Downloads</value>
+  </data>
+  <data name="SidebarPictures" xml:space="preserve">
+    <value>Pictures</value>
+  </data>
+  <data name="SidebarOneDrive" xml:space="preserve">
+    <value>OneDrive</value>
+  </data>
+  <data name="SidebarTagWork" xml:space="preserve">
+    <value>Work</value>
+  </data>
+  <data name="SidebarTagFocus" xml:space="preserve">
+    <value>Focus</value>
+  </data>
+  <data name="SidebarTagArchive" xml:space="preserve">
+    <value>Archive</value>
+  </data>
+  <data name="SidebarSettingsToolTip" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="ToolbarToggleLanguageToolTip" xml:space="preserve">
+    <value>Switch language</value>
+  </data>
+  <data name="BackButtonToolTip.Content" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="ForwardButtonToolTip.Content" xml:space="preserve">
+    <value>Forward</value>
+  </data>
+  <data name="UpButtonToolTip.Content" xml:space="preserve">
+    <value>Up</value>
+  </data>
+  <data name="LoadButtonToolTip.Content" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="NewFileButtonToolTip.Content" xml:space="preserve">
+    <value>New file</value>
+  </data>
+  <data name="NewFolderButtonToolTip.Content" xml:space="preserve">
+    <value>New folder</value>
+  </data>
+  <data name="CopyButtonToolTip.Content" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="CutButtonToolTip.Content" xml:space="preserve">
+    <value>Cut</value>
+  </data>
+  <data name="PasteButtonToolTip.Content" xml:space="preserve">
+    <value>Paste</value>
+  </data>
+  <data name="LanguageToggleButtonToolTip.Content" xml:space="preserve">
+    <value>Switch language</value>
+  </data>
+  <data name="OverflowBreadcrumbButtonToolTip.Content" xml:space="preserve">
+    <value>Show hidden path segments</value>
+  </data>
+  <data name="ToolTipBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="ToolTipForward" xml:space="preserve">
+    <value>Forward</value>
+  </data>
+  <data name="ToolTipUp" xml:space="preserve">
+    <value>Up</value>
+  </data>
+  <data name="ToolTipRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="ToolTipNewFile" xml:space="preserve">
+    <value>New file</value>
+  </data>
+  <data name="ToolTipNewFolder" xml:space="preserve">
+    <value>New folder</value>
+  </data>
+  <data name="ToolTipCopy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="ToolTipCut" xml:space="preserve">
+    <value>Cut</value>
+  </data>
+  <data name="ToolTipPaste" xml:space="preserve">
+    <value>Paste</value>
+  </data>
+  <data name="ToolTipSwitchLanguage" xml:space="preserve">
+    <value>Switch language</value>
+  </data>
+  <data name="ToolTipShowHiddenPathSegments" xml:space="preserve">
+    <value>Show hidden path segments</value>
+  </data>
+  <data name="PathTextBox.PlaceholderText" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="SearchTextBox.PlaceholderText" xml:space="preserve">
+    <value>Search current folder</value>
+  </data>
+  <data name="ColumnNameHeader" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="ColumnTypeHeader" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="ColumnSizeHeader" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="ColumnModifiedHeader" xml:space="preserve">
+    <value>Modified date</value>
+  </data>
+  <data name="NameHeaderTextBlock.Text" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="TypeHeaderTextBlock.Text" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="SizeHeaderTextBlock.Text" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="ModifiedHeaderTextBlock.Text" xml:space="preserve">
+    <value>Modified date</value>
+  </data>
+  <data name="ColumnTotalSizeHeader" xml:space="preserve">
+    <value>Total size</value>
+  </data>
+  <data name="ColumnFreeSpaceHeader" xml:space="preserve">
+    <value>Free space</value>
+  </data>
+  <data name="CommandDockTitle" xml:space="preserve">
+    <value>Command Dock</value>
+  </data>
+  <data name="CommandDockLoadMore" xml:space="preserve">
+    <value>Load more</value>
+  </data>
+  <data name="RenamePlaceholder" xml:space="preserve">
+    <value>New name</value>
+  </data>
+  <data name="RecursiveDeleteLabel" xml:space="preserve">
+    <value>Recursive delete</value>
+  </data>
+  <data name="DockTop" xml:space="preserve">
+    <value>Top</value>
+  </data>
+  <data name="DockRight" xml:space="preserve">
+    <value>Right</value>
+  </data>
+  <data name="DockBottom" xml:space="preserve">
+    <value>Bottom</value>
+  </data>
+  <data name="CommandDockAutoHide" xml:space="preserve">
+    <value>Auto hide</value>
+  </data>
+  <data name="CommandPeekButtonText" xml:space="preserve">
+    <value>Commands</value>
+  </data>
+  <data name="CommandDockTitleTextBlock.Text" xml:space="preserve">
+    <value>Command Dock</value>
+  </data>
+  <data name="RenameButton.Content" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="DeleteButton.Content" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="NextButton.Content" xml:space="preserve">
+    <value>Load more</value>
+  </data>
+  <data name="RenameTextBox.PlaceholderText" xml:space="preserve">
+    <value>New name</value>
+  </data>
+  <data name="RecursiveDeleteCheckBox.Content" xml:space="preserve">
+    <value>Recursive delete</value>
+  </data>
+  <data name="DockTopRadioButton.Content" xml:space="preserve">
+    <value>Top</value>
+  </data>
+  <data name="DockRightRadioButton.Content" xml:space="preserve">
+    <value>Right</value>
+  </data>
+  <data name="DockBottomRadioButton.Content" xml:space="preserve">
+    <value>Bottom</value>
+  </data>
+  <data name="CommandAutoHideSwitch.Header" xml:space="preserve">
+    <value>Auto hide</value>
+  </data>
+  <data name="CommandPeekButton.Content" xml:space="preserve">
+    <value>Commands</value>
+  </data>
+  <data name="StatusLoading" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="StatusTextBlock.Text" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="StatusCurrentFolderItems" xml:space="preserve">
+    <value>{0} item(s) in the current folder</value>
+  </data>
+  <data name="StatusDriveCount" xml:space="preserve">
+    <value>{0} drive(s) in This PC</value>
+  </data>
+  <data name="StatusLanguageSwitched" xml:space="preserve">
+    <value>Language switched: {0}</value>
+  </data>
+  <data name="StatusViewChanged" xml:space="preserve">
+    <value>View changed: {0}</value>
+  </data>
+  <data name="StatusSortChanged" xml:space="preserve">
+    <value>Sort changed: {0}, {1}</value>
+  </data>
+  <data name="StatusGroupChanged" xml:space="preserve">
+    <value>Group changed: {0}</value>
+  </data>
+  <data name="CreateKindFile" xml:space="preserve">
+    <value>file</value>
+  </data>
+  <data name="CreateKindFolder" xml:space="preserve">
+    <value>folder</value>
+  </data>
+  <data name="ErrorOpenFolderFirst" xml:space="preserve">
+    <value>Open a folder first.</value>
+  </data>
+  <data name="ErrorCurrentFolderUnavailable" xml:space="preserve">
+    <value>The current folder is unavailable.</value>
+  </data>
+  <data name="OperationMove" xml:space="preserve">
+    <value>Move</value>
+  </data>
+  <data name="OperationPaste" xml:space="preserve">
+    <value>Paste</value>
+  </data>
+  <data name="StatusNewFailedOpenFolderFirst" xml:space="preserve">
+    <value>New {0} failed: open a folder first.</value>
+  </data>
+  <data name="StatusNewFailedWithReason" xml:space="preserve">
+    <value>New {0} failed: {1}</value>
+  </data>
+  <data name="StatusRenameFailedSelectLoaded" xml:space="preserve">
+    <value>Rename failed: select a loaded entry first.</value>
+  </data>
+  <data name="StatusRenameFailedInvalidIndex" xml:space="preserve">
+    <value>Rename failed: invalid selected index.</value>
+  </data>
+  <data name="StatusDeleteFailedSelectLoaded" xml:space="preserve">
+    <value>Delete failed: select a loaded entry first.</value>
+  </data>
+  <data name="StatusDeleteFailedInvalidIndex" xml:space="preserve">
+    <value>Delete failed: invalid selected index.</value>
+  </data>
+  <data name="StatusDeleteCanceled" xml:space="preserve">
+    <value>Delete canceled by user.</value>
+  </data>
+  <data name="StatusCopyFailedSelectLoaded" xml:space="preserve">
+    <value>Copy failed: select a loaded entry first.</value>
+  </data>
+  <data name="StatusCutFailedSelectLoaded" xml:space="preserve">
+    <value>Cut failed: select a loaded entry first.</value>
+  </data>
+  <data name="StatusCopyFailedDriveRootsUnsupported" xml:space="preserve">
+    <value>Copy failed: drive roots are not supported yet.</value>
+  </data>
+  <data name="StatusCutFailedDriveRootsUnsupported" xml:space="preserve">
+    <value>Cut failed: drive roots are not supported yet.</value>
+  </data>
+  <data name="StatusCopyReady" xml:space="preserve">
+    <value>Copy ready: {0}</value>
+  </data>
+  <data name="StatusCutReady" xml:space="preserve">
+    <value>Cut ready: {0}</value>
+  </data>
+  <data name="StatusPasteFailedOpenFolderFirst" xml:space="preserve">
+    <value>Paste failed: open a folder first.</value>
+  </data>
+  <data name="StatusPasteFailedWithReason" xml:space="preserve">
+    <value>Paste failed: {0}</value>
+  </data>
+  <data name="StatusPasteFailedClipboardEmpty" xml:space="preserve">
+    <value>Paste failed: clipboard is empty.</value>
+  </data>
+  <data name="StatusPasteSkippedConflicts" xml:space="preserve">
+    <value>Paste skipped: {0} target item(s) already exist.</value>
+  </data>
+  <data name="StatusPasteSkippedSamePath" xml:space="preserve">
+    <value>Paste skipped: source and target are the same.</value>
+  </data>
+  <data name="StatusPasteSkippedNothingApplied" xml:space="preserve">
+    <value>Paste skipped: nothing was applied.</value>
+  </data>
+  <data name="StatusTransferSuccess" xml:space="preserve">
+    <value>{0} success: {1} item(s), conflicts {2}, same-path {3}, failures {4}.</value>
+  </data>
+  <data name="StatusCreateSuccess" xml:space="preserve">
+    <value>Create success: {0}</value>
+  </data>
+  <data name="StatusCreateFailed" xml:space="preserve">
+    <value>Create failed: {0}</value>
+  </data>
+  <data name="StatusPathNotFound" xml:space="preserve">
+    <value>Path not found: {0}</value>
+  </data>
+  <data name="StatusNoMoreEntries" xml:space="preserve">
+    <value>No more entries.</value>
+  </data>
+  <data name="StatusPathAccessDeniedSkip" xml:space="preserve">
+    <value>Path: {0} | Access denied. Skip current directory.</value>
+  </data>
+  <data name="StatusPathError" xml:space="preserve">
+    <value>Path: {0} | Error: {1}</value>
+  </data>
+  <data name="StatusPathInvalidateWarning" xml:space="preserve">
+    <value>Path: {0} | Invalidate warning({1}): {2}</value>
+  </data>
+  <data name="StatusPathAccessDenied" xml:space="preserve">
+    <value>Path: {0} | Access denied.</value>
+  </data>
+  <data name="StatusPathRustError" xml:space="preserve">
+    <value>Path: {0} | Error: Rust error {1}: {2}</value>
+  </data>
+  <data name="StatusSidebarTreeExpandFailed" xml:space="preserve">
+    <value>Sidebar tree expand failed: {0}</value>
+  </data>
+  <data name="StatusRenameFailedSelectTreeNode" xml:space="preserve">
+    <value>Rename failed: select a tree node first.</value>
+  </data>
+  <data name="StatusSidebarTreeNavIgnoredLoading" xml:space="preserve">
+    <value>Sidebar tree nav ignored: loading in progress.</value>
+  </data>
+  <data name="StatusSidebarTreeNavFailed" xml:space="preserve">
+    <value>Sidebar tree nav failed: {0}</value>
+  </data>
+  <data name="StatusSidebarNavIgnoredLoading" xml:space="preserve">
+    <value>Sidebar nav ignored: loading in progress.</value>
+  </data>
+  <data name="StatusSidebarNavFailed" xml:space="preserve">
+    <value>Sidebar nav failed: {0}</value>
+  </data>
+  <data name="StatusRenameFailedCouldNotStartInlineEditor" xml:space="preserve">
+    <value>Rename failed: could not start inline editor.</value>
+  </data>
+  <data name="StatusRenameFailedTreeItemUnavailable" xml:space="preserve">
+    <value>Rename failed: tree item is not available.</value>
+  </data>
+  <data name="StatusRenameFailedTreeOverlayUnavailable" xml:space="preserve">
+    <value>Rename failed: tree rename overlay is not available.</value>
+  </data>
+  <data name="StatusRenameFailedTreeTextAnchorUnavailable" xml:space="preserve">
+    <value>Rename failed: tree text anchor is not available.</value>
+  </data>
+  <data name="StatusOpened" xml:space="preserve">
+    <value>Opened: {0}</value>
+  </data>
+  <data name="StatusOpenFailed" xml:space="preserve">
+    <value>Open failed: {0}</value>
+  </data>
+  <data name="StatusCopyPathReady" xml:space="preserve">
+    <value>Copied path: {0}</value>
+  </data>
+  <data name="StatusCopyPathFailed" xml:space="preserve">
+    <value>Copy path failed: {0}</value>
+  </data>
+  <data name="StatusSettingsExported" xml:space="preserve">
+    <value>Settings exported: {0}</value>
+  </data>
+  <data name="StatusSettingsExportFailed" xml:space="preserve">
+    <value>Export settings failed: {0}</value>
+  </data>
+  <data name="StatusSettingsImported" xml:space="preserve">
+    <value>Settings imported: {0}</value>
+  </data>
+  <data name="StatusSettingsImportFailed" xml:space="preserve">
+    <value>Import settings failed: {0}</value>
+  </data>
+  <data name="StatusCreateShortcutSuccess" xml:space="preserve">
+    <value>Created shortcut: {0}</value>
+  </data>
+  <data name="StatusCreateShortcutFailed" xml:space="preserve">
+    <value>Create shortcut failed: {0}</value>
+  </data>
+  <data name="StatusOpenTargetFailed" xml:space="preserve">
+    <value>Open target failed: {0}</value>
+  </data>
+  <data name="StatusRunAsAdministratorStarted" xml:space="preserve">
+    <value>Run as administrator started: {0}</value>
+  </data>
+  <data name="StatusRunAsAdministratorFailed" xml:space="preserve">
+    <value>Run as administrator failed: {0}</value>
+  </data>
+  <data name="StatusOpenWithOpened" xml:space="preserve">
+    <value>Opened with dialog: {0}</value>
+  </data>
+  <data name="StatusOpenWithFailed" xml:space="preserve">
+    <value>Open with failed: {0}</value>
+  </data>
+  <data name="StatusOpenedInNewWindow" xml:space="preserve">
+    <value>Opened in new window: {0}</value>
+  </data>
+  <data name="StatusOpenInNewWindowFailed" xml:space="preserve">
+    <value>Open in new window failed: {0}</value>
+  </data>
+  <data name="StatusOpenTerminalSuccess" xml:space="preserve">
+    <value>Opened terminal: {0}</value>
+  </data>
+  <data name="StatusOpenTerminalFailed" xml:space="preserve">
+    <value>Open terminal failed: {0}</value>
+  </data>
+  <data name="StatusPropertiesOpened" xml:space="preserve">
+    <value>Opened properties: {0}</value>
+  </data>
+  <data name="StatusPropertiesFailed" xml:space="preserve">
+    <value>Open properties failed: {0}</value>
+  </data>
+  <data name="StatusAlreadyAtRoot" xml:space="preserve">
+    <value>Already at root.</value>
+  </data>
+  <data name="StatusRenameSuccess" xml:space="preserve">
+    <value>Rename success: {0} -&gt; {1}</value>
+  </data>
+  <data name="StatusRenameFailedWithReason" xml:space="preserve">
+    <value>Rename failed: {0}</value>
+  </data>
+  <data name="StatusDeleteSuccess" xml:space="preserve">
+    <value>Delete success: {0} (recursive: {1})</value>
+  </data>
+  <data name="StatusDeleteFailedWithReason" xml:space="preserve">
+    <value>Delete failed: {0}</value>
+  </data>
+  <data name="FileTypeGeneric" xml:space="preserve">
+    <value>File</value>
+  </data>
+  <data name="FileTypeWithExtension" xml:space="preserve">
+    <value>{0} File</value>
+  </data>
+  <data name="FileTypeFolder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="FileTypeFolderLink" xml:space="preserve">
+    <value>Folder link</value>
+  </data>
+  <data name="FileTypeFileLink" xml:space="preserve">
+    <value>File link</value>
+  </data>
+  <data name="DefaultNewFileBaseName" xml:space="preserve">
+    <value>New File</value>
+  </data>
+  <data name="DefaultNewFolderBaseName" xml:space="preserve">
+    <value>New Folder</value>
+  </data>
+  <data name="ErrorNameEmpty" xml:space="preserve">
+    <value>Name failed: name is empty.</value>
+  </data>
+  <data name="ErrorNameReserved" xml:space="preserve">
+    <value>Name failed: '{0}' is reserved.</value>
+  </data>
+  <data name="ErrorNameInvalidChars" xml:space="preserve">
+    <value>Name failed: '{0}' contains invalid characters.</value>
+  </data>
+  <data name="ErrorNameAlreadyExists" xml:space="preserve">
+    <value>Name failed: '{0}' already exists.</value>
+  </data>
+  <data name="ErrorRenameNameEmpty" xml:space="preserve">
+    <value>Rename failed: name is empty.</value>
+  </data>
+  <data name="ErrorRenameReservedName" xml:space="preserve">
+    <value>Rename failed: '{0}' is reserved.</value>
+  </data>
+  <data name="ErrorRenameInvalidChars" xml:space="preserve">
+    <value>Rename failed: '{0}' contains invalid characters.</value>
+  </data>
+  <data name="ErrorRenameAlreadyExists" xml:space="preserve">
+    <value>Rename failed: '{0}' already exists.</value>
+  </data>
+  <data name="WindowTitleItemsFormat" xml:space="preserve">
+    <value>NorthFile | Engine {0} | Items: {1}</value>
+  </data>
+  <data name="WindowTitleDrivesFormat" xml:space="preserve">
+    <value>NorthFile | Engine {0} | Drives: {1}</value>
+  </data>
+  <data name="WindowTitleReadFailedFormat" xml:space="preserve">
+    <value>NorthFile | Engine {0} | Read Failed</value>
+  </data>
+  <data name="DialogRenameTitle" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="DialogRenamePrimaryButton" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="DialogDeleteTitle" xml:space="preserve">
+    <value>Confirm Delete</value>
+  </data>
+  <data name="DialogDeleteContent" xml:space="preserve">
+    <value>Delete '{0}'? Recursive: {1}</value>
+  </data>
+  <data name="DialogDeletePrimaryButton" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="DialogCancelButton" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="CommonOpenTarget" xml:space="preserve">
+    <value>Open Target</value>
+  </data>
+  <data name="CommonPinToSidebar" xml:space="preserve">
+    <value>Add to favorites</value>
+  </data>
+  <data name="PinnedGroupTextBlock.Text" xml:space="preserve">
+    <value>Favorites</value>
+  </data>
+  <data name="DesktopTextBlock.Text" xml:space="preserve">
+    <value>Desktop</value>
+  </data>
+  <data name="DocumentsTextBlock.Text" xml:space="preserve">
+    <value>Documents</value>
+  </data>
+  <data name="DownloadsTextBlock.Text" xml:space="preserve">
+    <value>Downloads</value>
+  </data>
+  <data name="PicturesTextBlock.Text" xml:space="preserve">
+    <value>Pictures</value>
+  </data>
+  <data name="CloudHeaderTextBlock.Text" xml:space="preserve">
+    <value>Cloud</value>
+  </data>
+  <data name="OneDriveTextBlock.Text" xml:space="preserve">
+    <value>OneDrive</value>
+  </data>
+  <data name="NetworkHeaderTextBlock.Text" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="TagsHeaderTextBlock.Text" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="TagWorkTextBlock.Text" xml:space="preserve">
+    <value>Work</value>
+  </data>
+  <data name="TagFocusTextBlock.Text" xml:space="preserve">
+    <value>Focus</value>
+  </data>
+  <data name="TagArchiveTextBlock.Text" xml:space="preserve">
+    <value>Archive</value>
+  </data>
+  <data name="SidebarSettingsButtonToolTip.Content" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="UsnCapabilityError" xml:space="preserve">
+    <value>Error({0})</value>
+  </data>
+  <data name="UsnCapabilityAvailable" xml:space="preserve">
+    <value>Available</value>
+  </data>
+  <data name="UsnCapabilityNotNtfs" xml:space="preserve">
+    <value>Not NTFS</value>
+  </data>
+  <data name="UsnCapabilityDenied" xml:space="preserve">
+    <value>Denied</value>
+  </data>
+  <data name="UsnCapabilityUnavailable" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+  <data name="UsnFallbackProbeError" xml:space="preserve">
+    <value> (NTFS fallback: probe error {0})</value>
+  </data>
+  <data name="UsnFallbackNotLocalNtfs" xml:space="preserve">
+    <value> (NTFS fallback: not local NTFS)</value>
+  </data>
+  <data name="UsnFallbackAccessDenied" xml:space="preserve">
+    <value> (NTFS fallback: access denied)</value>
+  </data>
+  <data name="UsnFallbackBatchUnavailable" xml:space="preserve">
+    <value> (NTFS fallback: probe succeeded, batch path unavailable)</value>
+  </data>
+  <data name="UsnFallbackUnavailable" xml:space="preserve">
+    <value> (NTFS fallback: unavailable)</value>
+  </data>
+  <data name="ErrorPasteSameSourceAndTarget" xml:space="preserve">
+    <value>Source and target are the same.</value>
+  </data>
+  <data name="ErrorPasteTargetAlreadyExists" xml:space="preserve">
+    <value>The target already exists.</value>
+  </data>
+  <data name="DriveTypeLocalDisk" xml:space="preserve">
+    <value>Local Disk</value>
+  </data>
+  <data name="DriveTypeVolumeFormat" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="CommonRunAsAdministrator" xml:space="preserve">
+    <value>Run as administrator</value>
+  </data>
+  <data name="CommonExtract" xml:space="preserve">
+    <value>Extract</value>
+  </data>
+  <data name="CommonExtractSmart" xml:space="preserve">
+    <value>Smart extract</value>
+  </data>
+  <data name="CommonExtractHere" xml:space="preserve">
+    <value>Extract here</value>
+  </data>
+  <data name="CommonExtractToFolder" xml:space="preserve">
+    <value>Extract to folder</value>
+  </data>
+  <data name="CommonExtractToNamedFolder" xml:space="preserve">
+    <value>Extract to {0}</value>
+  </data>
+  <data name="CommonPreview" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="CommonEmpty" xml:space="preserve">
+    <value>(empty)</value>
+  </data>
+  <data name="GroupTypeFolder" xml:space="preserve">
+    <value>Folders</value>
+  </data>
+  <data name="GroupTypeDocument" xml:space="preserve">
+    <value>Documents</value>
+  </data>
+  <data name="GroupTypeImage" xml:space="preserve">
+    <value>Images</value>
+  </data>
+  <data name="GroupTypeAudio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="GroupTypeVideo" xml:space="preserve">
+    <value>Videos</value>
+  </data>
+  <data name="GroupTypeArchive" xml:space="preserve">
+    <value>Archives</value>
+  </data>
+  <data name="GroupTypeProgram" xml:space="preserve">
+    <value>Programs</value>
+  </data>
+  <data name="GroupTypeOther" xml:space="preserve">
+    <value>Other</value>
+  </data>
+  <data name="GroupTypeUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="GroupDateToday" xml:space="preserve">
+    <value>Today</value>
+  </data>
+  <data name="GroupDateYesterday" xml:space="preserve">
+    <value>Yesterday</value>
+  </data>
+  <data name="GroupDatePast7Days" xml:space="preserve">
+    <value>Past 7 days</value>
+  </data>
+  <data name="GroupDateEarlierThisMonth" xml:space="preserve">
+    <value>Earlier this month</value>
+  </data>
+  <data name="GroupDateOlder" xml:space="preserve">
+    <value>Older</value>
+  </data>
+  <data name="GroupDateUnknown" xml:space="preserve">
+    <value>Unknown date</value>
+  </data>
+  <data name="InteropUnknown" xml:space="preserve">
+    <value>unknown</value>
+  </data>
+  <data name="InteropUnknownRustFfiError" xml:space="preserve">
+    <value>unknown Rust FFI error</value>
+  </data>
+  <data name="InteropNtfsProbeFailed" xml:space="preserve">
+    <value>NTFS probe failed ({0})</value>
+  </data>
+  <data name="InteropMemoryInvalidateDirFailed" xml:space="preserve">
+    <value>Memory invalidate directory failed: {0}</value>
+  </data>
+  <data name="InteropMemoryClearCacheFailed" xml:space="preserve">
+    <value>Memory clear cache failed: {0}</value>
+  </data>
+  <data name="InteropDeletePathFailed" xml:space="preserve">
+    <value>Delete path failed ({0}): {1}</value>
+  </data>
+  <data name="InteropRenamePathFailed" xml:space="preserve">
+    <value>Rename path failed ({0}): {1}</value>
+  </data>
+  <data name="InteropRustErrorWithCode" xml:space="preserve">
+    <value>Rust error {0}: {1}</value>
+  </data>
+  <data name="InteropOperationInvalidParameter" xml:space="preserve">
+    <value>invalid parameter</value>
+  </data>
+  <data name="InteropOperationPathNotFound" xml:space="preserve">
+    <value>path not found</value>
+  </data>
+  <data name="InteropOperationPermissionDenied" xml:space="preserve">
+    <value>permission denied</value>
+  </data>
+  <data name="InteropOperationTargetAlreadyExists" xml:space="preserve">
+    <value>target already exists</value>
+  </data>
+  <data name="InteropOperationDirectoryNotEmpty" xml:space="preserve">
+    <value>directory is not empty</value>
+  </data>
+  <data name="InteropOperationResourceBusyOrTimedOut" xml:space="preserve">
+    <value>resource is busy or timed out</value>
+  </data>
+  <data name="InteropOperationInvalidPathOrInput" xml:space="preserve">
+    <value>invalid path or input</value>
+  </data>
+  <data name="InteropOperationNotSupported" xml:space="preserve">
+    <value>operation is not supported</value>
+  </data>
+  <data name="InteropOperationGenericIoFailure" xml:space="preserve">
+    <value>generic I/O failure</value>
+  </data>
+  <data name="InteropOperationUnknownError" xml:space="preserve">
+    <value>unknown error</value>
+  </data>
+  <data name="ErrorFileOperationNotFound" xml:space="preserve">
+    <value>The item could not be found.</value>
+  </data>
+  <data name="ErrorFileOperationCanceled" xml:space="preserve">
+    <value>The operation was canceled.</value>
+  </data>
+  <data name="ErrorFileOperationAccessDenied" xml:space="preserve">
+    <value>Access was denied.</value>
+  </data>
+  <data name="ErrorFileOperationAlreadyExists" xml:space="preserve">
+    <value>The target item already exists.</value>
+  </data>
+  <data name="ErrorFileOperationInvalidName" xml:space="preserve">
+    <value>The name or path is invalid.</value>
+  </data>
+  <data name="ErrorFileOperationPathTooLong" xml:space="preserve">
+    <value>The path is too long.</value>
+  </data>
+  <data name="ErrorFileOperationInUse" xml:space="preserve">
+    <value>The item is currently in use.</value>
+  </data>
+  <data name="ErrorFileOperationDiskFull" xml:space="preserve">
+    <value>There is not enough disk space.</value>
+  </data>
+  <data name="ErrorFileOperationNotSupported" xml:space="preserve">
+    <value>This operation is not supported.</value>
+  </data>
+  <data name="ErrorFileOperationInvalidArchive" xml:space="preserve">
+    <value>The archive is invalid or corrupted.</value>
+  </data>
+  <data name="ErrorFileOperationUnknown" xml:space="preserve">
+    <value>An unknown file operation error occurred.</value>
+  </data>
+  <data name="StatusShareOpened" xml:space="preserve">
+    <value>Opened share UI for: {0}</value>
+  </data>
+  <data name="StatusShareFailed" xml:space="preserve">
+    <value>Share failed: {0}</value>
+  </data>
+  <data name="StatusCompressZipSuccess" xml:space="preserve">
+    <value>Created zip archive: {0}</value>
+  </data>
+  <data name="StatusCompressZipFailed" xml:space="preserve">
+    <value>Failed to create zip archive: {0}</value>
+  </data>
+  <data name="StatusExtractZipSuccess" xml:space="preserve">
+    <value>Extracted zip archive: {0}</value>
+  </data>
+  <data name="StatusExtractZipFailed" xml:space="preserve">
+    <value>Failed to extract zip archive: {0}</value>
+  </data>
+  <data name="SettingsPageTitle" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsNavBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="SettingsSectionGeneral" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="SettingsSectionGeneralDescription" xml:space="preserve">
+    <value>Basic app behavior and startup options.</value>
+  </data>
+  <data name="SettingsLanguageTitle" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="SettingsLanguageDescription" xml:space="preserve">
+    <value>Controls the display language. Choose the system setting or a specific language.</value>
+  </data>
+  <data name="SettingsUseSystem" xml:space="preserve">
+    <value>Use system setting</value>
+  </data>
+  <data name="SettingsLanguageChineseSimplified" xml:space="preserve">
+    <value>简体中文</value>
+  </data>
+  <data name="SettingsStartupTitle" xml:space="preserve">
+    <value>Startup</value>
+  </data>
+  <data name="SettingsStartupDescription" xml:space="preserve">
+    <value>Controls the default location after launch.</value>
+  </data>
+  <data name="SettingsStartupLastLocation" xml:space="preserve">
+    <value>Last closed location</value>
+  </data>
+  <data name="SettingsStartupSpecifiedLocation" xml:space="preserve">
+    <value>Specified location</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathTitle" xml:space="preserve">
+    <value>Startup folder</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathDescription" xml:space="preserve">
+    <value>Choose the folder to open at launch when specified location is selected.</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathPlaceholder" xml:space="preserve">
+    <value>Enter a folder path</value>
+  </data>
+  <data name="SettingsBrowseFolder" xml:space="preserve">
+    <value>Browse</value>
+  </data>
+  <data name="SettingsStartupUseThisPc" xml:space="preserve">
+    <value>This PC</value>
+  </data>
+  <data name="SettingsStartupUseCustomPath" xml:space="preserve">
+    <value>Custom path</value>
+  </data>
+  <data name="SettingsFavoritesTitle" xml:space="preserve">
+    <value>Favorites</value>
+  </data>
+  <data name="SettingsFavoritesDescription" xml:space="preserve">
+    <value>Controls whether the favorites group is shown.</value>
+  </data>
+  <data name="SettingsCloudTitle" xml:space="preserve">
+    <value>Cloud drives</value>
+  </data>
+  <data name="SettingsCloudDescription" xml:space="preserve">
+    <value>Controls whether the cloud drives group is shown in the sidebar.</value>
+  </data>
+  <data name="SettingsNetworkTitle" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="SettingsNetworkDescription" xml:space="preserve">
+    <value>Controls whether the network group is shown in the sidebar.</value>
+  </data>
+  <data name="SettingsTagsTitle" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="SettingsTagsDescription" xml:space="preserve">
+    <value>Controls whether the tags group is shown in the sidebar.</value>
+  </data>
+  <data name="SettingsSectionAppearance" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="SettingsSectionAppearanceDescription" xml:space="preserve">
+    <value>App theme and default presentation.</value>
+  </data>
+  <data name="SettingsThemeTitle" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="SettingsThemeDescription" xml:space="preserve">
+    <value>Controls the light, dark, or system theme for NorthFile.</value>
+  </data>
+  <data name="SettingsThemeLight" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="SettingsThemeDark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="SettingsSortTitle" xml:space="preserve">
+    <value>Default sort mode</value>
+  </data>
+  <data name="SettingsSortDescription" xml:space="preserve">
+    <value>Controls the default sort used by new windows.</value>
+  </data>
+  <data name="SettingsGroupTitle" xml:space="preserve">
+    <value>Default group mode</value>
+  </data>
+  <data name="SettingsGroupDescription" xml:space="preserve">
+    <value>Controls the initial grouping state when entering a folder.</value>
+  </data>
+  <data name="SettingsSectionFilesAndFolders" xml:space="preserve">
+    <value>Files and folders</value>
+  </data>
+  <data name="SettingsSectionFilesAndFoldersDescription" xml:space="preserve">
+    <value>Visibility rules and delete behavior for files and folders.</value>
+  </data>
+  <data name="SettingsShowHiddenTitle" xml:space="preserve">
+    <value>Show hidden files and folders</value>
+  </data>
+  <data name="SettingsShowHiddenDescription" xml:space="preserve">
+    <value>Controls whether hidden items are visible in the file list.</value>
+  </data>
+  <data name="SettingsShowProtectedSystemTitle" xml:space="preserve">
+    <value>Show protected system files</value>
+  </data>
+  <data name="SettingsShowProtectedSystemDescription" xml:space="preserve">
+    <value>Controls whether protected system files are visible.</value>
+  </data>
+  <data name="SettingsShowDotFilesTitle" xml:space="preserve">
+    <value>Show files and folders starting with .</value>
+  </data>
+  <data name="SettingsShowDotFilesDescription" xml:space="preserve">
+    <value>Controls whether dot-prefixed items are visible.</value>
+  </data>
+  <data name="SettingsShowExtensionsTitle" xml:space="preserve">
+    <value>Show file extensions</value>
+  </data>
+  <data name="SettingsShowExtensionsDescription" xml:space="preserve">
+    <value>Controls whether file extensions are shown after the name.</value>
+  </data>
+  <data name="SettingsDeleteConfirmTitle" xml:space="preserve">
+    <value>Show confirmation when deleting</value>
+  </data>
+  <data name="SettingsDeleteConfirmDescription" xml:space="preserve">
+    <value>Show an app-level confirmation dialog before continuing with the system delete flow.</value>
+  </data>
+  <data name="SettingsSectionShortcuts" xml:space="preserve">
+    <value>Shortcuts</value>
+  </data>
+  <data name="SettingsSectionShortcutsDescription" xml:space="preserve">
+    <value>This stage only provides a placeholder. Shortcut customization will come later.</value>
+  </data>
+  <data name="SettingsShortcutsTitle" xml:space="preserve">
+    <value>Shortcut settings</value>
+  </data>
+  <data name="SettingsShortcutsDescription" xml:space="preserve">
+    <value>This area will later include shortcut lists, conflict detection, and custom bindings.</value>
+  </data>
+  <data name="SettingsComingSoon" xml:space="preserve">
+    <value>Coming soon</value>
+  </data>
+  <data name="SettingsSectionTags" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="SettingsSectionTagsDescription" xml:space="preserve">
+    <value>This stage only provides a placeholder. The tag model and management UI will come later.</value>
+  </data>
+  <data name="SettingsTagsFeatureTitle" xml:space="preserve">
+    <value>Tag features</value>
+  </data>
+  <data name="SettingsTagsFeatureDescription" xml:space="preserve">
+    <value>This area will later include default tags, colors, display policy, and filtering rules.</value>
+  </data>
+  <data name="SettingsSectionAdvanced" xml:space="preserve">
+    <value>Advanced</value>
+  </data>
+  <data name="SettingsSectionAdvancedDescription" xml:space="preserve">
+    <value>System-level behavior and settings migration.</value>
+  </data>
+  <data name="SettingsMigrationTitle" xml:space="preserve">
+    <value>Settings migration</value>
+  </data>
+  <data name="SettingsMigrationDescription" xml:space="preserve">
+    <value>Import or export the current app settings.</value>
+  </data>
+  <data name="SettingsExport" xml:space="preserve">
+    <value>Export settings</value>
+  </data>
+  <data name="SettingsImport" xml:space="preserve">
+    <value>Import settings</value>
+  </data>
+  <data name="SettingsAutoStartTitle" xml:space="preserve">
+    <value>Start with Windows</value>
+  </data>
+  <data name="SettingsAutoStartDescription" xml:space="preserve">
+    <value>Controls whether the app starts automatically after sign-in.</value>
+  </data>
+  <data name="SettingsMinimizeToTrayTitle" xml:space="preserve">
+    <value>Minimize to tray when closing</value>
+  </data>
+  <data name="SettingsMinimizeToTrayDescription" xml:space="preserve">
+    <value>Controls whether the main window collapses to the system tray when closed.</value>
+  </data>
+  <data name="SettingsDefaultManagerTitle" xml:space="preserve">
+    <value>Set NorthFile as the default file manager</value>
+  </data>
+  <data name="SettingsDefaultManagerDescription" xml:space="preserve">
+    <value>Currently shows the entry point only and does not perform system registration.</value>
+  </data>
+  <data name="SettingsSetDefault" xml:space="preserve">
+    <value>Set default</value>
+  </data>
+  <data name="SettingsSectionAbout" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="SettingsSectionAboutDescription" xml:space="preserve">
+    <value>App information and current build summary.</value>
+  </data>
+  <data name="SettingsAboutAppName" xml:space="preserve">
+    <value>NorthFile</value>
+  </data>
+  <data name="SettingsAboutAppDescription" xml:space="preserve">
+    <value>A WinUI file manager focused on large directories and modern interactions.</value>
+  </data>
+  <data name="SettingsAboutEngineVersion" xml:space="preserve">
+    <value>Engine version: {0}</value>
+  </data>
+  <data name="SettingsAboutAppVersion" xml:space="preserve">
+    <value>App version: {0}</value>
+  </data>
+  <data name="DialogDeleteFileContent" xml:space="preserve">
+    <value>Delete '{0}'?</value>
+  </data>
+  <data name="DialogDeleteFolderContent" xml:space="preserve">
+    <value>Delete folder '{0}' and its contents?</value>
+  </data>
 </root>

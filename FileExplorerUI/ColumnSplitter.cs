@@ -8,6 +8,13 @@ namespace FileExplorerUI;
 public sealed class ColumnSplitter : Grid
 {
     private static readonly InputCursor ResizeCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeWestEast);
+    public static readonly DependencyProperty GuideBrushProperty =
+        DependencyProperty.Register(
+            nameof(GuideBrush),
+            typeof(Brush),
+            typeof(ColumnSplitter),
+            new PropertyMetadata(null, OnGuideBrushChanged));
+
     private readonly Border _guide;
 
     public ColumnSplitter()
@@ -31,9 +38,23 @@ public sealed class ColumnSplitter : Grid
         PointerCaptureLost += (_, _) => ProtectedCursor = null;
     }
 
+    public Brush? GuideBrush
+    {
+        get => (Brush?)GetValue(GuideBrushProperty);
+        set => SetValue(GuideBrushProperty, value);
+    }
+
     public bool ShowGuide
     {
         get => _guide.Visibility == Visibility.Visible;
         set => _guide.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static void OnGuideBrushChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is ColumnSplitter splitter)
+        {
+            splitter._guide.Background = e.NewValue as Brush ?? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xE3, 0xE5, 0xE8));
+        }
     }
 }

@@ -6,6 +6,8 @@ using Microsoft.UI.Xaml.Media;
 using FileExplorerUI.Services;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace FileExplorerUI
 {
@@ -28,13 +30,22 @@ namespace FileExplorerUI
         private bool _isNetworkExpanded = true;
         private bool _isTagsExpanded = true;
         private bool _isCompact;
+        private bool _showFavoritesSection = true;
+        private bool _showCloudSection = true;
+        private bool _showNetworkSection = true;
+        private bool _showTagsSection = true;
         private string? _selectedPath;
         private bool _isSelectionActive = true;
         private TreeView? _attachedTreeView;
         private readonly CompactSidebarMenuController _compactMenuController = new();
         private bool _compactButtonsAttached;
+        public ObservableCollection<SidebarNavItemModel> PinnedItems { get; } = new();
+        public ObservableCollection<SidebarNavItemModel> CloudItems { get; } = new();
+        public ObservableCollection<SidebarNavItemModel> NetworkItems { get; } = new();
+        public ObservableCollection<SidebarNavItemModel> TagItems { get; } = new();
 
         public event EventHandler<SidebarNavigateRequestedEventArgs>? NavigateRequested;
+        public event EventHandler? SettingsRequested;
 
         public SidebarView()
         {
@@ -57,15 +68,7 @@ namespace FileExplorerUI
                 new GroupHeaderLayoutParts(NetworkGroupBorder, NetworkGroupGrid, NetworkGroupSelectionIndicator, NetworkGroupIcon),
                 new GroupHeaderLayoutParts(TagsGroupBorder, TagsGroupGrid, TagsGroupSelectionIndicator, TagsGroupIcon)
             });
-
-            RegisterStaticItem("Desktop", DesktopItemBorder, DesktopSelectionIndicator, DesktopTextBlock, SidebarSection.Pinned);
-            RegisterStaticItem("Documents", DocumentsItemBorder, DocumentsSelectionIndicator, DocumentsTextBlock, SidebarSection.Pinned);
-            RegisterStaticItem("Downloads", DownloadsItemBorder, DownloadsSelectionIndicator, DownloadsTextBlock, SidebarSection.Pinned);
-            RegisterStaticItem("Pictures", PicturesItemBorder, PicturesSelectionIndicator, PicturesTextBlock, SidebarSection.Pinned);
-            RegisterStaticItem("OneDrive", OneDriveItemBorder, OneDriveSelectionIndicator, OneDriveTextBlock, SidebarSection.Extra, selectable: false);
-            RegisterStaticItem("TagWork", TagWorkItemBorder, TagWorkSelectionIndicator, TagWorkTextBlock, SidebarSection.Extra, selectable: false);
-            RegisterStaticItem("TagFocus", TagFocusItemBorder, TagFocusSelectionIndicator, TagFocusTextBlock, SidebarSection.Extra, selectable: false);
-            RegisterStaticItem("TagArchive", TagArchiveItemBorder, TagArchiveSelectionIndicator, TagArchiveTextBlock, SidebarSection.Extra, selectable: false);
+            RefreshStaticItems();
 
             RegisterGroupHover(PinnedGroupBorder);
             RegisterGroupHover(TreeCompactBorder);
@@ -91,7 +94,10 @@ namespace FileExplorerUI
 
         public void SetExtraItems(IEnumerable<SidebarNavItemModel> items)
         {
-            // Extras are statically composed in XAML to match the pinned-group presentation.
+            // The full sidebar now statically composes Cloud/Network/Tags sections.
+            // The incoming items are only used to preserve future extensibility for Network children.
+            ResetStaticItems(NetworkItems, Array.Empty<SidebarNavItemModel>());
+            UpdateExpandedSectionVisibility(_isCompact);
         }
 
         public void AttachTreeView(TreeView treeView)
@@ -109,7 +115,6 @@ namespace FileExplorerUI
             treeView.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
             treeView.SetValue(ScrollViewer.HorizontalScrollModeProperty, ScrollMode.Disabled);
             treeView.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
-            ApplyTreeSelectionResources();
 
             TreeHostGrid.Children.Clear();
             TreeHostGrid.Children.Add(treeView);
@@ -128,6 +133,76 @@ namespace FileExplorerUI
             ApplyHeaderLayout(compact);
             UpdateExpandedSectionVisibility(compact);
             SetSelectedPath(_selectedPath);
+        }
+
+        public void SetSectionVisibility(bool showFavorites, bool showCloud, bool showNetwork, bool showTags)
+        {
+            _showFavoritesSection = showFavorites;
+            _showCloudSection = showCloud;
+            _showNetworkSection = showNetwork;
+            _showTagsSection = showTags;
+
+            ApplyCompactVisibility(_isCompact);
+            UpdateExpandedSectionVisibility(_isCompact);
+        }
+
+        public void RefreshLocalizedText()
+        {
+            PinnedGroupTextBlock.Text = S("SidebarPinned");
+            CloudHeaderTextBlock.Text = S("SidebarCloud");
+            NetworkHeaderTextBlock.Text = S("SidebarNetwork");
+            TagsHeaderTextBlock.Text = S("SidebarTags");
+            RefreshStaticItems();
+
+            ToolTipService.SetToolTip(PinnedGroupBorder, S("SidebarPinned"));
+            ToolTipService.SetToolTip(CloudGroupBorder, S("SidebarCloud"));
+            ToolTipService.SetToolTip(NetworkGroupBorder, S("SidebarNetwork"));
+            ToolTipService.SetToolTip(TagsGroupBorder, S("SidebarTags"));
+            ToolTipService.SetToolTip(TreeCompactBorder, S("SidebarMyComputer"));
+            if (ToolTipService.GetToolTip(SidebarSettingsButton) is ToolTip toolTip)
+            {
+                toolTip.Content = S("SidebarSettingsButtonToolTip.Content");
+            }
+
+        }
+
+        private void RefreshStaticItems()
+        {
+            ResetStaticItems(
+                PinnedItems,
+                new[]
+                {
+                    new SidebarNavItemModel("Desktop", S("SidebarDesktop"), null, "\uE80F"),
+                    new SidebarNavItemModel("Documents", S("SidebarDocuments"), null, "\uE8A5"),
+                    new SidebarNavItemModel("Downloads", S("SidebarDownloads"), null, "\uE896"),
+                    new SidebarNavItemModel("Pictures", S("SidebarPictures"), null, "\uE91B")
+                });
+            ResetStaticItems(
+                CloudItems,
+                new[]
+                {
+                    new SidebarNavItemModel("OneDrive", S("SidebarOneDrive"), null, "\uE753", selectable: false)
+                });
+            ResetStaticItems(NetworkItems, Array.Empty<SidebarNavItemModel>());
+            ResetStaticItems(
+                TagItems,
+                new[]
+                {
+                    new SidebarNavItemModel("TagWork", S("SidebarTagWork"), null, "\uE8EC", selectable: false),
+                    new SidebarNavItemModel("TagFocus", S("SidebarTagFocus"), null, "\uE8EC", selectable: false),
+                    new SidebarNavItemModel("TagArchive", S("SidebarTagArchive"), null, "\uE8EC", selectable: false)
+                });
+            ApplyPinnedSelection(null);
+            SetSelectedPath(_selectedPath);
+        }
+
+        private static void ResetStaticItems(ObservableCollection<SidebarNavItemModel> target, IReadOnlyList<SidebarNavItemModel> items)
+        {
+            target.Clear();
+            foreach (SidebarNavItemModel item in items)
+            {
+                target.Add(item);
+            }
         }
 
         private void UpdateCompactButtonPlacement(bool compact)
@@ -186,12 +261,30 @@ namespace FileExplorerUI
         private void ApplyCompactVisibility(bool compact)
         {
             SidebarScrollViewer.Padding = compact ? new Thickness(0) : new Thickness(0, 0, 12, 0);
+            UpdateSettingsButtonLayout(compact);
             CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             SetVisibility(_fullOnlySections, compact ? Visibility.Collapsed : Visibility.Visible);
             TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            PinnedGroupBorder.Visibility = _showFavoritesSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
+            PinnedSectionPanel.Visibility = _showFavoritesSection && !compact ? Visibility.Visible : Visibility.Collapsed;
+            CloudGroupBorder.Visibility = _showCloudSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
+            CloudSectionPanel.Visibility = _showCloudSection && !compact ? Visibility.Visible : Visibility.Collapsed;
+            NetworkGroupBorder.Visibility = _showNetworkSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
+            NetworkSectionPanel.Visibility = _showNetworkSection && !compact ? Visibility.Visible : Visibility.Collapsed;
+            TagsGroupBorder.Visibility = _showTagsSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
+            TagsSectionPanel.Visibility = _showTagsSection && !compact ? Visibility.Visible : Visibility.Collapsed;
             SetTextVisibility(_labelBlocks, compact);
             SetTextVisibility(_headerBlocks, compact);
             SetVisibility(_groupChevrons, compact ? Visibility.Collapsed : Visibility.Visible);
+        }
+
+        private void UpdateSettingsButtonLayout(bool compact)
+        {
+            SettingsFooterHost.Margin = compact ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 12, 2);
+            SidebarSettingsButton.Width = compact ? 32 : double.NaN;
+            SidebarSettingsButton.Padding = compact ? new Thickness(0) : new Thickness(9, 0, 0, 0);
+            SidebarSettingsButton.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+            SidebarSettingsButton.HorizontalContentAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
         }
 
         private void ApplyHeaderLayout(bool compact)
@@ -204,12 +297,13 @@ namespace FileExplorerUI
 
         private void UpdateExpandedSectionVisibility(bool compact)
         {
-            PinnedItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isPinnedExpanded ? Visibility.Visible : Visibility.Collapsed);
-            CloudItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isCloudExpanded ? Visibility.Visible : Visibility.Collapsed);
+            PinnedItemsPanel.Visibility = compact || !_showFavoritesSection ? Visibility.Collapsed : (_isPinnedExpanded ? Visibility.Visible : Visibility.Collapsed);
+            CloudItemsPanel.Visibility = compact || !_showCloudSection ? Visibility.Collapsed : (_isCloudExpanded ? Visibility.Visible : Visibility.Collapsed);
             NetworkItemsPanel.Visibility = compact
+                || !_showNetworkSection
                 ? Visibility.Collapsed
-                : (_isNetworkExpanded && NetworkItemsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed);
-            TagsItemsPanel.Visibility = compact ? Visibility.Collapsed : (_isTagsExpanded ? Visibility.Visible : Visibility.Collapsed);
+                : (_isNetworkExpanded && NetworkItems.Count > 0 ? Visibility.Visible : Visibility.Collapsed);
+            TagsItemsPanel.Visibility = compact || !_showTagsSection ? Visibility.Collapsed : (_isTagsExpanded ? Visibility.Visible : Visibility.Collapsed);
         }
 
         private static void SetTextVisibility(IEnumerable<TextBlock> blocks, bool compact)
@@ -252,9 +346,23 @@ namespace FileExplorerUI
                 return;
             }
 
+            string current = NormalizePath(path);
+            SidebarNavItemModel? selectedPinnedItem = FindBestPinnedItem(current);
+            if (selectedPinnedItem is not null)
+            {
+                if (!_isPinnedExpanded)
+                {
+                    PinnedGroupSelectionIndicator.Visibility = Visibility.Visible;
+                    PinnedGroupBorder.Background = SelectedBackgroundBrush();
+                    return;
+                }
+
+                ApplyPinnedSelection(selectedPinnedItem);
+                return;
+            }
+
             SidebarVisualItem? selected = null;
             int bestLength = -1;
-            string current = NormalizePath(path);
 
             foreach (SidebarVisualItem item in _visualItems)
             {
@@ -310,16 +418,7 @@ namespace FileExplorerUI
             }
 
             _isSelectionActive = isActive;
-            ApplyTreeSelectionResources();
             SetSelectedPath(_selectedPath);
-        }
-
-        private void RegisterStaticItem(string key, Border border, Border indicator, TextBlock labelBlock, SidebarSection section, bool selectable = true)
-        {
-            border.PointerEntered += Item_PointerEntered;
-            border.PointerExited += Item_PointerExited;
-            _labelBlocks.Add(labelBlock);
-            _visualItems.Add(new SidebarVisualItem(key, null, border, indicator, labelBlock, section, selectable));
         }
 
         private void PopulateDynamicItems(StackPanel panel, IEnumerable<SidebarNavItemModel> items, SidebarSection section)
@@ -407,6 +506,41 @@ namespace FileExplorerUI
             return border;
         }
 
+        private SidebarNavItemModel? FindBestPinnedItem(string currentPath)
+        {
+            SidebarNavItemModel? selected = null;
+            int bestLength = -1;
+
+            foreach (SidebarNavItemModel item in PinnedItems)
+            {
+                if (!_pinnedPaths.TryGetValue(item.Key, out string? itemPath) || string.IsNullOrWhiteSpace(itemPath))
+                {
+                    continue;
+                }
+
+                string candidate = NormalizePath(itemPath);
+                bool matched = string.Equals(candidate, currentPath, StringComparison.OrdinalIgnoreCase)
+                    || currentPath.StartsWith(candidate + "\\", StringComparison.OrdinalIgnoreCase);
+                if (!matched || candidate.Length <= bestLength)
+                {
+                    continue;
+                }
+
+                bestLength = candidate.Length;
+                selected = item;
+            }
+
+            return selected;
+        }
+
+        private void ApplyPinnedSelection(SidebarNavItemModel? item)
+        {
+            foreach (SidebarNavItemModel pinnedItem in PinnedItems)
+            {
+                pinnedItem.IsSelected = ReferenceEquals(pinnedItem, item);
+            }
+        }
+
         private void PinnedGroup_Click(object sender, PointerRoutedEventArgs e)
         {
             if (_isCompact)
@@ -459,7 +593,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (NetworkItemsPanel.Children.Count == 0)
+            if (NetworkItems.Count == 0)
             {
                 NetworkItemsPanel.Visibility = Visibility.Collapsed;
                 _isNetworkExpanded = !_isNetworkExpanded;
@@ -502,14 +636,14 @@ namespace FileExplorerUI
             ShowTreeCompactFlyout(TreeCompactBorder);
         }
 
-        private void PinnedItem_Click(object sender, PointerRoutedEventArgs e)
+        private void PinnedItemHost_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            if (sender is not Border border || border.Tag is not string key)
+            if (sender is not FrameworkElement element || element.DataContext is not SidebarNavItemModel item)
             {
                 return;
             }
 
-            if (!_pinnedPaths.TryGetValue(key, out string? path) || string.IsNullOrWhiteSpace(path))
+            if (!_pinnedPaths.TryGetValue(item.Key, out string? path) || string.IsNullOrWhiteSpace(path))
             {
                 return;
             }
@@ -531,11 +665,17 @@ namespace FileExplorerUI
             NavigateRequested?.Invoke(this, new SidebarNavigateRequestedEventArgs(item.Path));
         }
 
+        private void SidebarSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            SettingsRequested?.Invoke(this, EventArgs.Empty);
+        }
+
         private void ClearSelection()
         {
             PinnedGroupSelectionIndicator.Visibility = Visibility.Collapsed;
             PinnedGroupBorder.Background = TransparentBrush();
             PinnedGroupSelectionIndicator.Background = SelectionIndicatorBrush();
+            ApplyPinnedSelection(null);
 
             foreach (SidebarVisualItem item in _visualItems)
             {
@@ -692,32 +832,6 @@ namespace FileExplorerUI
                 : ColorHelper.FromArgb(0xFF, 0xC8, 0xC8, 0xC8));
         }
 
-        private void ApplyTreeSelectionResources()
-        {
-            if (_attachedTreeView is null)
-            {
-                return;
-            }
-
-            Brush selectionBrush = SelectionIndicatorBrush();
-            Brush selectedBackgroundBrush = _isSelectionActive
-                ? (Brush)Application.Current.Resources["ListViewItemBackgroundSelected"]
-                : new SolidColorBrush(ColorHelper.FromArgb(0x20, 0xC8, 0xC8, 0xC8));
-            _attachedTreeView.Resources["ListViewItemSelectionIndicatorBrush"] = selectionBrush;
-            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorBrush"] = selectionBrush;
-            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorForeground"] = selectionBrush;
-            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorForegroundPointerOver"] = selectionBrush;
-            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorForegroundPressed"] = selectionBrush;
-            _attachedTreeView.Resources["TreeViewItemSelectionIndicatorForegroundDisabled"] = selectionBrush;
-            _attachedTreeView.Resources["ListViewItemBackgroundSelected"] = selectedBackgroundBrush;
-            _attachedTreeView.Resources["ListViewItemBackgroundSelectedPointerOver"] = selectedBackgroundBrush;
-            _attachedTreeView.Resources["ListViewItemBackgroundSelectedPressed"] = selectedBackgroundBrush;
-            _attachedTreeView.Resources["TreeViewItemBackgroundSelected"] = selectedBackgroundBrush;
-            _attachedTreeView.Resources["TreeViewItemBackgroundSelectedPointerOver"] = selectedBackgroundBrush;
-            _attachedTreeView.Resources["TreeViewItemBackgroundSelectedPressed"] = selectedBackgroundBrush;
-            _attachedTreeView.Resources["TreeViewItemBackgroundSelectedDisabled"] = selectedBackgroundBrush;
-        }
-
         private static Brush HoverBackgroundBrush()
         {
             if (Application.Current.Resources.TryGetValue("ListViewItemBackgroundPointerOver", out object? brush) && brush is Brush resolved)
@@ -864,8 +978,10 @@ namespace FileExplorerUI
         }
     }
 
-    public sealed class SidebarNavItemModel
+    public sealed class SidebarNavItemModel : INotifyPropertyChanged
     {
+        private bool _isSelected;
+
         public SidebarNavItemModel(string key, string label, string? path, string glyph, bool selectable = true)
         {
             Key = key;
@@ -880,6 +996,26 @@ namespace FileExplorerUI
         public string? Path { get; }
         public string Glyph { get; }
         public bool Selectable { get; }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                {
+                    return;
+                }
+
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectionIndicatorVisibility)));
+            }
+        }
+
+        public Visibility SelectionIndicatorVisibility => _isSelected ? Visibility.Visible : Visibility.Collapsed;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
     }
 
     public sealed class SidebarNavigateRequestedEventArgs : EventArgs

@@ -20,9 +20,10 @@
         RowSpacing="8"
         Padding="8,8,8,0">
         <Grid
-            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,280"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,2*,*"
             Height="36"
-            ColumnSpacing="8">
+            ColumnSpacing="8"
+            Visibility="{x:Bind ExplorerChromeVisibility, Mode=OneWay}">
             <Button
                 x:Name="BackButton"
                 Width="32"
@@ -326,42 +327,46 @@
                 x:Uid="SearchTextBox"
                 Grid.Column="11"
                 Height="32"
+                MinWidth="120"
+                MaxWidth="280"
+                HorizontalAlignment="Stretch"
                 KeyDown="SearchTextBox_KeyDown" />
         </Grid>
 
-        <Grid
-            x:Name="ExplorerShellGrid"
-            Grid.Row="1"
-            ColumnSpacing="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="{x:Bind SidebarColumnWidth, Mode=OneWay}" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <Border
-                Grid.Column="0"
-                Background="Transparent">
-                <Grid>
-                    <local:SidebarView x:Name="StyledSidebarView" />
-                    <NavigationView
-                        x:Name="SidebarNavView"
-                        Visibility="Collapsed"
-                        IsEnabled="False"
-                        IsSettingsVisible="False"
-                        IsBackButtonVisible="Collapsed"
-                        IsPaneToggleButtonVisible="False"
-                        AlwaysShowHeader="False"
-                        CompactPaneLength="32"
-                        OpenPaneLength="220"
-                        PaneDisplayMode="Left"
-                        SelectionChanged="SidebarNavView_SelectionChanged" />
-                </Grid>
-            </Border>
-
+        <Grid Grid.Row="1">
             <Grid
-                Grid.Column="1"
-                RowDefinitions="*,Auto"
-                Padding="0">
+                x:Name="ExplorerShellGrid"
+                ColumnSpacing="0"
+                Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="{x:Bind SidebarColumnWidth, Mode=OneWay}" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border
+                    Grid.Column="0"
+                    Background="Transparent">
+                    <Grid>
+                        <local:SidebarView x:Name="StyledSidebarView" />
+                        <NavigationView
+                            x:Name="SidebarNavView"
+                            Visibility="Collapsed"
+                            IsEnabled="False"
+                            IsSettingsVisible="False"
+                            IsBackButtonVisible="Collapsed"
+                            IsPaneToggleButtonVisible="False"
+                            AlwaysShowHeader="False"
+                            CompactPaneLength="32"
+                            OpenPaneLength="220"
+                            PaneDisplayMode="Left"
+                            SelectionChanged="SidebarNavView_SelectionChanged" />
+                    </Grid>
+                </Border>
+
+                <Grid
+                    Grid.Column="1"
+                    RowDefinitions="*,Auto"
+                    Padding="0">
                 <Grid
                     x:Name="ExplorerBodyGrid"
                     Grid.Row="0"
@@ -380,7 +385,7 @@
                             Padding="0"
                             HorizontalAlignment="Left"
                             Background="Transparent"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,0,0,1"
                             Visibility="{x:Bind DetailsHeaderVisibility, Mode=OneWay}">
                             <Border.RenderTransform>
@@ -436,18 +441,21 @@
                                 <local:ColumnSplitter
                                     x:Name="HeaderSplitter1"
                                     Grid.Column="1"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                                     Tag="1"
                                     PointerEntered="ColumnSplitterHover_PointerEntered"
                                     PointerExited="ColumnSplitterHover_PointerExited" />
                                 <local:ColumnSplitter
                                     x:Name="HeaderSplitter2"
                                     Grid.Column="3"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                                     Tag="2"
                                     PointerEntered="ColumnSplitterHover_PointerEntered"
                                     PointerExited="ColumnSplitterHover_PointerExited" />
                                 <local:ColumnSplitter
                                     x:Name="HeaderSplitter3"
                                     Grid.Column="5"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                                     Tag="3"
                                     PointerEntered="ColumnSplitterHover_PointerEntered"
                                     PointerExited="ColumnSplitterHover_PointerExited" />
@@ -455,6 +463,7 @@
                                     x:Name="HeaderSplitter4"
                                     Grid.ColumnSpan="7"
                                     HorizontalAlignment="Right"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                                     Tag="4"
                                     PointerEntered="ColumnSplitterHover_PointerEntered"
                                     PointerExited="ColumnSplitterHover_PointerExited" />
@@ -665,10 +674,13 @@
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open-target" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpenTarget]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE838;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="run-as-administrator" Text="{Binding Source={StaticResource Strings}, Path=[CommonRunAsAdministrator]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7EF;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="share" Text="{Binding Source={StaticResource Strings}, Path=[CommonShare]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72D;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
-                                    <MenuFlyoutSubItem Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompress]}">
+                                    <MenuFlyoutSubItem x:Name="FileArchiveActionsSubMenu" Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonArchiveActions]}">
                                         <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7B8;" /></MenuFlyoutSubItem.Icon>
-                                        <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="compress-zip" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompressZip]}" />
-                                        <MenuFlyoutItem IsEnabled="False" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompress7z]}" />
+                                        <MenuFlyoutItem x:Name="FileExtractSmartMenuItem" Click="EntriesContextMenuItem_Click" Tag="extract-smart" Text="{Binding Source={StaticResource Strings}, Path=[CommonExtractSmart]}" />
+                                        <MenuFlyoutItem x:Name="FileExtractHereMenuItem" Click="EntriesContextMenuItem_Click" Tag="extract-here" Text="{Binding Source={StaticResource Strings}, Path=[CommonExtractHere]}" />
+                                        <MenuFlyoutItem x:Name="FileExtractToFolderMenuItem" Click="EntriesContextMenuItem_Click" Tag="extract-to-folder" Text="" />
+                                        <MenuFlyoutSeparator x:Name="FileArchiveExtractSeparator" />
+                                        <MenuFlyoutItem x:Name="FileCompressZipMenuItem" Click="EntriesContextMenuItem_Click" Tag="compress-zip" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompressZipAction]}" />
                                     </MenuFlyoutSubItem>
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="create-shortcut" Text="{Binding Source={StaticResource Strings}, Path=[CommonCreateShortcut]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE71B;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="copy-path" Text="{Binding Source={StaticResource Strings}, Path=[CommonCopyFilePath]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
@@ -823,7 +835,7 @@
                     PointerExited="CommandDockPanel_PointerExited"
                     Visibility="Collapsed">
                     <StackPanel Spacing="8">
-                        <TextBlock x:Uid="CommandDockTitleTextBlock" FontWeight="SemiBold" />
+                        <TextBlock x:Name="CommandDockTitleTextBlock" x:Uid="CommandDockTitleTextBlock" FontWeight="SemiBold" />
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                             <Button x:Name="RenameButton" x:Uid="RenameButton" Grid.Column="0" Click="RenameButton_Click" />
                             <Button x:Name="DeleteButton" x:Uid="DeleteButton" Grid.Column="1" Click="DeleteButton_Click" />
@@ -834,18 +846,21 @@
 
                         <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
                             <RadioButton
+                                x:Name="DockTopRadioButton"
                                 x:Uid="DockTopRadioButton"
                                 GroupName="DockSide"
                                 Tag="Top"
                                 Checked="DockRadio_Checked"
                                 IsChecked="True" />
                             <RadioButton
+                                x:Name="DockRightRadioButton"
                                 x:Uid="DockRightRadioButton"
                                 Grid.Column="1"
                                 GroupName="DockSide"
                                 Tag="Right"
                                 Checked="DockRadio_Checked" />
                             <RadioButton
+                                x:Name="DockBottomRadioButton"
                                 x:Uid="DockBottomRadioButton"
                                 Grid.Column="2"
                                 GroupName="DockSide"
@@ -875,25 +890,84 @@
                     <TextBlock
                         x:Name="StatusTextBlock"
                         x:Uid="StatusTextBlock"
-                        Margin="18,0,0,0"
+                        Margin="18,0,18,0"
                         VerticalAlignment="Center"
                         FontSize="11"
                         LineHeight="11"
                         LineStackingStrategy="BlockLineHeight"
-                        TextWrapping="Wrap" />
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
                 </Grid>
+                </Grid>
+
+                <local:ColumnSplitter
+                    x:Name="SidebarSplitter"
+                    Grid.Column="1"
+                    Width="8"
+                    Margin="-4,0,0,0"
+                    HorizontalAlignment="Left"
+                    ShowGuide="False"
+                    VerticalAlignment="Stretch"
+                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                    PointerExited="ColumnSplitterHover_PointerExited" />
             </Grid>
 
-            <local:ColumnSplitter
-                x:Name="SidebarSplitter"
-                Grid.Column="1"
-                Width="8"
-                Margin="-4,0,0,0"
-                HorizontalAlignment="Left"
-                ShowGuide="False"
-                VerticalAlignment="Stretch"
-                PointerEntered="ColumnSplitterHover_PointerEntered"
-                PointerExited="ColumnSplitterHover_PointerExited" />
+            <NavigationView
+                x:Name="SettingsNavigationView"
+                IsBackButtonVisible="Collapsed"
+                IsPaneToggleButtonVisible="False"
+                IsSettingsVisible="False"
+                AlwaysShowHeader="False"
+                CompactPaneLength="40"
+                OpenPaneLength="220"
+                PaneDisplayMode="Left"
+                SelectionChanged="SettingsNavigationView_SelectionChanged"
+                Visibility="{x:Bind SettingsShellVisibility, Mode=OneWay}">
+                <NavigationView.MenuItems>
+                    <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsNavBack]}" Tag="Back">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72B;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionGeneral]}" Tag="General">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionAppearance]}" Tag="Appearance">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE790;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionFilesAndFolders]}" Tag="FilesAndFolders">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B7;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionShortcuts]}" Tag="Shortcuts">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE765;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionTags]}" Tag="Tags">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8EC;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionAdvanced]}" Tag="Advanced">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9CE;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionAbout]}" Tag="About">
+                        <NavigationViewItem.Icon>
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                </NavigationView.MenuItems>
+
+                <controls:SettingsView x:Name="SettingsViewControl" />
+            </NavigationView>
         </Grid>
     </Grid>
 </Window>
