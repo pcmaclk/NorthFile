@@ -385,7 +385,7 @@
                             Padding="0"
                             HorizontalAlignment="Left"
                             Background="Transparent"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,0,0,1"
                             Visibility="{x:Bind DetailsHeaderVisibility, Mode=OneWay}">
                             <Border.RenderTransform>
@@ -441,18 +441,21 @@
                                 <local:ColumnSplitter
                                     x:Name="HeaderSplitter1"
                                     Grid.Column="1"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                                     Tag="1"
                                     PointerEntered="ColumnSplitterHover_PointerEntered"
                                     PointerExited="ColumnSplitterHover_PointerExited" />
                                 <local:ColumnSplitter
                                     x:Name="HeaderSplitter2"
                                     Grid.Column="3"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                                     Tag="2"
                                     PointerEntered="ColumnSplitterHover_PointerEntered"
                                     PointerExited="ColumnSplitterHover_PointerExited" />
                                 <local:ColumnSplitter
                                     x:Name="HeaderSplitter3"
                                     Grid.Column="5"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                                     Tag="3"
                                     PointerEntered="ColumnSplitterHover_PointerEntered"
                                     PointerExited="ColumnSplitterHover_PointerExited" />
@@ -460,6 +463,7 @@
                                     x:Name="HeaderSplitter4"
                                     Grid.ColumnSpan="7"
                                     HorizontalAlignment="Right"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                                     Tag="4"
                                     PointerEntered="ColumnSplitterHover_PointerEntered"
                                     PointerExited="ColumnSplitterHover_PointerExited" />
@@ -831,7 +835,7 @@
                     PointerExited="CommandDockPanel_PointerExited"
                     Visibility="Collapsed">
                     <StackPanel Spacing="8">
-                        <TextBlock x:Uid="CommandDockTitleTextBlock" FontWeight="SemiBold" />
+                        <TextBlock x:Name="CommandDockTitleTextBlock" x:Uid="CommandDockTitleTextBlock" FontWeight="SemiBold" />
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                             <Button x:Name="RenameButton" x:Uid="RenameButton" Grid.Column="0" Click="RenameButton_Click" />
                             <Button x:Name="DeleteButton" x:Uid="DeleteButton" Grid.Column="1" Click="DeleteButton_Click" />
@@ -842,18 +846,21 @@
 
                         <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
                             <RadioButton
+                                x:Name="DockTopRadioButton"
                                 x:Uid="DockTopRadioButton"
                                 GroupName="DockSide"
                                 Tag="Top"
                                 Checked="DockRadio_Checked"
                                 IsChecked="True" />
                             <RadioButton
+                                x:Name="DockRightRadioButton"
                                 x:Uid="DockRightRadioButton"
                                 Grid.Column="1"
                                 GroupName="DockSide"
                                 Tag="Right"
                                 Checked="DockRadio_Checked" />
                             <RadioButton
+                                x:Name="DockBottomRadioButton"
                                 x:Uid="DockBottomRadioButton"
                                 Grid.Column="2"
                                 GroupName="DockSide"

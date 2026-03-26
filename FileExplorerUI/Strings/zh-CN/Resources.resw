@@ -162,6 +162,9 @@
   <data name="CommonOpen" xml:space="preserve">
     <value>打开</value>
   </data>
+  <data name="TrayMenuExit" xml:space="preserve">
+    <value>退出</value>
+  </data>
   <data name="CommonOpenWith" xml:space="preserve">
     <value>打开方式</value>
   </data>
@@ -373,6 +376,39 @@
     <value>切换语言</value>
   </data>
   <data name="OverflowBreadcrumbButtonToolTip.Content" xml:space="preserve">
+    <value>显示隐藏的路径层级</value>
+  </data>
+  <data name="ToolTipBack" xml:space="preserve">
+    <value>后退</value>
+  </data>
+  <data name="ToolTipForward" xml:space="preserve">
+    <value>前进</value>
+  </data>
+  <data name="ToolTipUp" xml:space="preserve">
+    <value>上一级</value>
+  </data>
+  <data name="ToolTipRefresh" xml:space="preserve">
+    <value>刷新</value>
+  </data>
+  <data name="ToolTipNewFile" xml:space="preserve">
+    <value>新建文件</value>
+  </data>
+  <data name="ToolTipNewFolder" xml:space="preserve">
+    <value>新建文件夹</value>
+  </data>
+  <data name="ToolTipCopy" xml:space="preserve">
+    <value>复制</value>
+  </data>
+  <data name="ToolTipCut" xml:space="preserve">
+    <value>剪切</value>
+  </data>
+  <data name="ToolTipPaste" xml:space="preserve">
+    <value>粘贴</value>
+  </data>
+  <data name="ToolTipSwitchLanguage" xml:space="preserve">
+    <value>切换语言</value>
+  </data>
+  <data name="ToolTipShowHiddenPathSegments" xml:space="preserve">
     <value>显示隐藏的路径层级</value>
   </data>
   <data name="PathTextBox.PlaceholderText" xml:space="preserve">
@@ -641,6 +677,18 @@
   </data>
   <data name="StatusCopyPathFailed" xml:space="preserve">
     <value>复制路径失败：{0}</value>
+  </data>
+  <data name="StatusSettingsExported" xml:space="preserve">
+    <value>设置已导出：{0}</value>
+  </data>
+  <data name="StatusSettingsExportFailed" xml:space="preserve">
+    <value>导出设置失败：{0}</value>
+  </data>
+  <data name="StatusSettingsImported" xml:space="preserve">
+    <value>设置已导入：{0}</value>
+  </data>
+  <data name="StatusSettingsImportFailed" xml:space="preserve">
+    <value>导入设置失败：{0}</value>
   </data>
   <data name="StatusCreateShortcutSuccess" xml:space="preserve">
     <value>已创建快捷方式：{0}</value>
@@ -1045,13 +1093,13 @@
     <value>通用</value>
   </data>
   <data name="SettingsSectionGeneralDescription" xml:space="preserve">
-    <value>基础应用行为和启动方式。当前仅提供界面占位。</value>
+    <value>基础应用行为和启动方式。</value>
   </data>
   <data name="SettingsLanguageTitle" xml:space="preserve">
     <value>语言</value>
   </data>
   <data name="SettingsLanguageDescription" xml:space="preserve">
-    <value>应用显示语言。后续将支持使用系统设置和手动选择。</value>
+    <value>应用显示语言，可选择跟随系统或手动指定。</value>
   </data>
   <data name="SettingsUseSystem" xml:space="preserve">
     <value>使用系统设置</value>
@@ -1071,6 +1119,24 @@
   <data name="SettingsStartupSpecifiedLocation" xml:space="preserve">
     <value>指定位置</value>
   </data>
+  <data name="SettingsStartupSpecifiedPathTitle" xml:space="preserve">
+    <value>启动文件夹</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathDescription" xml:space="preserve">
+    <value>当启动位置选择为指定位置时，打开这里设置的文件夹。</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathPlaceholder" xml:space="preserve">
+    <value>输入文件夹路径</value>
+  </data>
+  <data name="SettingsBrowseFolder" xml:space="preserve">
+    <value>浏览</value>
+  </data>
+  <data name="SettingsStartupUseThisPc" xml:space="preserve">
+    <value>此电脑</value>
+  </data>
+  <data name="SettingsStartupUseCustomPath" xml:space="preserve">
+    <value>自定义路径</value>
+  </data>
   <data name="SettingsFavoritesTitle" xml:space="preserve">
     <value>收藏</value>
   </data>
@@ -1078,28 +1144,28 @@
     <value>控制收藏分组是否显示。</value>
   </data>
   <data name="SettingsCloudTitle" xml:space="preserve">
-    <value>云</value>
+    <value>云盘</value>
   </data>
   <data name="SettingsCloudDescription" xml:space="preserve">
-    <value>控制云盘分组是否显示。</value>
+    <value>控制侧边栏中的云盘分组是否显示。</value>
   </data>
   <data name="SettingsNetworkTitle" xml:space="preserve">
     <value>网络</value>
   </data>
   <data name="SettingsNetworkDescription" xml:space="preserve">
-    <value>控制网络分组是否显示。</value>
+    <value>控制侧边栏中的网络分组是否显示。</value>
   </data>
   <data name="SettingsTagsTitle" xml:space="preserve">
     <value>标签</value>
   </data>
   <data name="SettingsTagsDescription" xml:space="preserve">
-    <value>控制标签分组是否显示。</value>
+    <value>控制侧边栏中的标签分组是否显示。</value>
   </data>
   <data name="SettingsSectionAppearance" xml:space="preserve">
     <value>外观</value>
   </data>
   <data name="SettingsSectionAppearanceDescription" xml:space="preserve">
-    <value>应用主题和默认展示方式。当前仅提供界面占位。</value>
+    <value>应用主题和默认展示方式。</value>
   </data>
   <data name="SettingsThemeTitle" xml:space="preserve">
     <value>主题</value>
@@ -1117,7 +1183,7 @@
     <value>默认排序方式</value>
   </data>
   <data name="SettingsSortDescription" xml:space="preserve">
-    <value>为新窗口和新标签页准备的默认排序。</value>
+    <value>为新窗口准备的默认排序方式。</value>
   </data>
   <data name="SettingsGroupTitle" xml:space="preserve">
     <value>默认分组方式</value>
@@ -1129,7 +1195,7 @@
     <value>文件和文件夹</value>
   </data>
   <data name="SettingsSectionFilesAndFoldersDescription" xml:space="preserve">
-    <value>目录显示规则和删除体验。当前仅提供界面占位。</value>
+    <value>目录显示规则和删除体验。</value>
   </data>
   <data name="SettingsShowHiddenTitle" xml:space="preserve">
     <value>显示隐藏文件和文件夹</value>
@@ -1192,13 +1258,13 @@
     <value>高级</value>
   </data>
   <data name="SettingsSectionAdvancedDescription" xml:space="preserve">
-    <value>系统级行为与迁移能力。当前仅提供界面占位。</value>
+    <value>系统级行为与设置迁移能力。</value>
   </data>
   <data name="SettingsMigrationTitle" xml:space="preserve">
     <value>设置迁移</value>
   </data>
   <data name="SettingsMigrationDescription" xml:space="preserve">
-    <value>导入和导出设置将在后续版本接入。</value>
+    <value>导入和导出当前应用设置。</value>
   </data>
   <data name="SettingsExport" xml:space="preserve">
     <value>导出设置</value>
@@ -1222,7 +1288,7 @@
     <value>将 NorthFile 设为默认文件管理器</value>
   </data>
   <data name="SettingsDefaultManagerDescription" xml:space="preserve">
-    <value>第一阶段只展示入口，不执行系统注册。</value>
+    <value>当前仅展示入口，不执行系统注册。</value>
   </data>
   <data name="SettingsSetDefault" xml:space="preserve">
     <value>设置默认</value>

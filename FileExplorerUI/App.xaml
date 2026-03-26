@@ -46,8 +46,10 @@
                                         <Border
                                             x:Name="SelectionIndicator"
                                             HorizontalAlignment="Left"
-                                            VerticalAlignment="Stretch"
-                                            Margin="0,4"
+                                            Width="{TemplateBinding IndicatorWidth}"
+                                            Height="16"
+                                            VerticalAlignment="Center"
+                                            Margin="0"
                                             Visibility="Collapsed" />
                                         <ContentPresenter
                                             Content="{TemplateBinding Content}"

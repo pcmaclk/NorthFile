@@ -23,6 +23,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Globalization;
@@ -30,7 +31,10 @@ using System.Text;
 using System.Windows.Input;
 using Windows.Foundation;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Graphics;
 using Windows.Storage;
+using Windows.Storage.Provider;
+using Windows.Storage.Pickers;
 using WinRT;
 using WinRT.Interop;
 
@@ -92,6 +96,10 @@ namespace FileExplorerUI
         private static readonly string s_navigationPerfLogPath = Path.Combine(
             AppContext.BaseDirectory,
             "navigation-perf.log");
+        private static readonly object s_windowSizeLogLock = new();
+        private static readonly string s_windowSizeLogPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "window-size.log");
         private static int s_detailsViewportPerfSequence;
         private const int SettingsShellMinWindowWidth = 1024;
 
@@ -541,6 +549,10 @@ namespace FileExplorerUI
         private CancellationTokenSource? _watcherDebounceCts;
         private CancellationTokenSource? _directoryLoadCts;
         private CancellationTokenSource? _metadataPrefetchCts;
+        private bool _localizedUiRefreshScheduled;
+        private bool _localizedUiRefreshPending;
+        private int _localizedUiRefreshVersion;
+        private int _localizedUiDeferredRefreshVersion;
         private int _metadataViewportRequestVersion;
         private long _directorySnapshotVersion;
         private long _lastDetailsScrollInteractionTick;
@@ -548,6 +560,13 @@ namespace FileExplorerUI
         private bool _showCommandDock = false;
         private bool _sidebarInitialized;
         private long _lastWatcherRefreshTick;
+        private bool _allowActualClose;
+        private bool _isHiddenToTray;
+        private bool _trayIconAdded;
+        private int _lastRestoredWindowWidth;
+        private int _lastRestoredWindowHeight;
+        private bool _windowSizeRestorePending;
+        private bool _hasSeenFirstActivation;
         private readonly Dictionary<string, NavigationViewItem> _sidebarPathButtons = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _sidebarQuickAccessPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _sidebarDrivePaths = new(StringComparer.OrdinalIgnoreCase);
@@ -597,8 +616,31 @@ namespace FileExplorerUI
         private const int GWL_WNDPROC = -4;
         private const int WM_NCLBUTTONDOWN = 0x00A1;
         private const int WM_NCRBUTTONDOWN = 0x00A4;
+        private const int WM_CLOSE = 0x0010;
+        private const int WM_LBUTTONDBLCLK = 0x0203;
+        private const int WM_RBUTTONUP = 0x0205;
+        private const int WM_APP = 0x8000;
         private const int WM_SETCURSOR = 0x0020;
         private const int IDC_ARROW = 32512;
+        private const int IDI_APPLICATION = 32512;
+        private const int SW_HIDE = 0;
+        private const int SW_RESTORE = 9;
+        private const uint NIM_ADD = 0x00000000;
+        private const uint NIM_MODIFY = 0x00000001;
+        private const uint NIM_DELETE = 0x00000002;
+        private const uint NIF_MESSAGE = 0x00000001;
+        private const uint NIF_ICON = 0x00000002;
+        private const uint NIF_TIP = 0x00000004;
+        private const uint MF_STRING = 0x00000000;
+        private const uint TPM_RETURNCMD = 0x0100;
+        private const uint TPM_NONOTIFY = 0x0080;
+        private const uint TrayCallbackMessage = WM_APP + 1;
+        private const uint TrayOpenCommandId = 1001;
+        private const uint TrayExitCommandId = 1002;
+        private const string AutoStartRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string AutoStartRegistryValueName = "NorthFile";
+        private const int MinPersistedWindowWidth = 800;
+        private const int MinPersistedWindowHeight = 600;
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -741,6 +783,7 @@ namespace FileExplorerUI
             _pathDefaultBorderBrush = PathTextBox.BorderBrush;
             _engineVersion = _explorerService.GetEngineVersion();
             _appSettings = _appSettingsService.Load();
+            ApplyAppSettingsToPresentationDefaults();
             LocalizedStrings.Instance.PropertyChanged += LocalizedStrings_PropertyChanged;
             InitializeWorkspaceShellState();
 #if !DEBUG
@@ -754,9 +797,26 @@ namespace FileExplorerUI
             StyledSidebarView.SettingsRequested += StyledSidebarView_SettingsRequested;
             SettingsViewControl.VisibleSectionChanged += SettingsViewControl_VisibleSectionChanged;
             SettingsViewControl.SidebarSectionVisibilityChanged += SettingsViewControl_SidebarSectionVisibilityChanged;
+            SettingsViewControl.FileDisplaySettingsChanged += SettingsViewControl_FileDisplaySettingsChanged;
+            SettingsViewControl.ThemePreferenceChanged += SettingsViewControl_ThemePreferenceChanged;
+            SettingsViewControl.LanguagePreferenceChanged += SettingsViewControl_LanguagePreferenceChanged;
+            SettingsViewControl.StartupLocationPreferenceChanged += SettingsViewControl_StartupLocationPreferenceChanged;
+            SettingsViewControl.StartupSpecifiedPathChanged += SettingsViewControl_StartupSpecifiedPathChanged;
+            SettingsViewControl.StartupSpecifiedPathBrowseRequested += SettingsViewControl_StartupSpecifiedPathBrowseRequested;
+            SettingsViewControl.DefaultSortFieldChanged += SettingsViewControl_DefaultSortFieldChanged;
+            SettingsViewControl.DefaultGroupFieldChanged += SettingsViewControl_DefaultGroupFieldChanged;
             SettingsViewControl.DeleteConfirmationChanged += SettingsViewControl_DeleteConfirmationChanged;
+            SettingsViewControl.AutoStartChanged += SettingsViewControl_AutoStartChanged;
+            SettingsViewControl.MinimizeToTrayChanged += SettingsViewControl_MinimizeToTrayChanged;
+            SettingsViewControl.ExportSettingsRequested += SettingsViewControl_ExportSettingsRequested;
+            SettingsViewControl.ImportSettingsRequested += SettingsViewControl_ImportSettingsRequested;
+            Closed += MainWindow_Closed;
+            InstallWindowHook();
             BuildSidebarItems();
             ApplyAppSettingsToUi();
+            EnsureAutoStartRegistration(_appSettings.AutoStartEnabled);
+            RestoreWindowSizeFromSettings();
+            InitializeStartupPathFromSettings();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
             _ = LoadFirstPageAsync();
@@ -852,7 +912,116 @@ namespace FileExplorerUI
             return _currentViewMode != EntryViewMode.Details
                 || _currentSortField != EntrySortField.Name
                 || _currentSortDirection != SortDirection.Ascending
-                || _currentGroupField != EntryGroupField.None;
+                || _currentGroupField != EntryGroupField.None
+                || RequiresClientSideEntryFiltering();
+        }
+
+        private bool RequiresClientSideEntryFiltering()
+        {
+            return _appSettings.ShowHiddenEntries
+                || _appSettings.ShowProtectedSystemEntries
+                || !_appSettings.ShowDotEntries;
+        }
+
+        private bool ShouldIncludeEntry(string fullPath, string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return false;
+            }
+
+            if (!_appSettings.ShowDotEntries && name.StartsWith(".", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            try
+            {
+                System.IO.FileAttributes attributes = File.GetAttributes(fullPath);
+                bool isHidden = (attributes & System.IO.FileAttributes.Hidden) != 0;
+                bool isSystem = (attributes & System.IO.FileAttributes.System) != 0;
+
+                if (!_appSettings.ShowHiddenEntries && isHidden)
+                {
+                    return false;
+                }
+
+                if (!_appSettings.ShowProtectedSystemEntries && isSystem)
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+            }
+
+            return true;
+        }
+
+        private string GetEntryDisplayName(string name, bool isDirectory)
+        {
+            if (isDirectory || _appSettings.ShowFileExtensions)
+            {
+                return name;
+            }
+
+            string trimmedName = name.TrimEnd('.');
+            if (string.IsNullOrEmpty(trimmedName))
+            {
+                return name;
+            }
+
+            string withoutExtension = Path.GetFileNameWithoutExtension(name);
+            return string.IsNullOrWhiteSpace(withoutExtension) ? name : withoutExtension;
+        }
+
+        private void ApplyEntryVisibilityStyling(EntryViewModel entry)
+        {
+            bool isHidden = false;
+            bool isSystem = false;
+
+            try
+            {
+                System.IO.FileAttributes attributes = File.GetAttributes(entry.FullPath);
+                isHidden = (attributes & System.IO.FileAttributes.Hidden) != 0;
+                isSystem = (attributes & System.IO.FileAttributes.System) != 0;
+            }
+            catch
+            {
+            }
+
+            entry.IsHiddenEntry = isHidden;
+            entry.IsSystemEntry = isSystem;
+            entry.IconOpacity = isSystem
+                ? 0.55
+                : isHidden
+                    ? 0.68
+                    : 1.0;
+        }
+
+        private void UpdateDisplayedEntryNames()
+        {
+            foreach (EntryViewModel entry in _entries)
+            {
+                if (!entry.IsLoaded || entry.IsGroupHeader)
+                {
+                    continue;
+                }
+
+                entry.DisplayName = GetEntryDisplayName(entry.Name, entry.IsDirectory);
+            }
+
+            foreach (EntryViewModel entry in _presentationSourceEntries)
+            {
+                if (!entry.IsLoaded || entry.IsGroupHeader)
+                {
+                    continue;
+                }
+
+                entry.DisplayName = GetEntryDisplayName(entry.Name, entry.IsDirectory);
+            }
+
+            InvalidatePresentationSourceCache();
         }
 
         private bool UsesColumnsListPresentation()
@@ -996,11 +1165,7 @@ namespace FileExplorerUI
         private async Task SetSortAsync(EntrySortField field, SortDirection? explicitDirection = null)
         {
             _currentSortField = field;
-            _currentSortDirection = explicitDirection ?? field switch
-            {
-                EntrySortField.ModifiedDate or EntrySortField.Size => SortDirection.Descending,
-                _ => SortDirection.Ascending
-            };
+            _currentSortDirection = explicitDirection ?? GetDefaultSortDirection(field);
             InvalidateProjectionCaches();
             NotifyPresentationModeChanged();
             await ReloadCurrentPresentationAsync(PresentationReloadReason.PresentationSettingsChange);
@@ -1060,32 +1225,79 @@ namespace FileExplorerUI
 
         private void LocalizedStrings_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName is not "Item[]" and not nameof(LocalizedStrings.DebugLanguageButtonText))
+            if (e.PropertyName != "Item[]")
             {
                 return;
             }
 
-            _ = DispatcherQueue.TryEnqueue(RefreshLocalizedUi);
+            ScheduleLocalizedUiRefresh();
+        }
+
+        private void ScheduleLocalizedUiRefresh()
+        {
+            if (_localizedUiRefreshScheduled)
+            {
+                _localizedUiRefreshPending = true;
+                return;
+            }
+
+            _localizedUiRefreshScheduled = true;
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                do
+                {
+                    _localizedUiRefreshPending = false;
+                    RefreshLocalizedUi();
+                }
+                while (_localizedUiRefreshPending);
+
+                _localizedUiRefreshScheduled = false;
+            });
         }
 
         private void RefreshLocalizedUi()
         {
-            UpdateDetailsHeaders();
+            SettingsViewControl.RefreshLocalizedText();
             UpdateWindowTitle();
+            ScheduleDeferredLocalizedUiRefresh(++_localizedUiRefreshVersion);
+        }
 
-            if (_isLoading)
+        private void ScheduleDeferredLocalizedUiRefresh(int version)
+        {
+            if (_localizedUiDeferredRefreshVersion >= version)
             {
-                UpdateStatus(S("StatusLoading"));
                 return;
             }
 
-            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            _localizedUiDeferredRefreshVersion = version;
+            _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             {
-                UpdateStatus(SF("StatusDriveCount", _entries.Count));
-                return;
-            }
+                if (version != _localizedUiRefreshVersion)
+                {
+                    return;
+                }
 
-            UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
+                RefreshLocalizedChromeControls();
+                RefreshToolTipResources();
+                RefreshEntriesContextFlyoutText();
+                StyledSidebarView.RefreshLocalizedText();
+                RefreshLocalizedEntryPresentation();
+                UpdateDetailsHeaders();
+
+                if (_isLoading)
+                {
+                    UpdateStatus(S("StatusLoading"));
+                    return;
+                }
+
+                if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    UpdateStatus(SF("StatusDriveCount", _entries.Count));
+                    return;
+                }
+
+                UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
+            });
         }
 
         private void UpdateWindowTitle()
@@ -1117,6 +1329,29 @@ namespace FileExplorerUI
 
         private async void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
         {
+            bool isFirstActivation = !_hasSeenFirstActivation && args.WindowActivationState != WindowActivationState.Deactivated;
+            if (isFirstActivation)
+            {
+                _hasSeenFirstActivation = true;
+                TraceWindowSize(
+                    "首次激活应用",
+                    $"state={args.WindowActivationState} handleReady={_windowHandle != IntPtr.Zero}");
+            }
+            else
+            {
+                TraceWindowSize("窗口激活事件", $"state={args.WindowActivationState}");
+            }
+
+            if (_windowHandle == IntPtr.Zero)
+            {
+                InstallWindowHook();
+            }
+
+            if (args.WindowActivationState != WindowActivationState.Deactivated)
+            {
+                TryApplyPendingWindowSizeRestore();
+            }
+
             _selectionSurfaceCoordinator.SetWindowActive(args.WindowActivationState != WindowActivationState.Deactivated);
             if (args.WindowActivationState == WindowActivationState.Deactivated)
             {
@@ -1189,7 +1424,19 @@ namespace FileExplorerUI
             {
                 return;
             }
-            AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
+
+            if (Content is not FrameworkElement rootElement)
+            {
+                AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
+                return;
+            }
+
+            AppWindow.TitleBar.PreferredTheme = rootElement.ActualTheme switch
+            {
+                ElementTheme.Light => TitleBarTheme.Light,
+                ElementTheme.Dark => TitleBarTheme.Dark,
+                _ => TitleBarTheme.UseDefaultAppMode
+            };
         }
 
         private void RegisterColumnSplitterHandlers(UIElement splitter)
@@ -1235,8 +1482,251 @@ namespace FileExplorerUI
             }
         }
 
+        private void EnsureAutoStartRegistration(bool enabled)
+        {
+            try
+            {
+                using RegistryKey? key = Registry.CurrentUser.CreateSubKey(AutoStartRegistryPath, writable: true);
+                if (key is null)
+                {
+                    return;
+                }
+
+                if (!enabled)
+                {
+                    key.DeleteValue(AutoStartRegistryValueName, throwOnMissingValue: false);
+                    return;
+                }
+
+                string? exePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
+                if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
+                {
+                    return;
+                }
+
+                key.SetValue(AutoStartRegistryValueName, $"\"{exePath}\"", RegistryValueKind.String);
+            }
+            catch
+            {
+            }
+        }
+
+        private void RestoreWindowSizeFromSettings()
+        {
+            int width = _appSettings.WindowWidth;
+            int height = _appSettings.WindowHeight;
+            if (width < MinPersistedWindowWidth || height < MinPersistedWindowHeight)
+            {
+                TraceWindowSize("启动恢复", $"skip-invalid width={width} height={height}");
+                return;
+            }
+
+            _lastRestoredWindowWidth = width;
+            _lastRestoredWindowHeight = height;
+            _windowSizeRestorePending = true;
+            TraceWindowSize("启动恢复", $"scheduled width={width} height={height}");
+        }
+
+        private void TryApplyPendingWindowSizeRestore()
+        {
+            if (!_windowSizeRestorePending || AppWindow is null)
+            {
+                if (_windowSizeRestorePending)
+                {
+                    TraceWindowSize("启动恢复", "pending-but-appwindow-null");
+                }
+                return;
+            }
+
+            _windowSizeRestorePending = false;
+            try
+            {
+                TraceWindowSize("启动恢复", $"apply width={_lastRestoredWindowWidth} height={_lastRestoredWindowHeight}");
+                AppWindow.Resize(new SizeInt32(_lastRestoredWindowWidth, _lastRestoredWindowHeight));
+                SizeInt32 appliedSize = AppWindow.Size;
+                TraceWindowSize("启动恢复", $"applied-result width={appliedSize.Width} height={appliedSize.Height}");
+            }
+            catch (Exception ex)
+            {
+                _windowSizeRestorePending = true;
+                TraceWindowSize("启动恢复", $"apply-failed type={ex.GetType().Name} message=\"{ex.Message}\"");
+            }
+        }
+
+        private void PersistCurrentWindowSize()
+        {
+            if (AppWindow is null)
+            {
+                TraceWindowSize("保存到设置", "skip-appwindow-null");
+                return;
+            }
+
+            SizeInt32 liveSize = AppWindow.Size;
+            TraceWindowSize("保存到设置", $"live-sampled width={liveSize.Width} height={liveSize.Height}");
+            if (liveSize.Width < MinPersistedWindowWidth || liveSize.Height < MinPersistedWindowHeight)
+            {
+                TraceWindowSize(
+                    "保存到设置",
+                    $"skip-live-too-small width={liveSize.Width} height={liveSize.Height}");
+                return;
+            }
+
+            if (_appSettings.WindowWidth == liveSize.Width && _appSettings.WindowHeight == liveSize.Height)
+            {
+                TraceWindowSize(
+                    "保存到设置",
+                    $"skip-unchanged width={liveSize.Width} height={liveSize.Height}");
+                return;
+            }
+
+            _appSettings.WindowWidth = liveSize.Width;
+            _appSettings.WindowHeight = liveSize.Height;
+            TraceWindowSize(
+                "保存到设置",
+                $"save-request width={_appSettings.WindowWidth} height={_appSettings.WindowHeight}");
+            _appSettingsService.Save(_appSettings);
+            TraceWindowSize(
+                "保存到设置",
+                $"saved width={_appSettings.WindowWidth} height={_appSettings.WindowHeight}");
+        }
+
+        private void UpdateTrayIcon()
+        {
+            if (_windowHandle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            if (!_appSettings.MinimizeToTrayEnabled)
+            {
+                RemoveTrayIcon();
+                return;
+            }
+
+            if (!_isHiddenToTray)
+            {
+                return;
+            }
+
+            var data = CreateTrayIconData();
+            NativeMethods.Shell_NotifyIcon(_trayIconAdded ? NIM_MODIFY : NIM_ADD, ref data);
+            _trayIconAdded = true;
+        }
+
+        private void RemoveTrayIcon()
+        {
+            if (!_trayIconAdded || _windowHandle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            var data = CreateTrayIconData();
+            NativeMethods.Shell_NotifyIcon(NIM_DELETE, ref data);
+            _trayIconAdded = false;
+        }
+
+        private NativeMethods.NOTIFYICONDATA CreateTrayIconData()
+        {
+            return new NativeMethods.NOTIFYICONDATA
+            {
+                cbSize = (uint)Marshal.SizeOf<NativeMethods.NOTIFYICONDATA>(),
+                hWnd = _windowHandle,
+                uID = 1,
+                uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP,
+                uCallbackMessage = TrayCallbackMessage,
+                hIcon = NativeMethods.LoadIcon(IntPtr.Zero, IDI_APPLICATION),
+                szTip = "NorthFile"
+            };
+        }
+
+        private void HideToTray()
+        {
+            if (_windowHandle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            PersistCurrentWindowSize();
+            _isHiddenToTray = true;
+            UpdateTrayIcon();
+            NativeMethods.ShowWindow(_windowHandle, SW_HIDE);
+        }
+
+        private void RestoreFromTray()
+        {
+            if (_windowHandle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            _isHiddenToTray = false;
+            NativeMethods.ShowWindow(_windowHandle, SW_RESTORE);
+            Activate();
+            RemoveTrayIcon();
+        }
+
+        private void ShowTrayContextMenu()
+        {
+            IntPtr menu = NativeMethods.CreatePopupMenu();
+            if (menu == IntPtr.Zero)
+            {
+                return;
+            }
+
+            try
+            {
+                NativeMethods.AppendMenu(menu, MF_STRING, TrayOpenCommandId, S("CommonOpen"));
+                NativeMethods.AppendMenu(menu, MF_STRING, TrayExitCommandId, S("TrayMenuExit"));
+                NativeMethods.GetCursorPos(out NativeMethods.POINT point);
+                NativeMethods.SetForegroundWindow(_windowHandle);
+                uint command = NativeMethods.TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY, point.X, point.Y, 0, _windowHandle, IntPtr.Zero);
+                if (command == TrayOpenCommandId)
+                {
+                    RestoreFromTray();
+                }
+                else if (command == TrayExitCommandId)
+                {
+                    _allowActualClose = true;
+                    RemoveTrayIcon();
+                    Close();
+                }
+            }
+            finally
+            {
+                NativeMethods.DestroyMenu(menu);
+            }
+        }
+
+        private void MainWindow_Closed(object sender, WindowEventArgs args)
+        {
+            PersistCurrentWindowSize();
+            RemoveTrayIcon();
+        }
+
         private IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
+            if (_appSettings.MinimizeToTrayEnabled && msg == WM_CLOSE && !_allowActualClose)
+            {
+                _ = DispatcherQueue.TryEnqueue(HideToTray);
+                return IntPtr.Zero;
+            }
+
+            if (msg == TrayCallbackMessage)
+            {
+                int notification = unchecked((int)lParam.ToInt64());
+                if (notification == WM_LBUTTONDBLCLK)
+                {
+                    _ = DispatcherQueue.TryEnqueue(RestoreFromTray);
+                    return IntPtr.Zero;
+                }
+
+                if (notification == WM_RBUTTONUP)
+                {
+                    _ = DispatcherQueue.TryEnqueue(ShowTrayContextMenu);
+                    return IntPtr.Zero;
+                }
+            }
+
             if (msg == WM_NCLBUTTONDOWN || msg == WM_NCRBUTTONDOWN)
             {
                 _ = DispatcherQueue.TryEnqueue(CloseActiveBreadcrumbFlyout);
@@ -1255,7 +1745,7 @@ namespace FileExplorerUI
 
         private async void LoadButton_Click(object sender, RoutedEventArgs e)
         {
-            await NavigateToPathAsync(PathTextBox.Text.Trim(), pushHistory: true);
+            await NavigateToPathAsync(NormalizeAddressInputPath(PathTextBox.Text), pushHistory: true);
         }
 
         private void ColumnSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -2269,7 +2759,8 @@ namespace FileExplorerUI
         {
             NavigationPerfSession? perf = TryGetCurrentNavigationPerfSession();
             perf?.Mark("load-first-page.enter");
-            _currentPath = string.IsNullOrWhiteSpace(PathTextBox.Text) ? ShellMyComputerPath : PathTextBox.Text.Trim();
+            _currentPath = string.IsNullOrWhiteSpace(PathTextBox.Text) ? ShellMyComputerPath : NormalizeAddressInputPath(PathTextBox.Text);
+            PersistLastOpenedPathIfNeeded();
             if (!_sidebarInitialized)
             {
                 BuildSidebarItems();
@@ -2330,7 +2821,7 @@ namespace FileExplorerUI
 
                     _currentPath = ShellMyComputerPath;
                     _pendingHistoryStateRestorePath = pushHistory ? null : ShellMyComputerPath;
-                    PathTextBox.Text = ShellMyComputerPath;
+                    PathTextBox.Text = GetDisplayPathText(ShellMyComputerPath);
                     _currentQuery = string.Empty;
                     SearchTextBox.Text = string.Empty;
                     UpdateBreadcrumbs(_currentPath);
@@ -2364,7 +2855,7 @@ namespace FileExplorerUI
 
                 _currentPath = target;
                 _pendingHistoryStateRestorePath = pushHistory ? null : target;
-                PathTextBox.Text = target;
+                PathTextBox.Text = GetDisplayPathText(target);
                 _currentQuery = string.Empty;
                 SearchTextBox.Text = string.Empty;
                 UpdateBreadcrumbs(target);
@@ -2487,22 +2978,25 @@ namespace FileExplorerUI
                 sw.Stop();
                 perf?.Mark("load-page.fetch-completed", $"rows={page.Rows.Count} total={page.TotalEntries} source={_explorerService.DescribeBatchSource(page.SourceKind)}");
                 _lastFetchMs = (uint)Math.Clamp(sw.ElapsedMilliseconds, 0, int.MaxValue);
-                _totalEntries = page.TotalEntries;
+                List<FileRow> visibleRows = page.Rows
+                    .Where(row => ShouldIncludeEntry(Path.Combine(path, row.Name), row.Name))
+                    .ToList();
 
                 if (!append)
                 {
                     ResetEntriesViewport();
                     _entries.Clear();
-                    EnsureLoadedRangeCapacity(0, page.Rows.Count);
-                    FillPageRows(0, page.Rows, path);
+                    EnsureLoadedRangeCapacity(0, visibleRows.Count);
+                    FillPageRows(0, visibleRows, path);
                     perf?.Mark("load-page.visible-entries-updated", $"count={_entries.Count}");
                 }
                 else
                 {
-                    EnsureLoadedRangeCapacity((int)cursor, page.Rows.Count);
-                    FillPageRows((int)cursor, page.Rows, path);
+                    EnsureLoadedRangeCapacity(_entries.Count, visibleRows.Count);
+                    FillPageRows(_entries.Count, visibleRows, path);
                     perf?.Mark("load-page.visible-entries-updated", $"count={_entries.Count}");
                 }
+                _totalEntries = (uint)_entries.Count;
                 InvalidateEntriesLayouts();
                 perf?.Mark("load-page.layouts-invalidated");
                 if (!append && perf is not null)
@@ -2654,6 +3148,11 @@ namespace FileExplorerUI
                     totalEntries = page.TotalEntries;
                     foreach (FileRow row in page.Rows)
                     {
+                        if (!ShouldIncludeEntry(Path.Combine(path, row.Name), row.Name))
+                        {
+                            continue;
+                        }
+
                         EntryViewModel entry = CreateLoadedEntryModel(path, row);
                         PopulateEntryMetadata(entry);
                         loadedEntries.Add(entry);
@@ -2667,7 +3166,7 @@ namespace FileExplorerUI
                 SetPresentationSourceEntries(loadedEntries);
                 perf?.Mark("load-all.fetch-completed", $"loaded={loadedEntries.Count}");
                 ApplyCurrentPresentation(perf);
-                _totalEntries = totalEntries == 0 ? (uint)loadedEntries.Count : totalEntries;
+                _totalEntries = (uint)loadedEntries.Count;
                 InvalidateEntriesLayouts();
                 _nextCursor = 0;
                 _hasMore = false;
@@ -2773,6 +3272,31 @@ namespace FileExplorerUI
             {
                 File.AppendAllText(s_navigationPerfLogPath, line, Encoding.UTF8);
             }
+        }
+
+        private static void AppendWindowSizeLog(string message)
+        {
+            string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}";
+            lock (s_windowSizeLogLock)
+            {
+                File.AppendAllText(s_windowSizeLogPath, line, Encoding.UTF8);
+            }
+        }
+
+        private void TraceWindowSize(string node, string detail)
+        {
+            string presenterState = AppWindow?.Presenter is OverlappedPresenter presenter
+                ? presenter.State.ToString()
+                : "unknown";
+            string liveSize = AppWindow is null
+                ? "null"
+                : $"{AppWindow.Size.Width}x{AppWindow.Size.Height}";
+            string message =
+                $"[WINDOW-SIZE] node={node} detail={detail} cached={_lastRestoredWindowWidth}x{_lastRestoredWindowHeight} " +
+                $"pending={_windowSizeRestorePending} settings={_appSettings.WindowWidth}x{_appSettings.WindowHeight} " +
+                $"live={liveSize} presenter={presenterState}";
+            Debug.WriteLine(message);
+            AppendWindowSizeLog(message);
         }
 
         private void ScheduleNavigationPerfFirstFrameMark(NavigationPerfSession perf, string stage)
@@ -2929,18 +3453,251 @@ namespace FileExplorerUI
 
         private void ApplyAppSettingsToUi()
         {
+            SettingsViewControl.SetGeneralSettings(
+                _appSettings.LanguagePreference,
+                _appSettings.StartupLocationPreference,
+                _appSettings.StartupSpecifiedPath);
             SettingsViewControl.SetSidebarSectionVisibility(
                 _appSettings.ShowFavorites,
                 _appSettings.ShowCloud,
                 _appSettings.ShowNetwork,
                 _appSettings.ShowTags);
+            SettingsViewControl.SetAppearanceSettings(
+                _appSettings.ThemePreference,
+                _appSettings.DefaultSortField,
+                _appSettings.DefaultGroupField);
+            SettingsViewControl.SetFileDisplaySettings(
+                _appSettings.ShowHiddenEntries,
+                _appSettings.ShowProtectedSystemEntries,
+                _appSettings.ShowDotEntries,
+                _appSettings.ShowFileExtensions);
             SettingsViewControl.SetDeleteConfirmationEnabled(_appSettings.ConfirmDelete);
+            SettingsViewControl.SetAdvancedSettings(
+                _appSettings.AutoStartEnabled,
+                _appSettings.MinimizeToTrayEnabled);
 
             StyledSidebarView.SetSectionVisibility(
                 _appSettings.ShowFavorites,
                 _appSettings.ShowCloud,
                 _appSettings.ShowNetwork,
                 _appSettings.ShowTags);
+            ApplyLanguagePreference(_appSettings.LanguagePreference);
+            ApplyThemePreference(_appSettings.ThemePreference);
+        }
+
+        private void ApplyAppSettingsToPresentationDefaults()
+        {
+            _currentSortField = _appSettings.DefaultSortField;
+            _currentSortDirection = GetDefaultSortDirection(_currentSortField);
+            _currentGroupField = _appSettings.DefaultGroupField;
+        }
+
+        private static SortDirection GetDefaultSortDirection(EntrySortField field)
+        {
+            return field switch
+            {
+                EntrySortField.ModifiedDate or EntrySortField.Size => SortDirection.Descending,
+                _ => SortDirection.Ascending
+            };
+        }
+
+        private void ApplyThemePreference(AppThemePreference preference)
+        {
+            if (Content is not FrameworkElement rootElement)
+            {
+                return;
+            }
+
+            rootElement.RequestedTheme = preference switch
+            {
+                AppThemePreference.Light => ElementTheme.Light,
+                AppThemePreference.Dark => ElementTheme.Dark,
+                _ => ElementTheme.Default
+            };
+
+            ApplyTitleBarTheme();
+        }
+
+        private void ApplyLanguagePreference(AppLanguagePreference preference)
+        {
+            string languageTag = preference switch
+            {
+                AppLanguagePreference.ChineseSimplified => "zh-CN",
+                AppLanguagePreference.English => "en-US",
+                _ => ResolveSystemLanguageTag()
+            };
+
+            ApplyRuntimeLanguageOverrides(languageTag);
+            LocalizedStrings.Instance.SetLanguage(languageTag);
+        }
+
+        private static string ResolveSystemLanguageTag()
+        {
+            string current = CultureInfo.CurrentUICulture.Name;
+            return current.StartsWith("zh", StringComparison.OrdinalIgnoreCase) ? "zh-CN" : "en-US";
+        }
+
+        private static void ApplyRuntimeLanguageOverrides(string languageTag)
+        {
+            try
+            {
+                CultureInfo culture = CultureInfo.GetCultureInfo(languageTag);
+                CultureInfo.DefaultThreadCurrentCulture = culture;
+                CultureInfo.DefaultThreadCurrentUICulture = culture;
+                CultureInfo.CurrentCulture = culture;
+                CultureInfo.CurrentUICulture = culture;
+            }
+            catch (CultureNotFoundException)
+            {
+            }
+
+            try
+            {
+                Windows.Globalization.ApplicationLanguages.PrimaryLanguageOverride = languageTag;
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        private void RefreshLocalizedEntryPresentation()
+        {
+            EntryViewModel[] presentationEntries = _presentationSourceEntries.ToArray();
+            EntryViewModel[] loadedEntries = _entries.ToArray();
+            var seen = new HashSet<EntryViewModel>();
+            foreach (EntryViewModel entry in presentationEntries.Concat(loadedEntries))
+            {
+                if (!seen.Add(entry) || !entry.IsLoaded)
+                {
+                    continue;
+                }
+
+                if (!entry.IsGroupHeader)
+                {
+                    entry.DisplayName = GetEntryDisplayName(entry.Name, entry.IsDirectory);
+                    entry.Type = GetEntryTypeText(entry.Name, entry.IsDirectory, entry.IsLink);
+                    entry.ModifiedText = FormatModifiedTime(entry.ModifiedAt);
+                }
+            }
+
+            bool requiresPresentationRebuild =
+                _currentSortField == EntrySortField.Type ||
+                _currentGroupField == EntryGroupField.Type;
+
+            if (requiresPresentationRebuild)
+            {
+                ApplyCurrentPresentation();
+            }
+            else
+            {
+                UpdateEntrySelectionVisuals();
+            }
+        }
+
+        private void RefreshLocalizedChromeControls()
+        {
+            PathTextBox.PlaceholderText = S("PathTextBox.PlaceholderText");
+            SearchTextBox.PlaceholderText = S("SearchTextBox.PlaceholderText");
+            CommandDockTitleTextBlock.Text = S("CommandDockTitleTextBlock.Text");
+            RenameButton.Content = S("RenameButton.Content");
+            DeleteButton.Content = S("DeleteButton.Content");
+            NextButton.Content = S("NextButton.Content");
+            RenameTextBox.PlaceholderText = S("RenameTextBox.PlaceholderText");
+            RecursiveDeleteCheckBox.Content = S("RecursiveDeleteCheckBox.Content");
+            DockTopRadioButton.Content = S("DockTopRadioButton.Content");
+            DockRightRadioButton.Content = S("DockRightRadioButton.Content");
+            DockBottomRadioButton.Content = S("DockBottomRadioButton.Content");
+            CommandAutoHideSwitch.Header = S("CommandAutoHideSwitch.Header");
+            CommandPeekButton.Content = S("CommandPeekButton.Content");
+        }
+
+        private void RefreshToolTipResources()
+        {
+            RefreshToolTip(BackButton, "ToolTipBack");
+            RefreshToolTip(ForwardButton, "ToolTipForward");
+            RefreshToolTip(UpButton, "ToolTipUp");
+            RefreshToolTip(LoadButton, "ToolTipRefresh");
+            RefreshToolTip(NewFileButton, "ToolTipNewFile");
+            RefreshToolTip(NewFolderButton, "ToolTipNewFolder");
+            RefreshToolTip(CopyButton, "ToolTipCopy");
+            RefreshToolTip(CutButton, "ToolTipCut");
+            RefreshToolTip(PasteButton, "ToolTipPaste");
+            RefreshToolTip(LanguageToggleButton, "ToolTipSwitchLanguage");
+            RefreshToolTip(OverflowBreadcrumbButton, "ToolTipShowHiddenPathSegments");
+        }
+
+        private static void RefreshToolTip(FrameworkElement element, string resourceKey)
+        {
+            if (ToolTipService.GetToolTip(element) is ToolTip toolTip)
+            {
+                toolTip.Content = LocalizedStrings.Instance.Get(resourceKey);
+            }
+        }
+
+        private void InitializeStartupPathFromSettings()
+        {
+            string startupPath = ResolveStartupPath();
+            _currentPath = startupPath;
+            PathTextBox.Text = GetDisplayPathText(startupPath);
+        }
+
+        private string ResolveStartupPath()
+        {
+            string candidate = _appSettings.StartupLocationPreference switch
+            {
+                StartupLocationPreference.ThisPc => ShellMyComputerPath,
+                StartupLocationPreference.SpecifiedLocation => _appSettings.StartupSpecifiedPath,
+                _ => _appSettings.LastOpenedPath
+            };
+
+            return IsValidStartupPath(candidate) ? candidate : ShellMyComputerPath;
+        }
+
+        private bool IsValidStartupPath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            if (string.Equals(path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return _explorerService.DirectoryExists(path);
+        }
+
+        private string GetDisplayPathText(string? path)
+        {
+            return string.Equals(path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase)
+                ? S("SidebarMyComputer")
+                : path ?? string.Empty;
+        }
+
+        private string NormalizeAddressInputPath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            string trimmed = path.Trim();
+            return string.Equals(trimmed, S("SidebarMyComputer"), StringComparison.CurrentCultureIgnoreCase)
+                ? ShellMyComputerPath
+                : trimmed;
+        }
+
+        private void PersistLastOpenedPathIfNeeded()
+        {
+            if (!IsValidStartupPath(_currentPath) ||
+                string.Equals(_appSettings.LastOpenedPath, _currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _appSettings.LastOpenedPath = _currentPath;
+            _appSettingsService.Save(_appSettings);
         }
 
         private void EnsureSidebarTreeView()
@@ -3374,6 +4131,7 @@ namespace FileExplorerUI
                 drives.Add(new EntryViewModel
                 {
                     Name = label,
+                    DisplayName = label,
                     PendingName = label,
                     FullPath = root,
                     Type = type,
@@ -3551,7 +4309,7 @@ namespace FileExplorerUI
             if (string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 _currentPath = ShellMyComputerPath;
-                PathTextBox.Text = ShellMyComputerPath;
+                PathTextBox.Text = GetDisplayPathText(ShellMyComputerPath);
                 _currentQuery = string.Empty;
                 SearchTextBox.Text = string.Empty;
                 UpdateBreadcrumbs(_currentPath);
@@ -3787,6 +4545,195 @@ namespace FileExplorerUI
         {
             _appSettings.ConfirmDelete = enabled;
             _appSettingsService.Save(_appSettings);
+        }
+
+        private void SettingsViewControl_AutoStartChanged(bool enabled)
+        {
+            _appSettings.AutoStartEnabled = enabled;
+            _appSettingsService.Save(_appSettings);
+            EnsureAutoStartRegistration(enabled);
+        }
+
+        private void SettingsViewControl_MinimizeToTrayChanged(bool enabled)
+        {
+            _appSettings.MinimizeToTrayEnabled = enabled;
+            _appSettingsService.Save(_appSettings);
+            if (!enabled)
+            {
+                RemoveTrayIcon();
+            }
+        }
+
+        private async void SettingsViewControl_ExportSettingsRequested()
+        {
+            PersistCurrentWindowSize();
+            var picker = new FileSavePicker();
+            picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
+            picker.SuggestedFileName = "northfile.settings";
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+
+            StorageFile? file = await picker.PickSaveFileAsync();
+            if (file is null)
+            {
+                return;
+            }
+
+            CachedFileManager.DeferUpdates(file);
+            try
+            {
+                _appSettingsService.ExportToPath(_appSettings, file.Path);
+                FileUpdateStatus status = await CachedFileManager.CompleteUpdatesAsync(file);
+                if (status is FileUpdateStatus.Complete or FileUpdateStatus.CompleteAndRenamed)
+                {
+                    UpdateStatusKey("StatusSettingsExported", file.Name);
+                    return;
+                }
+
+                UpdateStatusKey("StatusSettingsExportFailed", file.Name);
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusSettingsExportFailed", ex.Message);
+            }
+        }
+
+        private async void SettingsViewControl_ImportSettingsRequested()
+        {
+            var picker = new FileOpenPicker();
+            picker.FileTypeFilter.Add(".json");
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+
+            StorageFile? file = await picker.PickSingleFileAsync();
+            if (file is null)
+            {
+                return;
+            }
+
+            AppSettings? importedSettings = _appSettingsService.ImportFromPath(file.Path);
+            if (importedSettings is null)
+            {
+                UpdateStatusKey("StatusSettingsImportFailed", file.Name);
+                return;
+            }
+
+            await ApplyImportedSettingsAsync(importedSettings);
+            UpdateStatusKey("StatusSettingsImported", file.Name);
+        }
+
+        private async Task ApplyImportedSettingsAsync(AppSettings importedSettings)
+        {
+            AppSettings previousSettings = _appSettings;
+            bool filteringChanged =
+                previousSettings.ShowHiddenEntries != importedSettings.ShowHiddenEntries ||
+                previousSettings.ShowProtectedSystemEntries != importedSettings.ShowProtectedSystemEntries ||
+                previousSettings.ShowDotEntries != importedSettings.ShowDotEntries;
+            bool extensionsChanged = previousSettings.ShowFileExtensions != importedSettings.ShowFileExtensions;
+
+            _appSettings = importedSettings;
+            _appSettingsService.Save(_appSettings);
+            ApplyAppSettingsToPresentationDefaults();
+            ApplyAppSettingsToUi();
+            EnsureAutoStartRegistration(_appSettings.AutoStartEnabled);
+            if (!_appSettings.MinimizeToTrayEnabled)
+            {
+                RemoveTrayIcon();
+            }
+
+            if (extensionsChanged)
+            {
+                UpdateDisplayedEntryNames();
+            }
+
+            if (filteringChanged)
+            {
+                await LoadFirstPageAsync();
+                return;
+            }
+
+            await SetSortAsync(_appSettings.DefaultSortField, GetDefaultSortDirection(_appSettings.DefaultSortField));
+            await SetGroupAsync(_appSettings.DefaultGroupField);
+        }
+
+        private async void SettingsViewControl_FileDisplaySettingsChanged(bool showHidden, bool showProtectedSystem, bool showDotFiles, bool showFileExtensions)
+        {
+            bool filteringChanged =
+                _appSettings.ShowHiddenEntries != showHidden ||
+                _appSettings.ShowProtectedSystemEntries != showProtectedSystem ||
+                _appSettings.ShowDotEntries != showDotFiles;
+            bool extensionsChanged = _appSettings.ShowFileExtensions != showFileExtensions;
+
+            _appSettings.ShowHiddenEntries = showHidden;
+            _appSettings.ShowProtectedSystemEntries = showProtectedSystem;
+            _appSettings.ShowDotEntries = showDotFiles;
+            _appSettings.ShowFileExtensions = showFileExtensions;
+            _appSettingsService.Save(_appSettings);
+
+            if (extensionsChanged)
+            {
+                UpdateDisplayedEntryNames();
+            }
+
+            if (filteringChanged)
+            {
+                await LoadFirstPageAsync();
+            }
+        }
+
+        private void SettingsViewControl_ThemePreferenceChanged(AppThemePreference preference)
+        {
+            _appSettings.ThemePreference = preference;
+            _appSettingsService.Save(_appSettings);
+            ApplyThemePreference(preference);
+        }
+
+        private void SettingsViewControl_LanguagePreferenceChanged(AppLanguagePreference preference)
+        {
+            _appSettings.LanguagePreference = preference;
+            _appSettingsService.Save(_appSettings);
+            ApplyLanguagePreference(preference);
+        }
+
+        private void SettingsViewControl_StartupLocationPreferenceChanged(StartupLocationPreference preference)
+        {
+            _appSettings.StartupLocationPreference = preference;
+            _appSettingsService.Save(_appSettings);
+        }
+
+        private void SettingsViewControl_StartupSpecifiedPathChanged(string path)
+        {
+            _appSettings.StartupSpecifiedPath = path;
+            _appSettingsService.Save(_appSettings);
+        }
+
+        private async void SettingsViewControl_StartupSpecifiedPathBrowseRequested()
+        {
+            var picker = new FolderPicker();
+            picker.FileTypeFilter.Add("*");
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+
+            StorageFolder? folder = await picker.PickSingleFolderAsync();
+            if (folder is null)
+            {
+                return;
+            }
+
+            _appSettings.StartupSpecifiedPath = folder.Path;
+            _appSettingsService.Save(_appSettings);
+            SettingsViewControl.SetStartupSpecifiedPath(folder.Path);
+        }
+
+        private async void SettingsViewControl_DefaultSortFieldChanged(EntrySortField field)
+        {
+            _appSettings.DefaultSortField = field;
+            _appSettingsService.Save(_appSettings);
+            await SetSortAsync(field, GetDefaultSortDirection(field));
+        }
+
+        private async void SettingsViewControl_DefaultGroupFieldChanged(EntryGroupField field)
+        {
+            _appSettings.DefaultGroupField = field;
+            _appSettingsService.Save(_appSettings);
+            await SetGroupAsync(field);
         }
 
         private void SidebarSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -4960,6 +5907,7 @@ namespace FileExplorerUI
             return new EntryViewModel
             {
                 Name = string.Empty,
+                DisplayName = string.Empty,
                 PendingName = string.Empty,
                 FullPath = string.Empty,
                 Type = string.Empty,
@@ -5000,6 +5948,7 @@ namespace FileExplorerUI
         private void ApplyLoadedEntryRow(EntryViewModel entry, string basePath, FileRow row)
         {
             entry.Name = row.Name;
+            entry.DisplayName = GetEntryDisplayName(row.Name, row.IsDirectory);
             entry.PendingName = row.Name;
             entry.FullPath = Path.Combine(basePath, row.Name);
             entry.Type = GetEntryTypeText(row.Name, row.IsDirectory, row.IsLink);
@@ -5020,6 +5969,7 @@ namespace FileExplorerUI
             entry.PendingCreateIsDirectory = false;
             entry.IsLoaded = true;
             entry.IsMetadataLoaded = row.ModifiedAt.HasValue || row.IsDirectory || row.SizeBytes.HasValue;
+            ApplyEntryVisibilityStyling(entry);
         }
 
         private void PopulateEntryMetadata(EntryViewModel entry)
@@ -5908,6 +6858,7 @@ namespace FileExplorerUI
             return new EntryViewModel
             {
                 Name = name,
+                DisplayName = GetEntryDisplayName(name, isDirectory),
                 PendingName = name,
                 FullPath = Path.Combine(_currentPath, name),
                 Type = GetEntryTypeText(name, isDirectory, isLink: false),
@@ -7054,6 +8005,7 @@ namespace FileExplorerUI
                 }
 
                 entry.Name = proposedName;
+                entry.DisplayName = GetEntryDisplayName(proposedName, entry.PendingCreateIsDirectory);
                 entry.PendingName = proposedName;
                 entry.FullPath = targetPath;
                 entry.Type = GetEntryTypeText(proposedName, entry.PendingCreateIsDirectory, isLink: false);
@@ -7506,6 +8458,7 @@ namespace FileExplorerUI
             EntryViewModel current = _entries[index];
             current.Name = newName;
             current.PendingName = newName;
+            current.DisplayName = GetEntryDisplayName(newName, current.IsDirectory);
             current.FullPath = Path.Combine(_currentPath, newName);
             current.SizeText = string.Empty;
             current.ModifiedText = string.Empty;
@@ -7542,6 +8495,7 @@ namespace FileExplorerUI
             bool wasSelected = string.Equals(_selectedEntryPath, current.FullPath, StringComparison.OrdinalIgnoreCase);
             current.Name = newName;
             current.PendingName = newName;
+            current.DisplayName = GetEntryDisplayName(newName, current.IsDirectory);
             current.FullPath = Path.Combine(_currentPath, newName);
             InvalidatePresentationSourceCache();
 
@@ -7597,7 +8551,14 @@ namespace FileExplorerUI
                 UpdateUsnCapability(_currentPath);
                 ConfigureDirectoryWatcher(_currentPath);
                 EnsureRefreshFallbackInvalidation(_currentPath, "background_refresh");
-                await LoadPageAsync(_currentPath, cursor: 0, append: false);
+                if (UsesClientPresentationPipeline())
+                {
+                    await LoadAllEntriesForPresentationAsync(_currentPath);
+                }
+                else
+                {
+                    await LoadPageAsync(_currentPath, cursor: 0, append: false);
+                }
                 if (preserveViewport)
                 {
                     _ = DispatcherQueue.TryEnqueue(() =>
@@ -8557,7 +9518,7 @@ namespace FileExplorerUI
             int existingIndex = -1;
             for (int i = 0; i < flyout.Commands.Count; i++)
             {
-                if (string.Equals(flyout.Commands[i].Label, label, StringComparison.Ordinal))
+                if (string.Equals(flyout.Commands[i].CommandId, commandId, StringComparison.Ordinal))
                 {
                     existingIndex = i;
                     break;
@@ -8640,13 +9601,51 @@ namespace FileExplorerUI
             FileArchiveActionsSubMenu.Visibility = showAnyExtract || showCompress ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        private void RefreshEntriesContextFlyoutText()
+        {
+            RefreshEntriesContextStaticText(FileEntriesContextFlyout);
+            RefreshEntriesContextStaticText(FolderEntriesContextFlyout);
+            RefreshEntriesContextStaticText(BackgroundEntriesContextFlyout);
+            RefreshEntriesContextCommandLabels(FileEntriesContextFlyout);
+            RefreshEntriesContextCommandLabels(FolderEntriesContextFlyout);
+            RefreshEntriesContextCommandLabels(BackgroundEntriesContextFlyout);
+        }
+
+        private void RefreshEntriesContextStaticText(CommandMenuFlyout flyout)
+        {
+            FileCommandTarget target = TryBuildActiveEntriesContextTarget(out FileCommandTarget activeTarget)
+                ? activeTarget
+                : ResolveEntriesContextTarget(null);
+
+            foreach (MenuFlyoutItemBase item in EnumerateMenuItemsRecursive(flyout.Items))
+            {
+                switch (item)
+                {
+                    case MenuFlyoutItem menuItem when menuItem.Tag is string commandId:
+                        menuItem.Text = GetEntriesContextMenuItemLabel(commandId, target);
+                        break;
+                    case MenuFlyoutSubItem subItem when ReferenceEquals(subItem, FileArchiveActionsSubMenu):
+                        subItem.Text = S("CommonArchiveActions");
+                        break;
+                }
+            }
+        }
+
+        private void RefreshEntriesContextCommandLabels(CommandMenuFlyout flyout)
+        {
+            foreach (CommandMenuFlyoutItem item in flyout.Commands)
+            {
+                item.Label = GetEntriesContextCommandBarLabel(item.CommandId);
+            }
+        }
+
         private void RefreshEntriesContextDynamicLabels(CommandMenuFlyout flyout, FileCommandTarget target)
         {
             foreach (MenuFlyoutItemBase item in EnumerateMenuItemsRecursive(flyout.Items))
             {
                 if (item is MenuFlyoutItem menuItem && menuItem.Tag is string commandId)
                 {
-                    menuItem.Text = GetEntriesContextMenuItemLabel(commandId, target, menuItem.Text);
+                    menuItem.Text = GetEntriesContextMenuItemLabel(commandId, target);
                 }
             }
         }
@@ -8675,13 +9674,18 @@ namespace FileExplorerUI
             switch (item)
             {
                 case MenuFlyoutItem menuItem when menuItem.Tag is string commandId:
-                    menuItem.Text = GetEntriesContextMenuItemLabel(commandId, target, menuItem.Text);
+                    menuItem.Text = GetEntriesContextMenuItemLabel(commandId, target);
                     bool visible = availableCommandIds.Contains(commandId);
                     menuItem.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
                     menuItem.IsEnabled = visible && CanExecuteEntriesContextCommand(commandId, target);
                     break;
 
                 case MenuFlyoutSubItem subItem:
+                    if (ReferenceEquals(subItem, FileArchiveActionsSubMenu))
+                    {
+                        subItem.Text = S("CommonArchiveActions");
+                    }
+
                     bool hasTaggedChildren = false;
                     bool anyVisibleChild = false;
                     foreach (MenuFlyoutItemBase child in subItem.Items)
@@ -8703,7 +9707,7 @@ namespace FileExplorerUI
             }
         }
 
-        private string GetEntriesContextMenuItemLabel(string commandId, FileCommandTarget target, string currentLabel)
+        private string GetEntriesContextMenuItemLabel(string commandId, FileCommandTarget target)
         {
             if (string.Equals(commandId, FileCommandIds.ExtractToFolder, StringComparison.Ordinal))
             {
@@ -8712,9 +9716,36 @@ namespace FileExplorerUI
 
             return commandId switch
             {
+                FileCommandIds.Open => S("CommonOpen"),
+                FileCommandIds.OpenWith => S("CommonOpenWith"),
+                FileCommandIds.OpenTarget => S("CommonOpenTarget"),
+                FileCommandIds.RunAsAdministrator => S("CommonRunAsAdministrator"),
+                FileCommandIds.Share => S("CommonShare"),
+                FileCommandIds.CreateShortcut => S("CommonCreateShortcut"),
+                FileCommandIds.CopyPath => target.IsDirectory ? S("CommonCopyFolderPath") : S("CommonCopyFilePath"),
+                FileCommandIds.Properties => S("CommonProperties"),
+                FileCommandIds.OpenInNewWindow => S("CommonOpenInNewWindow"),
+                FileCommandIds.OpenInTerminal => S("CommonOpenInTerminal"),
+                FileCommandIds.CompressZip => target.IsDirectory ? S("CommonCompressZip") : S("CommonCompressZipAction"),
                 FileCommandIds.ExtractSmart => S("CommonExtractSmart"),
                 FileCommandIds.ExtractHere => S("CommonExtractHere"),
-                _ => currentLabel
+                FileCommandIds.NewFile => S("CommonNewFile"),
+                FileCommandIds.NewFolder => S("CommonNewFolder"),
+                _ => string.Empty
+            };
+        }
+
+        private string GetEntriesContextCommandBarLabel(string commandId)
+        {
+            return commandId switch
+            {
+                FileCommandIds.Cut => S("CommonCut"),
+                FileCommandIds.Copy => S("CommonCopy"),
+                FileCommandIds.Paste => S("CommonPaste"),
+                FileCommandIds.Rename => S("CommonRename"),
+                FileCommandIds.Delete => S("CommonDelete"),
+                FileCommandIds.Refresh => S("CommonRefresh"),
+                _ => commandId
             };
         }
 
@@ -8824,6 +9855,7 @@ namespace FileExplorerUI
             _activeEntriesContextFlyout = sender as CommandMenuFlyout;
             ResetColumnSplitterCursorState();
             UpdateViewCommandStates();
+            RefreshEntriesContextFlyoutText();
 
             if (ReferenceEquals(sender, FileEntriesContextFlyout) &&
                 _entriesContextRequest?.Entry is EntryViewModel fileEntry &&
@@ -9245,7 +10277,7 @@ namespace FileExplorerUI
                         ? _currentPath[renamed.SourcePath.Length..]
                         : string.Empty;
                     _currentPath = renamed.TargetPath + suffix;
-                    PathTextBox.Text = _currentPath;
+                    PathTextBox.Text = GetDisplayPathText(_currentPath);
                     UpdateBreadcrumbs(_currentPath);
                     UpdateNavButtonsState();
                     StyledSidebarView.SetSelectedPath(_currentPath);
@@ -9646,6 +10678,14 @@ namespace FileExplorerUI
         private void LanguageToggleButton_Click(object sender, RoutedEventArgs e)
         {
             string language = LocalizedStrings.Instance.ToggleDebugLanguage();
+            _appSettings.LanguagePreference = language.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
+                ? AppLanguagePreference.ChineseSimplified
+                : AppLanguagePreference.English;
+            _appSettingsService.Save(_appSettings);
+            SettingsViewControl.SetGeneralSettings(
+                _appSettings.LanguagePreference,
+                _appSettings.StartupLocationPreference,
+                _appSettings.StartupSpecifiedPath);
             string exePath = Environment.ProcessPath
                 ?? Process.GetCurrentProcess().MainModule?.FileName
                 ?? string.Empty;
@@ -9662,6 +10702,7 @@ namespace FileExplorerUI
                 UseShellExecute = true
             });
 
+            _allowActualClose = true;
             Close();
         }
 
@@ -9676,7 +10717,7 @@ namespace FileExplorerUI
             _inlineEditCoordinator.BeginSession(_addressInlineSession);
             AddressBreadcrumbBorder.Visibility = Visibility.Collapsed;
             PathTextBox.Visibility = Visibility.Visible;
-            PathTextBox.Text = _currentPath;
+            PathTextBox.Text = GetDisplayPathText(_currentPath);
             PathTextBox.Focus(FocusState.Programmatic);
             if (selectAll)
             {
@@ -9697,7 +10738,7 @@ namespace FileExplorerUI
 
             if (!commit)
             {
-                PathTextBox.Text = _currentPath;
+                PathTextBox.Text = GetDisplayPathText(_currentPath);
             }
 
             PathTextBox.Visibility = Visibility.Collapsed;
@@ -9711,7 +10752,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            string targetPath = PathTextBox.Text.Trim();
+            string targetPath = NormalizeAddressInputPath(PathTextBox.Text);
             await NavigateToPathAsync(targetPath, pushHistory: true);
             ExitAddressEditMode(commit: true);
         }
@@ -9742,6 +10783,7 @@ namespace FileExplorerUI
     public sealed class EntryViewModel : INotifyPropertyChanged
     {
         private string _name = string.Empty;
+        private string _displayName = string.Empty;
         private string _fullPath = string.Empty;
         private string _type = string.Empty;
         private string _iconGlyph = "\uE8A5";
@@ -9755,9 +10797,12 @@ namespace FileExplorerUI
         private bool _isMetadataLoaded;
         private bool _isPendingCreate;
         private bool _pendingCreateIsDirectory;
+        private bool _isHiddenEntry;
+        private bool _isSystemEntry;
         private bool _isExplicitlySelected;
         private bool _isKeyboardAnchor;
         private bool _isSelectionActive = true;
+        private double _iconOpacity = 1.0;
         private string _pendingName = string.Empty;
         private bool _isNameEditing;
         private long? _sizeBytes;
@@ -9779,6 +10824,7 @@ namespace FileExplorerUI
             return new EntryViewModel
             {
                 Name = groupHeaderText,
+                DisplayName = groupHeaderText,
                 GroupKey = groupKey,
                 GroupHeaderText = groupHeaderText,
                 GroupItemCount = groupItemCount,
@@ -9806,6 +10852,20 @@ namespace FileExplorerUI
             }
         }
 
+        public string DisplayName
+        {
+            get => _displayName;
+            set
+            {
+                if (_displayName == value)
+                {
+                    return;
+                }
+                _displayName = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+            }
+        }
+
         public string FullPath
         {
             get => _fullPath;
@@ -9817,6 +10877,48 @@ namespace FileExplorerUI
                 }
                 _fullPath = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FullPath)));
+            }
+        }
+
+        public bool IsHiddenEntry
+        {
+            get => _isHiddenEntry;
+            set
+            {
+                if (_isHiddenEntry == value)
+                {
+                    return;
+                }
+                _isHiddenEntry = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsHiddenEntry)));
+            }
+        }
+
+        public bool IsSystemEntry
+        {
+            get => _isSystemEntry;
+            set
+            {
+                if (_isSystemEntry == value)
+                {
+                    return;
+                }
+                _isSystemEntry = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSystemEntry)));
+            }
+        }
+
+        public double IconOpacity
+        {
+            get => _iconOpacity;
+            set
+            {
+                if (Math.Abs(_iconOpacity - value) < 0.001)
+                {
+                    return;
+                }
+                _iconOpacity = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IconOpacity)));
             }
         }
 
@@ -10410,6 +11512,42 @@ namespace FileExplorerUI
             internal uint Flags;
         }
 
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        internal struct NOTIFYICONDATA
+        {
+            internal uint cbSize;
+            internal IntPtr hWnd;
+            internal uint uID;
+            internal uint uFlags;
+            internal uint uCallbackMessage;
+            internal IntPtr hIcon;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            internal string szTip;
+
+            internal uint dwState;
+            internal uint dwStateMask;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+            internal string szInfo;
+
+            internal uint uTimeoutOrVersion;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+            internal string szInfoTitle;
+
+            internal uint dwInfoFlags;
+            internal Guid guidItem;
+            internal IntPtr hBalloonIcon;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct POINT
+        {
+            internal int X;
+            internal int Y;
+        }
+
         [ComImport]
         [Guid("3A3DCD6C-3EAB-43DC-BCDE-45671CE800C8")]
         [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -10422,6 +11560,9 @@ namespace FileExplorerUI
         [LibraryImport("user32.dll", EntryPoint = "LoadCursorW", SetLastError = true)]
         internal static partial IntPtr LoadCursor(IntPtr hInstance, int lpCursorName);
 
+        [LibraryImport("user32.dll", EntryPoint = "LoadIconW", SetLastError = true)]
+        internal static partial IntPtr LoadIcon(IntPtr hInstance, int lpIconName);
+
         [LibraryImport("user32.dll", EntryPoint = "SetCursor", SetLastError = true)]
         internal static partial IntPtr SetCursor(IntPtr hCursor);
 
@@ -10430,6 +11571,36 @@ namespace FileExplorerUI
 
         [LibraryImport("user32.dll", EntryPoint = "CallWindowProcW")]
         internal static partial IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [LibraryImport("user32.dll", EntryPoint = "ShowWindow")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [LibraryImport("user32.dll", EntryPoint = "SetForegroundWindow")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool SetForegroundWindow(IntPtr hWnd);
+
+        [LibraryImport("user32.dll", EntryPoint = "CreatePopupMenu", SetLastError = true)]
+        internal static partial IntPtr CreatePopupMenu();
+
+        [LibraryImport("user32.dll", EntryPoint = "AppendMenuW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool AppendMenu(IntPtr hMenu, uint uFlags, uint uIDNewItem, string lpNewItem);
+
+        [LibraryImport("user32.dll", EntryPoint = "TrackPopupMenu", SetLastError = true)]
+        internal static partial uint TrackPopupMenu(IntPtr hMenu, uint uFlags, int x, int y, int nReserved, IntPtr hWnd, IntPtr prcRect);
+
+        [LibraryImport("user32.dll", EntryPoint = "DestroyMenu", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool DestroyMenu(IntPtr hMenu);
+
+        [LibraryImport("user32.dll", EntryPoint = "GetCursorPos", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool GetCursorPos(out POINT point);
+
+        [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconW", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool Shell_NotifyIcon(uint dwMessage, ref NOTIFYICONDATA lpData);
 
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
         internal static extern int SHOpenWithDialog(IntPtr hwndParent, ref OpenAsInfo openAsInfo);

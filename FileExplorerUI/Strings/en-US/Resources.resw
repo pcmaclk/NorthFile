@@ -162,6 +162,9 @@
   <data name="CommonOpen" xml:space="preserve">
     <value>Open</value>
   </data>
+  <data name="TrayMenuExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
   <data name="CommonOpenWith" xml:space="preserve">
     <value>Open with</value>
   </data>
@@ -373,6 +376,39 @@
     <value>Switch language</value>
   </data>
   <data name="OverflowBreadcrumbButtonToolTip.Content" xml:space="preserve">
+    <value>Show hidden path segments</value>
+  </data>
+  <data name="ToolTipBack" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="ToolTipForward" xml:space="preserve">
+    <value>Forward</value>
+  </data>
+  <data name="ToolTipUp" xml:space="preserve">
+    <value>Up</value>
+  </data>
+  <data name="ToolTipRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="ToolTipNewFile" xml:space="preserve">
+    <value>New file</value>
+  </data>
+  <data name="ToolTipNewFolder" xml:space="preserve">
+    <value>New folder</value>
+  </data>
+  <data name="ToolTipCopy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="ToolTipCut" xml:space="preserve">
+    <value>Cut</value>
+  </data>
+  <data name="ToolTipPaste" xml:space="preserve">
+    <value>Paste</value>
+  </data>
+  <data name="ToolTipSwitchLanguage" xml:space="preserve">
+    <value>Switch language</value>
+  </data>
+  <data name="ToolTipShowHiddenPathSegments" xml:space="preserve">
     <value>Show hidden path segments</value>
   </data>
   <data name="PathTextBox.PlaceholderText" xml:space="preserve">
@@ -642,6 +678,18 @@
   <data name="StatusCopyPathFailed" xml:space="preserve">
     <value>Copy path failed: {0}</value>
   </data>
+  <data name="StatusSettingsExported" xml:space="preserve">
+    <value>Settings exported: {0}</value>
+  </data>
+  <data name="StatusSettingsExportFailed" xml:space="preserve">
+    <value>Export settings failed: {0}</value>
+  </data>
+  <data name="StatusSettingsImported" xml:space="preserve">
+    <value>Settings imported: {0}</value>
+  </data>
+  <data name="StatusSettingsImportFailed" xml:space="preserve">
+    <value>Import settings failed: {0}</value>
+  </data>
   <data name="StatusCreateShortcutSuccess" xml:space="preserve">
     <value>Created shortcut: {0}</value>
   </data>
@@ -761,12 +809,6 @@
   </data>
   <data name="DialogDeleteContent" xml:space="preserve">
     <value>Delete '{0}'? Recursive: {1}</value>
-  </data>
-  <data name="DialogDeleteFileContent" xml:space="preserve">
-    <value>Delete '{0}'?</value>
-  </data>
-  <data name="DialogDeleteFolderContent" xml:space="preserve">
-    <value>Delete folder '{0}' and its contents?</value>
   </data>
   <data name="DialogDeletePrimaryButton" xml:space="preserve">
     <value>Delete</value>
@@ -1045,19 +1087,19 @@
     <value>General</value>
   </data>
   <data name="SettingsSectionGeneralDescription" xml:space="preserve">
-    <value>Basic app behavior and startup options. This stage is UI only.</value>
+    <value>Basic app behavior and startup options.</value>
   </data>
   <data name="SettingsLanguageTitle" xml:space="preserve">
     <value>Language</value>
   </data>
   <data name="SettingsLanguageDescription" xml:space="preserve">
-    <value>Controls the display language. System and manual selection will be supported later.</value>
+    <value>Controls the display language. Choose the system setting or a specific language.</value>
   </data>
   <data name="SettingsUseSystem" xml:space="preserve">
     <value>Use system setting</value>
   </data>
   <data name="SettingsLanguageChineseSimplified" xml:space="preserve">
-    <value>Simplified Chinese</value>
+    <value>简体中文</value>
   </data>
   <data name="SettingsStartupTitle" xml:space="preserve">
     <value>Startup</value>
@@ -1071,35 +1113,53 @@
   <data name="SettingsStartupSpecifiedLocation" xml:space="preserve">
     <value>Specified location</value>
   </data>
+  <data name="SettingsStartupSpecifiedPathTitle" xml:space="preserve">
+    <value>Startup folder</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathDescription" xml:space="preserve">
+    <value>Choose the folder to open at launch when specified location is selected.</value>
+  </data>
+  <data name="SettingsStartupSpecifiedPathPlaceholder" xml:space="preserve">
+    <value>Enter a folder path</value>
+  </data>
+  <data name="SettingsBrowseFolder" xml:space="preserve">
+    <value>Browse</value>
+  </data>
+  <data name="SettingsStartupUseThisPc" xml:space="preserve">
+    <value>This PC</value>
+  </data>
+  <data name="SettingsStartupUseCustomPath" xml:space="preserve">
+    <value>Custom path</value>
+  </data>
   <data name="SettingsFavoritesTitle" xml:space="preserve">
     <value>Favorites</value>
   </data>
   <data name="SettingsFavoritesDescription" xml:space="preserve">
-    <value>Controls whether the favorites group is shownr.</value>
+    <value>Controls whether the favorites group is shown.</value>
   </data>
   <data name="SettingsCloudTitle" xml:space="preserve">
-    <value>Cloud</value>
+    <value>Cloud drives</value>
   </data>
   <data name="SettingsCloudDescription" xml:space="preserve">
-    <value>Controls whether the cloud group is shown.</value>
+    <value>Controls whether the cloud drives group is shown in the sidebar.</value>
   </data>
   <data name="SettingsNetworkTitle" xml:space="preserve">
     <value>Network</value>
   </data>
   <data name="SettingsNetworkDescription" xml:space="preserve">
-    <value>Controls whether the network group is shown.</value>
+    <value>Controls whether the network group is shown in the sidebar.</value>
   </data>
   <data name="SettingsTagsTitle" xml:space="preserve">
     <value>Tags</value>
   </data>
   <data name="SettingsTagsDescription" xml:space="preserve">
-    <value>Controls whether the tags group is shown.</value>
+    <value>Controls whether the tags group is shown in the sidebar.</value>
   </data>
   <data name="SettingsSectionAppearance" xml:space="preserve">
     <value>Appearance</value>
   </data>
   <data name="SettingsSectionAppearanceDescription" xml:space="preserve">
-    <value>App theme and default presentation. This stage is UI only.</value>
+    <value>App theme and default presentation.</value>
   </data>
   <data name="SettingsThemeTitle" xml:space="preserve">
     <value>Theme</value>
@@ -1117,7 +1177,7 @@
     <value>Default sort mode</value>
   </data>
   <data name="SettingsSortDescription" xml:space="preserve">
-    <value>Controls the default sort used by new windows and tabs.</value>
+    <value>Controls the default sort used by new windows.</value>
   </data>
   <data name="SettingsGroupTitle" xml:space="preserve">
     <value>Default group mode</value>
@@ -1129,7 +1189,7 @@
     <value>Files and folders</value>
   </data>
   <data name="SettingsSectionFilesAndFoldersDescription" xml:space="preserve">
-    <value>Folder visibility rules and delete behavior. This stage is UI only.</value>
+    <value>Visibility rules and delete behavior for files and folders.</value>
   </data>
   <data name="SettingsShowHiddenTitle" xml:space="preserve">
     <value>Show hidden files and folders</value>
@@ -1192,13 +1252,13 @@
     <value>Advanced</value>
   </data>
   <data name="SettingsSectionAdvancedDescription" xml:space="preserve">
-    <value>System-level behavior and migration capabilities. This stage is UI only.</value>
+    <value>System-level behavior and settings migration.</value>
   </data>
   <data name="SettingsMigrationTitle" xml:space="preserve">
     <value>Settings migration</value>
   </data>
   <data name="SettingsMigrationDescription" xml:space="preserve">
-    <value>Importing and exporting settings will be added in a later version.</value>
+    <value>Import or export the current app settings.</value>
   </data>
   <data name="SettingsExport" xml:space="preserve">
     <value>Export settings</value>
@@ -1222,7 +1282,7 @@
     <value>Set NorthFile as the default file manager</value>
   </data>
   <data name="SettingsDefaultManagerDescription" xml:space="preserve">
-    <value>This stage only shows the entry point and does not perform system registration.</value>
+    <value>Currently shows the entry point only and does not perform system registration.</value>
   </data>
   <data name="SettingsSetDefault" xml:space="preserve">
     <value>Set default</value>
@@ -1244,5 +1304,11 @@
   </data>
   <data name="SettingsAboutAppVersion" xml:space="preserve">
     <value>App version: {0}</value>
+  </data>
+  <data name="DialogDeleteFileContent" xml:space="preserve">
+    <value>Delete '{0}'?</value>
+  </data>
+  <data name="DialogDeleteFolderContent" xml:space="preserve">
+    <value>Delete folder '{0}' and its contents?</value>
   </data>
 </root>

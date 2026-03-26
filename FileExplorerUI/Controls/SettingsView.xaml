@@ -122,28 +122,76 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsLanguageTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsLanguageDescription]}" />
                         </StackPanel>
-                        <ComboBox Grid.Column="2" Style="{StaticResource SettingsComboBoxStyle}" SelectedIndex="0">
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsUseSystem]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsLanguageChineseSimplified]}" />
-                            <ComboBoxItem Content="English" />
+                        <ComboBox
+                            x:Name="LanguagePreferenceComboBox"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsComboBoxStyle}"
+                            SelectedIndex="0"
+                            SelectionChanged="LanguagePreferenceComboBox_SelectionChanged">
+                            <ComboBoxItem x:Name="LanguageUseSystemComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[SettingsUseSystem]}" />
+                            <ComboBoxItem x:Name="LanguageChineseSimplifiedComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[SettingsLanguageChineseSimplified]}" />
+                            <ComboBoxItem x:Name="LanguageEnglishComboBoxItem" Content="English" />
                         </ComboBox>
                     </Grid>
                 </Border>
 
                 <Border Style="{StaticResource SettingsItemCardStyle}">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="0">
-                        <Border Style="{StaticResource SettingsIconHostStyle}">
-                            <FontIcon HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe Fluent Icons" Glyph="&#xE823;" />
-                        </Border>
-                        <StackPanel Grid.Column="1" Spacing="0" Style="{StaticResource SettingsItemTextHostStyle}">
-                            <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsStartupTitle]}" />
-                            <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsStartupDescription]}" />
-                        </StackPanel>
-                        <ComboBox Grid.Column="2" Style="{StaticResource SettingsComboBoxStyle}" SelectedIndex="0">
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsStartupLastLocation]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsStartupSpecifiedLocation]}" />
-                        </ComboBox>
-                    </Grid>
+                    <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="0">
+                            <Border Style="{StaticResource SettingsIconHostStyle}">
+                                <FontIcon HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe Fluent Icons" Glyph="&#xE823;" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="0" Style="{StaticResource SettingsItemTextHostStyle}">
+                                <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsStartupTitle]}" />
+                                <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsStartupDescription]}" />
+                            </StackPanel>
+                            <ComboBox
+                                x:Name="StartupLocationComboBox"
+                                Grid.Column="2"
+                                Style="{StaticResource SettingsComboBoxStyle}"
+                                SelectedIndex="0"
+                                SelectionChanged="StartupLocationComboBox_SelectionChanged">
+                                <ComboBoxItem x:Name="StartupThisPcComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[SettingsStartupUseThisPc]}" />
+                                <ComboBoxItem x:Name="StartupLastLocationComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[SettingsStartupLastLocation]}" />
+                                <ComboBoxItem x:Name="StartupSpecifiedLocationComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[SettingsStartupSpecifiedLocation]}" />
+                            </ComboBox>
+                        </Grid>
+                        <Grid
+                            x:Name="StartupSpecifiedPathPanel"
+                            Margin="0,16,0,0"
+                            RowDefinitions="Auto,Auto"
+                            Visibility="Collapsed">
+                            <Border
+                                x:Name="StartupSpecifiedPathSeparator"
+                                Height="1"
+                                Margin="0,0,0,16"
+                                Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+                            <Grid
+                                Grid.Row="1"
+                                ColumnDefinitions="*"
+                                ColumnSpacing="8">
+                                <StackPanel Margin="42,0,24,0" Spacing="8">
+                                    <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsStartupSpecifiedPathDescription]}" />
+                                    <Grid
+                                        x:Name="StartupSpecifiedCustomPathPanel"
+                                        ColumnDefinitions="*,Auto"
+                                        ColumnSpacing="8">
+                                        <TextBox
+                                            x:Name="StartupSpecifiedPathTextBox"
+                                            HorizontalAlignment="Stretch"
+                                            PlaceholderText="{Binding Source={StaticResource Strings}, Path=[SettingsStartupSpecifiedPathPlaceholder]}"
+                                            TextChanged="StartupSpecifiedPathTextBox_TextChanged" />
+                                        <Button
+                                            x:Name="StartupBrowseButton"
+                                            Grid.Column="1"
+                                            Style="{StaticResource SettingsActionButtonStyle}"
+                                            Click="StartupBrowseButton_Click"
+                                            Content="{Binding Source={StaticResource Strings}, Path=[SettingsBrowseFolder]}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </StackPanel>
                 </Border>
 
                 <Border Style="{StaticResource SettingsItemCardStyle}">
@@ -233,10 +281,15 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsThemeTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsThemeDescription]}" />
                         </StackPanel>
-                        <ComboBox Grid.Column="2" Style="{StaticResource SettingsComboBoxStyle}" SelectedIndex="0">
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsUseSystem]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsThemeLight]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsThemeDark]}" />
+                        <ComboBox
+                            x:Name="ThemePreferenceComboBox"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsComboBoxStyle}"
+                            SelectedIndex="0"
+                            SelectionChanged="ThemePreferenceComboBox_SelectionChanged">
+                            <ComboBoxItem x:Name="ThemeUseSystemComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[SettingsUseSystem]}" />
+                            <ComboBoxItem x:Name="ThemeLightComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[SettingsThemeLight]}" />
+                            <ComboBoxItem x:Name="ThemeDarkComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[SettingsThemeDark]}" />
                         </ComboBox>
                     </Grid>
                 </Border>
@@ -250,11 +303,16 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsSortTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsSortDescription]}" />
                         </StackPanel>
-                        <ComboBox Grid.Column="2" Style="{StaticResource SettingsComboBoxStyle}" SelectedIndex="0">
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[CommonSortByName]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[CommonSortByModifiedDate]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[CommonSortByType]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[CommonSortBySize]}" />
+                        <ComboBox
+                            x:Name="DefaultSortComboBox"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsComboBoxStyle}"
+                            SelectedIndex="0"
+                            SelectionChanged="DefaultSortComboBox_SelectionChanged">
+                            <ComboBoxItem x:Name="SortByNameComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[CommonSortByName]}" />
+                            <ComboBoxItem x:Name="SortByModifiedDateComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[CommonSortByModifiedDate]}" />
+                            <ComboBoxItem x:Name="SortByTypeComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[CommonSortByType]}" />
+                            <ComboBoxItem x:Name="SortBySizeComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[CommonSortBySize]}" />
                         </ComboBox>
                     </Grid>
                 </Border>
@@ -268,11 +326,16 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsGroupTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsGroupDescription]}" />
                         </StackPanel>
-                        <ComboBox Grid.Column="2" Style="{StaticResource SettingsComboBoxStyle}" SelectedIndex="0">
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[CommonGroupByNone]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[CommonGroupByName]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[CommonGroupByType]}" />
-                            <ComboBoxItem Content="{Binding Source={StaticResource Strings}, Path=[CommonGroupByModifiedDate]}" />
+                        <ComboBox
+                            x:Name="DefaultGroupComboBox"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsComboBoxStyle}"
+                            SelectedIndex="0"
+                            SelectionChanged="DefaultGroupComboBox_SelectionChanged">
+                            <ComboBoxItem x:Name="GroupByNoneComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[CommonGroupByNone]}" />
+                            <ComboBoxItem x:Name="GroupByNameComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[CommonGroupByName]}" />
+                            <ComboBoxItem x:Name="GroupByTypeComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[CommonGroupByType]}" />
+                            <ComboBoxItem x:Name="GroupByModifiedDateComboBoxItem" Content="{Binding Source={StaticResource Strings}, Path=[CommonGroupByModifiedDate]}" />
                         </ComboBox>
                     </Grid>
                 </Border>
@@ -291,7 +354,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowHiddenTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowHiddenDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="False" />
+                        <ToggleSwitch
+                            x:Name="ShowHiddenToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="False"
+                            Toggled="FileDisplayToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -304,7 +372,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowProtectedSystemTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowProtectedSystemDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="False" />
+                        <ToggleSwitch
+                            x:Name="ShowProtectedSystemToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="False"
+                            Toggled="FileDisplayToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -317,7 +390,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowDotFilesTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowDotFilesDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="True" />
+                        <ToggleSwitch
+                            x:Name="ShowDotFilesToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="True"
+                            Toggled="FileDisplayToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -330,7 +408,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowExtensionsTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsShowExtensionsDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="True" />
+                        <ToggleSwitch
+                            x:Name="ShowFileExtensionsToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="True"
+                            Toggled="FileDisplayToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -403,8 +486,16 @@
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsMigrationDescription]}" />
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                            <Button Style="{StaticResource SettingsActionButtonStyle}" Content="{Binding Source={StaticResource Strings}, Path=[SettingsExport]}" IsEnabled="False" />
-                            <Button Style="{StaticResource SettingsActionButtonStyle}" Content="{Binding Source={StaticResource Strings}, Path=[SettingsImport]}" IsEnabled="False" />
+                            <Button
+                                x:Name="ExportSettingsButton"
+                                Style="{StaticResource SettingsActionButtonStyle}"
+                                Click="ExportSettingsButton_Click"
+                                Content="{Binding Source={StaticResource Strings}, Path=[SettingsExport]}" />
+                            <Button
+                                x:Name="ImportSettingsButton"
+                                Style="{StaticResource SettingsActionButtonStyle}"
+                                Click="ImportSettingsButton_Click"
+                                Content="{Binding Source={StaticResource Strings}, Path=[SettingsImport]}" />
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -418,7 +509,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsAutoStartTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsAutoStartDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="False" />
+                        <ToggleSwitch
+                            x:Name="AutoStartToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="False"
+                            Toggled="AutoStartToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -431,7 +527,12 @@
                             <TextBlock Style="{StaticResource SettingsItemHeaderStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsMinimizeToTrayTitle]}" />
                             <TextBlock Style="{StaticResource SettingsItemDescriptionStyle}" Text="{Binding Source={StaticResource Strings}, Path=[SettingsMinimizeToTrayDescription]}" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="2" Style="{StaticResource SettingsToggleSwitchStyle}" IsOn="False" />
+                        <ToggleSwitch
+                            x:Name="MinimizeToTrayToggleSwitch"
+                            Grid.Column="2"
+                            Style="{StaticResource SettingsToggleSwitchStyle}"
+                            IsOn="False"
+                            Toggled="MinimizeToTrayToggleSwitch_Toggled" />
                     </Grid>
                 </Border>
 
@@ -465,8 +566,8 @@
                         <StackPanel Grid.Column="1" Spacing="6" Style="{StaticResource SettingsItemTextHostStyle}">
                             <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding Source={StaticResource Strings}, Path=[SettingsAboutAppName]}" />
                             <TextBlock Opacity="0.72" Text="{Binding Source={StaticResource Strings}, Path=[SettingsAboutAppDescription]}" TextWrapping="WrapWholeWords" />
-                            <TextBlock Opacity="0.72" Text="{x:Bind EngineVersionText, Mode=OneWay}" />
-                            <TextBlock Opacity="0.72" Text="{x:Bind AppVersionText, Mode=OneWay}" />
+                            <TextBlock x:Name="EngineVersionTextBlock" Opacity="0.72" />
+                            <TextBlock x:Name="AppVersionTextBlock" Opacity="0.72" />
                         </StackPanel>
                         <FontIcon
                             Grid.Column="2"

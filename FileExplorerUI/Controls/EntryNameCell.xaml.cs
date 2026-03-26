@@ -88,9 +88,10 @@ public sealed partial class EntryNameCell : UserControl
 
     private void Entry_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is not (nameof(FileExplorerUI.EntryViewModel.Name)
+        if (e.PropertyName is not (nameof(FileExplorerUI.EntryViewModel.DisplayName)
             or nameof(FileExplorerUI.EntryViewModel.IconGlyph)
-            or nameof(FileExplorerUI.EntryViewModel.IconForeground)))
+            or nameof(FileExplorerUI.EntryViewModel.IconForeground)
+            or nameof(FileExplorerUI.EntryViewModel.IconOpacity)))
         {
             return;
         }
@@ -115,11 +116,12 @@ public sealed partial class EntryNameCell : UserControl
         IconTextBlock.Width = metrics.IconColumnWidth;
         IconTextBlock.FontSize = metrics.IconFontSize;
         IconTextBlock.Foreground = entry?.IconForeground;
+        IconTextBlock.Opacity = entry?.IconOpacity ?? 1.0;
         IconTextBlock.Text = entry?.IconGlyph ?? string.Empty;
 
         EntryNameTextBlock.Margin = new Thickness(0, 0, metrics.NameTrailingSpacing, 0);
         EntryNameTextBlock.FontSize = metrics.NameFontSize;
-        EntryNameTextBlock.Text = entry?.Name ?? string.Empty;
+        EntryNameTextBlock.Text = entry?.DisplayName ?? string.Empty;
     }
 
     private void EntryNameCell_Unloaded(object sender, RoutedEventArgs e)
