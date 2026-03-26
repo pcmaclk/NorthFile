@@ -1,4 +1,5 @@
 using FileExplorerUI.Workspace;
+using System.Collections.Generic;
 
 namespace FileExplorerUI.Settings;
 
@@ -64,4 +65,19 @@ public sealed class AppSettings
     public int WindowWidth { get; set; } = 0;
 
     public int WindowHeight { get; set; } = 0;
+
+    public bool FavoritesInitialized { get; set; } = false;
+
+    public List<FavoriteItem> Favorites { get; set; } = new();
+}
+
+public sealed class FavoriteItem
+{
+    public string Path { get; set; } = string.Empty;
+
+    public string Label { get; set; } = string.Empty;
+
+    public string Glyph { get; set; } = "\uE8B7";
+
+    public int Order { get; set; } = 0;
 }

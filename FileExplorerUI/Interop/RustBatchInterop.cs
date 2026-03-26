@@ -359,28 +359,62 @@ public static partial class RustBatchInterop
 
     public static void DeletePath(string path, bool recursive = true)
     {
+        if (!TryDeletePath(path, recursive, out Exception? error))
+        {
+            throw error!;
+        }
+    }
+
+    public static bool TryDeletePath(string path, bool recursive, out Exception? error)
+    {
         int code;
         lock (NativeCallGate)
         {
             code = DeletePathNative(path, recursive ? (byte)1 : (byte)0);
         }
-        if (code != 0)
-        {
-            throw new InvalidOperationException(SF("InteropDeletePathFailed", code, DescribeOperationError(code)));
-        }
+
+        error = code == 0
+            ? null
+            : CreateOperationException(code, "InteropDeletePathFailed");
+        return error is null;
     }
 
     public static void RenamePath(string sourcePath, string targetPath)
+    {
+        if (!TryRenamePath(sourcePath, targetPath, out Exception? error))
+        {
+            throw error!;
+        }
+    }
+
+    public static bool TryRenamePath(string sourcePath, string targetPath, out Exception? error)
     {
         int code;
         lock (NativeCallGate)
         {
             code = RenamePathNative(sourcePath, targetPath);
         }
-        if (code != 0)
+
+        error = code == 0
+            ? null
+            : CreateOperationException(code, "InteropRenamePathFailed");
+        return error is null;
+    }
+
+    private static Exception CreateOperationException(int code, string messageKey)
+    {
+        string message = SF(messageKey, code, DescribeOperationError(code));
+        return code switch
         {
-            throw new InvalidOperationException(SF("InteropRenamePathFailed", code, DescribeOperationError(code)));
-        }
+            2101 => new DirectoryNotFoundException(message),
+            2102 => new UnauthorizedAccessException(message),
+            2103 => new IOException(message, unchecked((int)0x80070050)),
+            2104 => new IOException(message),
+            2105 => new IOException(message, unchecked((int)0x80070020)),
+            2106 => new IOException(message, unchecked((int)0x8007007B)),
+            2107 => new NotSupportedException(message),
+            _ => new IOException(message)
+        };
     }
 
     private static unsafe FileBatchPage DecodeAndFree(RustBatchResult batch)

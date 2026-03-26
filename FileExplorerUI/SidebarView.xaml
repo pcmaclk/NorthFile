@@ -19,6 +19,22 @@
         <x:Double x:Key="TreeViewItemContentHeight">32</x:Double>
         <DataTemplate x:Key="SidebarPinnedItemTemplate" x:DataType="local:SidebarNavItemModel">
             <Grid>
+                <Border
+                    Height="2"
+                    Margin="14,0,0,0"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Stretch"
+                    Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                    CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                    Visibility="{x:Bind DragInsertBeforeVisibility, Mode=OneWay}" />
+                <Border
+                    Height="2"
+                    Margin="14,0,0,0"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Stretch"
+                    Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                    CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
+                    Visibility="{x:Bind DragInsertAfterVisibility, Mode=OneWay}" />
                 <controls:EntryItemHost
                     Margin="0,2,0,2"
                     MinHeight="32"
@@ -27,8 +43,15 @@
                     IndicatorBrush="{ThemeResource ListViewItemSelectionIndicatorBrush}"
                     IsSelected="{x:Bind IsSelected, Mode=OneWay}"
                     HorizontalAlignment="Stretch"
-                    PointerPressed="PinnedItemHost_PointerPressed">
-                    <Grid Margin="6,0,0,0" Height="26" ColumnDefinitions="32,12,*" ColumnSpacing="0">
+                    Loaded="PinnedItemHost_Loaded"
+                    Unloaded="PinnedItemHost_Unloaded"
+                    PointerPressed="PinnedItemHost_PointerPressed"
+                    PointerMoved="PinnedItemHost_PointerMoved"
+                    PointerReleased="PinnedItemHost_PointerReleased"
+                    PointerCaptureLost="PinnedItemHost_PointerCaptureLost"
+                    Tapped="PinnedItemHost_Tapped"
+                    ContextRequested="PinnedItemHost_ContextRequested">
+                    <Grid Margin="6,0,0,0" Height="26" ColumnDefinitions="32,12,*,26" ColumnSpacing="0">
                         <FontIcon
                             Grid.Column="1"
                             Width="12"
@@ -44,6 +67,16 @@
                             VerticalAlignment="Center"
                             Text="{x:Bind Label}"
                             TextTrimming="CharacterEllipsis" />
+                        <FontIcon
+                            Grid.Column="3"
+                            Width="12"
+                            Height="12"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="10"
+                            Opacity="0.72"
+                            Glyph="&#xE718;" />
                     </Grid>
                 </controls:EntryItemHost>
             </Grid>
@@ -81,7 +114,7 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Grid RowDefinitions="*,Auto">
+    <Grid x:Name="RootGrid" RowDefinitions="*,Auto">
         <ScrollViewer x:Name="SidebarScrollViewer" Padding="0,0,12,0" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="RootStackPanel" Margin="0,4,0,0" Spacing="0">
                 <StackPanel x:Name="CompactButtonsPanel" Spacing="6" Visibility="Collapsed" />
@@ -93,7 +126,8 @@
                     Padding="0,4"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
-                    PointerPressed="PinnedGroup_Click">
+                    PointerPressed="PinnedGroup_Click"
+                    >
                     <Grid x:Name="PinnedGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
                         <Border
                             x:Name="PinnedGroupSelectionIndicator"
@@ -352,5 +386,28 @@
                     Glyph="&#xE713;" />
             </Button>
         </Grid>
+
+        <Canvas x:Name="PinnedDragOverlayCanvas" IsHitTestVisible="False">
+            <Border
+                x:Name="PinnedDragPreviewHost"
+                Width="44"
+                Height="44"
+                CornerRadius="8"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                Opacity="0.96"
+                Visibility="Collapsed">
+                <Grid>
+                    <FontIcon
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FontFamily="Segoe Fluent Icons"
+                        FontSize="18"
+                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                        Glyph="&#xE8B7;" />
+                </Grid>
+            </Border>
+        </Canvas>
     </Grid>
 </UserControl>

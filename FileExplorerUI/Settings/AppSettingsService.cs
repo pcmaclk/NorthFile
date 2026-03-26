@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Collections.Generic;
 using System.Text.Json;
 using Windows.Storage;
 using FileExplorerUI.Workspace;
@@ -46,7 +47,9 @@ public sealed class AppSettingsService
                     AutoStartEnabled = ReadBool(localSettings, nameof(AppSettings.AutoStartEnabled), false),
                     MinimizeToTrayEnabled = ReadBool(localSettings, nameof(AppSettings.MinimizeToTrayEnabled), false),
                     WindowWidth = ReadInt(localSettings, nameof(AppSettings.WindowWidth), 0),
-                    WindowHeight = ReadInt(localSettings, nameof(AppSettings.WindowHeight), 0)
+                    WindowHeight = ReadInt(localSettings, nameof(AppSettings.WindowHeight), 0),
+                    FavoritesInitialized = ReadBool(localSettings, nameof(AppSettings.FavoritesInitialized), false),
+                    Favorites = ReadFavorites(localSettings)
                 };
                 TraceWindowSizeSettings("加载设置", $"source=local-settings width={settings.WindowWidth} height={settings.WindowHeight}");
                 return settings;
@@ -88,6 +91,8 @@ public sealed class AppSettingsService
                 localSettings.Values[nameof(AppSettings.MinimizeToTrayEnabled)] = settings.MinimizeToTrayEnabled;
                 localSettings.Values[nameof(AppSettings.WindowWidth)] = settings.WindowWidth;
                 localSettings.Values[nameof(AppSettings.WindowHeight)] = settings.WindowHeight;
+                localSettings.Values[nameof(AppSettings.FavoritesInitialized)] = settings.FavoritesInitialized;
+                localSettings.Values[nameof(AppSettings.Favorites)] = JsonSerializer.Serialize(settings.Favorites ?? new List<FavoriteItem>());
                 TraceWindowSizeSettings("保存到设置", $"target=local-settings-done width={settings.WindowWidth} height={settings.WindowHeight}");
                 return;
             }
@@ -173,6 +178,24 @@ public sealed class AppSettingsService
         }
 
         return fallback;
+    }
+
+    private static List<FavoriteItem> ReadFavorites(ApplicationDataContainer localSettings)
+    {
+        object? value = localSettings.Values[nameof(AppSettings.Favorites)];
+        if (value is not string json || string.IsNullOrWhiteSpace(json))
+        {
+            return new List<FavoriteItem>();
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<FavoriteItem>>(json) ?? new List<FavoriteItem>();
+        }
+        catch
+        {
+            return new List<FavoriteItem>();
+        }
     }
 
     private AppSettings LoadFromFile()
