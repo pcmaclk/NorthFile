@@ -702,7 +702,7 @@
                                     </controls:CommandMenuFlyout.Commands>
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpen]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8E5;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open-in-new-window" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpenInNewWindow]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8A7;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
-                                    <MenuFlyoutItem IsEnabled="False" Text="{Binding Source={StaticResource Strings}, Path=[CommonPinToggle]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE718;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="pin-to-sidebar" Text="{Binding Source={StaticResource Strings}, Path=[CommonPinToSidebar]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE718;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="share" Text="{Binding Source={StaticResource Strings}, Path=[CommonShare]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72D;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                     <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="create-shortcut" Text="{Binding Source={StaticResource Strings}, Path=[CommonCreateShortcut]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE71B;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                     <MenuFlyoutSubItem Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompress]}">
@@ -763,7 +763,7 @@
                                 x:Name="RenameOverlayBorder"
                                 Width="160"
                                 Height="24"
-                                Background="White"
+                                Background="{ThemeResource TextControlBackgroundFocused}"
                                 BorderBrush="{ThemeResource ListViewItemSelectionIndicatorBrush}"
                                 BorderThickness="1"
                                 Padding="1,0,8,1"
@@ -777,6 +777,7 @@
                                     FontSize="14"
                                     FocusVisualPrimaryThickness="0"
                                     FocusVisualSecondaryThickness="0"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                     HorizontalContentAlignment="Left"
                                     KeyDown="RenameOverlayTextBox_KeyDown"
                                     LostFocus="RenameOverlayTextBox_LostFocus"

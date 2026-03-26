@@ -547,6 +547,7 @@ namespace FileExplorerUI
         private RustUsnCapability _usnCapability;
         private FileSystemWatcher? _dirWatcher;
         private CancellationTokenSource? _watcherDebounceCts;
+        private readonly Dictionary<string, FileSystemWatcher> _favoriteWatchers = new(StringComparer.OrdinalIgnoreCase);
         private CancellationTokenSource? _directoryLoadCts;
         private CancellationTokenSource? _metadataPrefetchCts;
         private bool _localizedUiRefreshScheduled;
@@ -783,6 +784,7 @@ namespace FileExplorerUI
             _pathDefaultBorderBrush = PathTextBox.BorderBrush;
             _engineVersion = _explorerService.GetEngineVersion();
             _appSettings = _appSettingsService.Load();
+            EnsureFavoritesInitialized();
             ApplyAppSettingsToPresentationDefaults();
             LocalizedStrings.Instance.PropertyChanged += LocalizedStrings_PropertyChanged;
             InitializeWorkspaceShellState();
@@ -794,6 +796,7 @@ namespace FileExplorerUI
             UpdateWindowTitle();
             ApplyTitleBarTheme();
             StyledSidebarView.NavigateRequested += StyledSidebarView_NavigateRequested;
+            StyledSidebarView.FavoriteActionRequested += StyledSidebarView_FavoriteActionRequested;
             StyledSidebarView.SettingsRequested += StyledSidebarView_SettingsRequested;
             SettingsViewControl.VisibleSectionChanged += SettingsViewControl_VisibleSectionChanged;
             SettingsViewControl.SidebarSectionVisibilityChanged += SettingsViewControl_SidebarSectionVisibilityChanged;
@@ -1701,6 +1704,7 @@ namespace FileExplorerUI
         {
             PersistCurrentWindowSize();
             RemoveTrayIcon();
+            DisposeFavoriteWatchers();
         }
 
         private IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
@@ -2770,6 +2774,7 @@ namespace FileExplorerUI
             {
                 UpdateSidebarSelectionOnly();
             }
+            RefreshSidebarFavorites(refreshSelection: false);
             _currentPageSize = InitialPageSize;
             _lastFetchMs = 0;
             UpdateBreadcrumbs(_currentPath);
@@ -3387,11 +3392,6 @@ namespace FileExplorerUI
             _sidebarQuickAccessPaths.Clear();
             _sidebarDrivePaths.Clear();
 
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
-            string picturesPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
-
             NavigationViewItem CreateLeaf(string label, string path, Symbol icon, bool inQuickAccess, bool inDrives)
             {
                 var item = new NavigationViewItem
@@ -3418,16 +3418,22 @@ namespace FileExplorerUI
                 Icon = new SymbolIcon(Symbol.Favorite),
                 SelectsOnInvoked = false
             };
-            quickAccess.MenuItems.Add(CreateLeaf(S("SidebarDesktop"), desktopPath, Symbol.Home, true, false));
-            quickAccess.MenuItems.Add(CreateLeaf(S("SidebarDocuments"), documentsPath, Symbol.Document, true, false));
-            quickAccess.MenuItems.Add(CreateLeaf(S("SidebarDownloads"), downloadsPath, Symbol.Download, true, false));
+            foreach (SidebarNavItemModel favorite in BuildSidebarFavoriteModels())
+            {
+                if (string.IsNullOrWhiteSpace(favorite.Path))
+                {
+                    continue;
+                }
+
+                quickAccess.MenuItems.Add(CreateLeaf(favorite.Label, favorite.Path, Symbol.Folder, true, false));
+            }
             SidebarNavView.MenuItems.Add(quickAccess);
 
             SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarCloud"), Icon = new SymbolIcon(Symbol.World), SelectsOnInvoked = false });
             SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarNetwork"), Icon = new SymbolIcon(Symbol.Globe), SelectsOnInvoked = false });
             SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarTags"), Icon = new SymbolIcon(Symbol.Tag), SelectsOnInvoked = false });
 
-            StyledSidebarView.ConfigurePinnedPaths(desktopPath, documentsPath, downloadsPath, picturesPath);
+            StyledSidebarView.SetPinnedItems(BuildSidebarFavoriteModels());
             StyledSidebarView.SetExtraItems(new[]
             {
                 new SidebarNavItemModel("cloud", S("SidebarCloud"), null, "\uE753", selectable: false),
@@ -3449,6 +3455,567 @@ namespace FileExplorerUI
                 _appSettings.ShowTags);
             ApplySidebarCompactState(_isSidebarCompact);
             UpdateSidebarSelectionOnly();
+        }
+
+        private void EnsureFavoritesInitialized()
+        {
+            NormalizeFavoritesInPlace();
+            if (_appSettings.FavoritesInitialized)
+            {
+                SyncFavoriteWatchers();
+                return;
+            }
+
+            if (_appSettings.Favorites.Count > 0)
+            {
+                _appSettings.FavoritesInitialized = true;
+                _appSettingsService.Save(_appSettings);
+                SyncFavoriteWatchers();
+                return;
+            }
+
+            _appSettings.Favorites = CreateDefaultFavoriteItems();
+            _appSettings.FavoritesInitialized = true;
+            _appSettingsService.Save(_appSettings);
+            SyncFavoriteWatchers();
+        }
+
+        private void NormalizeFavoritesInPlace()
+        {
+            var normalized = new List<FavoriteItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (FavoriteItem favorite in _appSettings.Favorites ?? new List<FavoriteItem>())
+            {
+                if (string.IsNullOrWhiteSpace(favorite.Path))
+                {
+                    continue;
+                }
+
+                string normalizedPath = NormalizeFavoritePath(favorite.Path);
+                if (!seen.Add(normalizedPath))
+                {
+                    continue;
+                }
+
+                normalized.Add(new FavoriteItem
+                {
+                    Path = normalizedPath,
+                    Label = favorite.Label ?? string.Empty,
+                    Glyph = string.IsNullOrWhiteSpace(favorite.Glyph) ? GetFavoriteGlyph(normalizedPath) : favorite.Glyph,
+                    Order = favorite.Order
+                });
+            }
+
+            _appSettings.Favorites = normalized
+                .OrderBy(item => item.Order)
+                .ThenBy(item => item.Label, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+
+            for (int i = 0; i < _appSettings.Favorites.Count; i++)
+            {
+                _appSettings.Favorites[i].Order = i;
+            }
+        }
+
+        private void ReindexFavoritesInPlace()
+        {
+            for (int i = 0; i < _appSettings.Favorites.Count; i++)
+            {
+                _appSettings.Favorites[i].Order = i;
+            }
+        }
+
+        private List<FavoriteItem> CreateDefaultFavoriteItems()
+        {
+            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string downloadsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            string picturesPath = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+
+            return new List<FavoriteItem>
+            {
+                new() { Path = NormalizeFavoritePath(desktopPath), Label = S("SidebarDesktop"), Glyph = "\uE80F", Order = 0 },
+                new() { Path = NormalizeFavoritePath(documentsPath), Label = S("SidebarDocuments"), Glyph = "\uE8A5", Order = 1 },
+                new() { Path = NormalizeFavoritePath(downloadsPath), Label = S("SidebarDownloads"), Glyph = "\uE896", Order = 2 },
+                new() { Path = NormalizeFavoritePath(picturesPath), Label = S("SidebarPictures"), Glyph = "\uE91B", Order = 3 }
+            };
+        }
+
+        private IReadOnlyList<SidebarNavItemModel> BuildSidebarFavoriteModels()
+        {
+            NormalizeFavoritesInPlace();
+            return _appSettings.Favorites
+                .OrderBy(item => item.Order)
+                .Select(item => new SidebarNavItemModel(
+                    key: item.Path,
+                    label: ResolveFavoriteLabel(item),
+                    path: item.Path,
+                    glyph: string.IsNullOrWhiteSpace(item.Glyph) ? GetFavoriteGlyph(item.Path) : item.Glyph))
+                .ToList();
+        }
+
+        private string ResolveFavoriteLabel(FavoriteItem favorite)
+        {
+            if (TryGetLocalizedFavoriteLabel(favorite.Path, out string? localizedLabel))
+            {
+                return localizedLabel!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(favorite.Label))
+            {
+                return favorite.Label;
+            }
+
+            string trimmedPath = favorite.Path.TrimEnd('\\');
+            string fileName = Path.GetFileName(trimmedPath);
+            return string.IsNullOrWhiteSpace(fileName) ? trimmedPath : fileName;
+        }
+
+        private static string NormalizeFavoritePath(string path)
+        {
+            try
+            {
+                return Path.GetFullPath(path).TrimEnd('\\');
+            }
+            catch
+            {
+                return path.TrimEnd('\\');
+            }
+        }
+
+        private bool TryGetLocalizedFavoriteLabel(string path, out string? label)
+        {
+            string normalizedPath = NormalizeFavoritePath(path);
+            string desktopPath = NormalizeFavoritePath(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+            if (string.Equals(normalizedPath, desktopPath, StringComparison.OrdinalIgnoreCase))
+            {
+                label = S("SidebarDesktop");
+                return true;
+            }
+
+            string documentsPath = NormalizeFavoritePath(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+            if (string.Equals(normalizedPath, documentsPath, StringComparison.OrdinalIgnoreCase))
+            {
+                label = S("SidebarDocuments");
+                return true;
+            }
+
+            string downloadsPath = NormalizeFavoritePath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));
+            if (string.Equals(normalizedPath, downloadsPath, StringComparison.OrdinalIgnoreCase))
+            {
+                label = S("SidebarDownloads");
+                return true;
+            }
+
+            string picturesPath = NormalizeFavoritePath(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));
+            if (string.Equals(normalizedPath, picturesPath, StringComparison.OrdinalIgnoreCase))
+            {
+                label = S("SidebarPictures");
+                return true;
+            }
+
+            label = null;
+            return false;
+        }
+
+        private string GetFavoriteGlyph(string path)
+        {
+            string normalizedPath = NormalizeFavoritePath(path);
+            if (string.Equals(normalizedPath, NormalizeFavoritePath(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)), StringComparison.OrdinalIgnoreCase))
+            {
+                return "\uE80F";
+            }
+
+            if (string.Equals(normalizedPath, NormalizeFavoritePath(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)), StringComparison.OrdinalIgnoreCase))
+            {
+                return "\uE8A5";
+            }
+
+            if (string.Equals(normalizedPath, NormalizeFavoritePath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")), StringComparison.OrdinalIgnoreCase))
+            {
+                return "\uE896";
+            }
+
+            if (string.Equals(normalizedPath, NormalizeFavoritePath(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)), StringComparison.OrdinalIgnoreCase))
+            {
+                return "\uE91B";
+            }
+
+            return "\uE8B7";
+        }
+
+        private bool IsFavoritePath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            string normalizedPath = NormalizeFavoritePath(path);
+            return _appSettings.Favorites.Any(item => string.Equals(item.Path, normalizedPath, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void RefreshSidebarFavorites(bool refreshSelection)
+        {
+            SyncFavoriteWatchers();
+            StyledSidebarView.SetPinnedItems(BuildSidebarFavoriteModels(), refreshSelection);
+            UpdateSidebarSelectionOnly();
+        }
+
+        private bool ToggleFavoriteForTarget(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path) || !target.IsDirectory)
+            {
+                return false;
+            }
+
+            string normalizedPath = NormalizeFavoritePath(target.Path);
+            int existingIndex = _appSettings.Favorites.FindIndex(item => string.Equals(item.Path, normalizedPath, StringComparison.OrdinalIgnoreCase));
+            if (existingIndex >= 0)
+            {
+                _appSettings.Favorites.RemoveAt(existingIndex);
+            }
+            else
+            {
+                _appSettings.Favorites.Add(new FavoriteItem
+                {
+                    Path = normalizedPath,
+                    Label = ResolveDefaultFavoriteAddLabel(target),
+                    Glyph = GetFavoriteGlyph(normalizedPath),
+                    Order = _appSettings.Favorites.Count
+                });
+            }
+
+            NormalizeFavoritesInPlace();
+            _appSettings.FavoritesInitialized = true;
+            _appSettingsService.Save(_appSettings);
+            RefreshSidebarFavorites(refreshSelection: false);
+            return true;
+        }
+
+        private int FindFavoriteIndex(string path)
+        {
+            string normalizedPath = NormalizeFavoritePath(path);
+            return _appSettings.Favorites.FindIndex(item => string.Equals(item.Path, normalizedPath, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void SyncFavoriteWatchers()
+        {
+            var desiredWatchPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (FavoriteItem favorite in _appSettings.Favorites)
+            {
+                string? watchPath = ResolveFavoriteWatchPath(favorite.Path);
+                if (!string.IsNullOrWhiteSpace(watchPath))
+                {
+                    desiredWatchPaths.Add(watchPath);
+                }
+            }
+
+            foreach ((string path, FileSystemWatcher watcher) in _favoriteWatchers.ToArray())
+            {
+                if (desiredWatchPaths.Contains(path))
+                {
+                    continue;
+                }
+
+                watcher.Dispose();
+                _favoriteWatchers.Remove(path);
+            }
+
+            foreach (string watchPath in desiredWatchPaths)
+            {
+                if (_favoriteWatchers.ContainsKey(watchPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var watcher = new FileSystemWatcher(watchPath)
+                    {
+                        IncludeSubdirectories = false,
+                        NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName,
+                        EnableRaisingEvents = true
+                    };
+
+                    watcher.Deleted += FavoriteWatcher_OnChanged;
+                    watcher.Renamed += FavoriteWatcher_OnRenamed;
+                    _favoriteWatchers.Add(watchPath, watcher);
+                }
+                catch
+                {
+                    // Favorites can still update on navigation and explicit refresh.
+                }
+            }
+        }
+
+        private string? ResolveFavoriteWatchPath(string? favoritePath)
+        {
+            if (string.IsNullOrWhiteSpace(favoritePath))
+            {
+                return null;
+            }
+
+            string normalizedPath = NormalizeFavoritePath(favoritePath);
+            if (IsDriveRoot(normalizedPath))
+            {
+                return _explorerService.DirectoryExists(normalizedPath) ? normalizedPath : null;
+            }
+
+            string? parentPath = Path.GetDirectoryName(normalizedPath);
+            if (string.IsNullOrWhiteSpace(parentPath))
+            {
+                return null;
+            }
+
+            try
+            {
+                string fullParentPath = Path.GetFullPath(parentPath);
+                return _explorerService.DirectoryExists(fullParentPath) ? fullParentPath : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void FavoriteWatcher_OnChanged(object sender, FileSystemEventArgs e)
+        {
+            if (e.ChangeType != WatcherChangeTypes.Deleted)
+            {
+                return;
+            }
+
+            string deletedPath = e.FullPath;
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                TryRemoveFavoritesForDeletedPath(deletedPath);
+            });
+        }
+
+        private void FavoriteWatcher_OnRenamed(object sender, RenamedEventArgs e)
+        {
+            string oldPath = e.OldFullPath;
+            string newPath = e.FullPath;
+
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                if (TryUpdateFavoritePathsForRename(oldPath, newPath))
+                {
+                    return;
+                }
+            });
+        }
+
+        private bool TryUpdateFavoritePathsForRename(string oldPath, string newPath)
+        {
+            if (string.IsNullOrWhiteSpace(oldPath) || string.IsNullOrWhiteSpace(newPath))
+            {
+                return false;
+            }
+
+            string normalizedOldPath = NormalizeFavoritePath(oldPath);
+            string normalizedNewPath = NormalizeFavoritePath(newPath);
+            bool changed = false;
+
+            foreach (FavoriteItem favorite in _appSettings.Favorites)
+            {
+                if (string.IsNullOrWhiteSpace(favorite.Path))
+                {
+                    continue;
+                }
+
+                string normalizedFavoritePath = NormalizeFavoritePath(favorite.Path);
+                if (string.Equals(normalizedFavoritePath, normalizedOldPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    favorite.Path = normalizedNewPath;
+                    favorite.Label = ResolveFavoriteStoredLabel(normalizedNewPath);
+                    favorite.Glyph = GetFavoriteGlyph(normalizedNewPath);
+                    changed = true;
+                    continue;
+                }
+
+                if (!normalizedFavoritePath.StartsWith(normalizedOldPath + "\\", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string suffix = normalizedFavoritePath[normalizedOldPath.Length..];
+                favorite.Path = normalizedNewPath + suffix;
+                favorite.Label = ResolveFavoriteStoredLabel(favorite.Path);
+                favorite.Glyph = GetFavoriteGlyph(favorite.Path);
+                changed = true;
+            }
+
+            if (!changed)
+            {
+                return false;
+            }
+
+            NormalizeFavoritesInPlace();
+            _appSettings.FavoritesInitialized = true;
+            _appSettingsService.Save(_appSettings);
+            RefreshSidebarFavorites(refreshSelection: false);
+            return true;
+        }
+
+        private bool TryRemoveFavoritesForDeletedPath(string deletedPath)
+        {
+            if (string.IsNullOrWhiteSpace(deletedPath))
+            {
+                return false;
+            }
+
+            string normalizedDeletedPath = NormalizeFavoritePath(deletedPath);
+            bool removed = false;
+            for (int i = _appSettings.Favorites.Count - 1; i >= 0; i--)
+            {
+                FavoriteItem favorite = _appSettings.Favorites[i];
+                if (string.IsNullOrWhiteSpace(favorite.Path))
+                {
+                    continue;
+                }
+
+                string normalizedFavoritePath = NormalizeFavoritePath(favorite.Path);
+                bool shouldRemove = string.Equals(normalizedFavoritePath, normalizedDeletedPath, StringComparison.OrdinalIgnoreCase)
+                    || normalizedFavoritePath.StartsWith(normalizedDeletedPath + "\\", StringComparison.OrdinalIgnoreCase);
+                if (!shouldRemove)
+                {
+                    continue;
+                }
+
+                _appSettings.Favorites.RemoveAt(i);
+                removed = true;
+            }
+
+            if (!removed)
+            {
+                return false;
+            }
+
+            NormalizeFavoritesInPlace();
+            _appSettings.FavoritesInitialized = true;
+            _appSettingsService.Save(_appSettings);
+            RefreshSidebarFavorites(refreshSelection: false);
+            return true;
+        }
+
+        private void DisposeFavoriteWatchers()
+        {
+            foreach (FileSystemWatcher watcher in _favoriteWatchers.Values)
+            {
+                watcher.Dispose();
+            }
+
+            _favoriteWatchers.Clear();
+        }
+
+        private bool RemoveFavorite(string path)
+        {
+            int index = FindFavoriteIndex(path);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            _appSettings.Favorites.RemoveAt(index);
+            NormalizeFavoritesInPlace();
+            _appSettings.FavoritesInitialized = true;
+            _appSettingsService.Save(_appSettings);
+            RefreshSidebarFavorites(refreshSelection: false);
+            return true;
+        }
+
+        private bool MoveFavorite(string path, int direction)
+        {
+            int index = FindFavoriteIndex(path);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            int targetIndex = index + direction;
+            if (targetIndex < 0 || targetIndex >= _appSettings.Favorites.Count)
+            {
+                return false;
+            }
+
+            FavoriteItem favorite = _appSettings.Favorites[index];
+            _appSettings.Favorites.RemoveAt(index);
+            _appSettings.Favorites.Insert(targetIndex, favorite);
+            ReindexFavoritesInPlace();
+            NormalizeFavoritesInPlace();
+            _appSettings.FavoritesInitialized = true;
+            _appSettingsService.Save(_appSettings);
+            RefreshSidebarFavorites(refreshSelection: false);
+            return true;
+        }
+
+        private bool MoveFavoriteToTarget(string sourcePath, string? targetPath, bool insertAfter)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath) || string.IsNullOrWhiteSpace(targetPath))
+            {
+                return false;
+            }
+
+            int sourceIndex = FindFavoriteIndex(sourcePath);
+            int targetIndex = FindFavoriteIndex(targetPath);
+            if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex)
+            {
+                return false;
+            }
+
+            FavoriteItem favorite = _appSettings.Favorites[sourceIndex];
+            _appSettings.Favorites.RemoveAt(sourceIndex);
+            if (sourceIndex < targetIndex)
+            {
+                targetIndex--;
+            }
+
+            int insertIndex = insertAfter ? targetIndex + 1 : targetIndex;
+            insertIndex = Math.Clamp(insertIndex, 0, _appSettings.Favorites.Count);
+            _appSettings.Favorites.Insert(insertIndex, favorite);
+
+            ReindexFavoritesInPlace();
+            NormalizeFavoritesInPlace();
+            _appSettings.FavoritesInitialized = true;
+            _appSettingsService.Save(_appSettings);
+            RefreshSidebarFavorites(refreshSelection: false);
+            return true;
+        }
+
+        private string ResolveDefaultFavoriteAddLabel(FileCommandTarget target)
+        {
+            if (!string.IsNullOrWhiteSpace(target.Path) && TryGetLocalizedFavoriteLabel(target.Path, out string? localizedLabel))
+            {
+                return localizedLabel!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(target.DisplayName))
+            {
+                return target.DisplayName;
+            }
+
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                return string.Empty;
+            }
+
+            string trimmedPath = target.Path.TrimEnd('\\');
+            string fileName = Path.GetFileName(trimmedPath);
+            return string.IsNullOrWhiteSpace(fileName) ? trimmedPath : fileName;
+        }
+
+        private string ResolveFavoriteStoredLabel(string path)
+        {
+            if (TryGetLocalizedFavoriteLabel(path, out string? localizedLabel))
+            {
+                return localizedLabel!;
+            }
+
+            string trimmedPath = path.TrimEnd('\\');
+            string fileName = Path.GetFileName(trimmedPath);
+            return string.IsNullOrWhiteSpace(fileName) ? trimmedPath : fileName;
         }
 
         private void ApplyAppSettingsToUi()
@@ -3482,6 +4049,7 @@ namespace FileExplorerUI
                 _appSettings.ShowNetwork,
                 _appSettings.ShowTags);
             ApplyLanguagePreference(_appSettings.LanguagePreference);
+            RefreshSidebarFavorites(refreshSelection: true);
             ApplyThemePreference(_appSettings.ThemePreference);
         }
 
@@ -4469,6 +5037,30 @@ namespace FileExplorerUI
             }
         }
 
+        private void StyledSidebarView_FavoriteActionRequested(object? sender, SidebarFavoriteActionRequestedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(e.Path))
+            {
+                return;
+            }
+
+            switch (e.Action)
+            {
+                case SidebarFavoriteAction.Remove:
+                    RemoveFavorite(e.Path);
+                    break;
+                case SidebarFavoriteAction.MoveUp:
+                    MoveFavorite(e.Path, -1);
+                    break;
+                case SidebarFavoriteAction.MoveDown:
+                    MoveFavorite(e.Path, 1);
+                    break;
+                case SidebarFavoriteAction.Reorder:
+                    MoveFavoriteToTarget(e.Path, e.TargetPath, e.InsertAfter);
+                    break;
+            }
+        }
+
         private void StyledSidebarView_SettingsRequested(object? sender, EventArgs e)
         {
             EnterSettingsShell();
@@ -4630,6 +5222,7 @@ namespace FileExplorerUI
             bool extensionsChanged = previousSettings.ShowFileExtensions != importedSettings.ShowFileExtensions;
 
             _appSettings = importedSettings;
+            EnsureFavoritesInitialized();
             _appSettingsService.Save(_appSettings);
             ApplyAppSettingsToPresentationDefaults();
             ApplyAppSettingsToUi();
@@ -4691,6 +5284,7 @@ namespace FileExplorerUI
             _appSettings.LanguagePreference = preference;
             _appSettingsService.Save(_appSettings);
             ApplyLanguagePreference(preference);
+            RefreshSidebarFavorites(refreshSelection: true);
         }
 
         private void SettingsViewControl_StartupLocationPreferenceChanged(StartupLocationPreference preference)
@@ -4971,18 +5565,8 @@ namespace FileExplorerUI
             _dirWatcher?.Dispose();
             _dirWatcher = null;
 
-            // Week4 MVP: when USN is unavailable, consume incremental changes via watcher.
-            if (_usnCapability.available != 0)
-            {
-                return;
-            }
             if (!_explorerService.DirectoryExists(path))
             {
-                return;
-            }
-            if (IsDriveRoot(path))
-            {
-                // Root volumes produce noisy system events; skip watcher to avoid refresh storms.
                 return;
             }
 
@@ -5077,6 +5661,7 @@ namespace FileExplorerUI
                         }
 
                         EnsurePersistentRefreshFallbackInvalidation(_currentPath, $"watcher_{reason}");
+                        RefreshSidebarFavorites(refreshSelection: false);
                         _ = RefreshCurrentDirectoryInBackgroundAsync();
                     });
                 }
@@ -8893,6 +9478,10 @@ namespace FileExplorerUI
                 case FileCommandIds.OpenInNewWindow:
                     ExecuteOpenInNewWindowCommand(target);
                     break;
+                case FileCommandIds.PinToSidebar:
+                case FileCommandIds.UnpinFromSidebar:
+                    ToggleFavoriteForTarget(target);
+                    break;
                 case FileCommandIds.OpenInTerminal:
                     ExecuteOpenInTerminalCommand(target);
                     break;
@@ -8956,6 +9545,8 @@ namespace FileExplorerUI
                 FileCommandIds.RunAsAdministrator => !string.IsNullOrWhiteSpace(target.Path) &&
                     !target.IsDirectory,
                 FileCommandIds.OpenInNewWindow => !string.IsNullOrWhiteSpace(target.Path) &&
+                    target.IsDirectory,
+                FileCommandIds.PinToSidebar or FileCommandIds.UnpinFromSidebar => !string.IsNullOrWhiteSpace(target.Path) &&
                     target.IsDirectory,
                 FileCommandIds.OpenInTerminal => !string.IsNullOrWhiteSpace(target.Path) &&
                     !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
@@ -9725,6 +10316,9 @@ namespace FileExplorerUI
                 FileCommandIds.CopyPath => target.IsDirectory ? S("CommonCopyFolderPath") : S("CommonCopyFilePath"),
                 FileCommandIds.Properties => S("CommonProperties"),
                 FileCommandIds.OpenInNewWindow => S("CommonOpenInNewWindow"),
+                FileCommandIds.PinToSidebar or FileCommandIds.UnpinFromSidebar => IsFavoritePath(target.Path)
+                    ? S("CommonUnpinFromSidebar")
+                    : S("CommonPinToSidebar"),
                 FileCommandIds.OpenInTerminal => S("CommonOpenInTerminal"),
                 FileCommandIds.CompressZip => target.IsDirectory ? S("CommonCompressZip") : S("CommonCompressZipAction"),
                 FileCommandIds.ExtractSmart => S("CommonExtractSmart"),
@@ -9744,6 +10338,7 @@ namespace FileExplorerUI
                 FileCommandIds.Paste => S("CommonPaste"),
                 FileCommandIds.Rename => S("CommonRename"),
                 FileCommandIds.Delete => S("CommonDelete"),
+                FileCommandIds.PinToSidebar or FileCommandIds.UnpinFromSidebar => S("CommonPinToggle"),
                 FileCommandIds.Refresh => S("CommonRefresh"),
                 _ => commandId
             };
@@ -10288,6 +10883,7 @@ namespace FileExplorerUI
                     await SelectSidebarTreePathAsync(renamed.TargetPath);
                 }
 
+                TryUpdateFavoritePathsForRename(renamed.SourcePath, renamed.TargetPath);
                 UpdateListEntryNameForCurrentDirectory(renamed.SourcePath, newName);
 
                 UpdateStatusKey("StatusRenameSuccess", entry.Name, newName);
@@ -10344,6 +10940,8 @@ namespace FileExplorerUI
                 {
                     _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
                 }
+
+                TryUpdateFavoritePathsForRename(renamed.SourcePath, renamed.TargetPath);
                 UpdateStatusKey("StatusRenameSuccess", oldName, newName);
             }
             catch (Exception ex)
@@ -10384,6 +10982,8 @@ namespace FileExplorerUI
                     string parentPath = Path.GetDirectoryName(targetPath) ?? _currentPath;
                     EnsurePersistentRefreshFallbackInvalidation(parentPath, "delete");
                 }
+
+                TryRemoveFavoritesForDeletedPath(targetPath);
                 ApplyLocalDelete(selectedIndex);
                 _ = RefreshCurrentDirectoryInBackgroundAsync(preserveViewport: true);
                 UpdateStatusKey("StatusDeleteSuccess", entry.Name, recursive);

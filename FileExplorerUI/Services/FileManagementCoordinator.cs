@@ -137,14 +137,16 @@ public sealed class FileManagementCoordinator
 
     public async Task<FileOperationResult<RenamedEntryInfo>> TryRenameEntryAsync(string directoryPath, string currentName, string newName)
     {
-        try
+        string sourcePath = Path.Combine(directoryPath, currentName);
+        string targetPath = Path.Combine(directoryPath, newName);
+        Exception? error = await _explorerService.TryRenamePathAsync(sourcePath, targetPath);
+        if (error is not null)
         {
-            return FileOperationResult<RenamedEntryInfo>.Success(await RenameEntryAsync(directoryPath, currentName, newName));
+            return FileOperationResult<RenamedEntryInfo>.Fail(error);
         }
-        catch (Exception ex)
-        {
-            return FileOperationResult<RenamedEntryInfo>.Fail(ex);
-        }
+
+        bool changeNotified = TryMarkPathChanged(directoryPath);
+        return FileOperationResult<RenamedEntryInfo>.Success(new RenamedEntryInfo(sourcePath, targetPath, changeNotified));
     }
 
     public async Task<bool> DeleteEntryAsync(string targetPath, bool recursive)
@@ -161,14 +163,15 @@ public sealed class FileManagementCoordinator
 
     public async Task<FileOperationResult<bool>> TryDeleteEntryAsync(string targetPath, bool recursive)
     {
-        try
+        Exception? error = await _explorerService.TryDeletePathAsync(targetPath, recursive);
+        if (error is not null)
         {
-            return FileOperationResult<bool>.Success(await DeleteEntryAsync(targetPath, recursive));
+            return FileOperationResult<bool>.Fail(error);
         }
-        catch (Exception ex)
-        {
-            return FileOperationResult<bool>.Fail(ex);
-        }
+
+        string? parentPath = Path.GetDirectoryName(targetPath);
+        bool changeNotified = !string.IsNullOrWhiteSpace(parentPath) && TryMarkPathChanged(parentPath);
+        return FileOperationResult<bool>.Success(changeNotified);
     }
 
     public async Task<FileOperationResult<string>> TryCreateZipArchiveAsync(string sourcePath, string archivePath)

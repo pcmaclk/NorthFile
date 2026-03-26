@@ -290,6 +290,15 @@ public sealed class ExplorerService
         return Task.Run(() => RustBatchInterop.RenamePath(sourcePath, targetPath));
     }
 
+    public Task<Exception?> TryRenamePathAsync(string sourcePath, string targetPath)
+    {
+        return Task.Run(() =>
+        {
+            RustBatchInterop.TryRenamePath(sourcePath, targetPath, out Exception? error);
+            return error;
+        });
+    }
+
     public Task DeletePathAsync(string path, bool recursive)
     {
         return Task.Run(() =>
@@ -309,6 +318,43 @@ public sealed class ExplorerService
                 UIOption.OnlyErrorDialogs,
                 RecycleOption.SendToRecycleBin,
                 UICancelOption.ThrowException);
+        });
+    }
+
+    public Task<Exception?> TryDeletePathAsync(string path, bool recursive)
+    {
+        return Task.Run(() =>
+        {
+            if (Directory.Exists(path))
+            {
+                try
+                {
+                    FileSystem.DeleteDirectory(
+                        path,
+                        UIOption.OnlyErrorDialogs,
+                        RecycleOption.SendToRecycleBin,
+                        UICancelOption.ThrowException);
+                    return (Exception?)null;
+                }
+                catch (Exception ex)
+                {
+                    return ex;
+                }
+            }
+
+            try
+            {
+                FileSystem.DeleteFile(
+                    path,
+                    UIOption.OnlyErrorDialogs,
+                    RecycleOption.SendToRecycleBin,
+                    UICancelOption.ThrowException);
+                return (Exception?)null;
+            }
+            catch (Exception ex)
+            {
+                return ex;
+            }
         });
     }
 

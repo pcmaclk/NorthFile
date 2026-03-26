@@ -642,6 +642,12 @@
   <data name="StatusRenameFailedSelectTreeNode" xml:space="preserve">
     <value>Rename failed: select a tree node first.</value>
   </data>
+  <data name="StatusFavoritesCleaned" xml:space="preserve">
+    <value>Cleaned {0} invalid favorites.</value>
+  </data>
+  <data name="StatusFavoritesCleanupSkipped" xml:space="preserve">
+    <value>No invalid favorites to clean.</value>
+  </data>
   <data name="StatusSidebarTreeNavIgnoredLoading" xml:space="preserve">
     <value>Sidebar tree nav ignored: loading in progress.</value>
   </data>
@@ -821,6 +827,18 @@
   </data>
   <data name="CommonPinToSidebar" xml:space="preserve">
     <value>Add to favorites</value>
+  </data>
+  <data name="CommonUnpinFromSidebar" xml:space="preserve">
+    <value>Remove from favorites</value>
+  </data>
+  <data name="CommonMoveUp" xml:space="preserve">
+    <value>Move up</value>
+  </data>
+  <data name="CommonMoveDown" xml:space="preserve">
+    <value>Move down</value>
+  </data>
+  <data name="CommonCleanupInvalidFavorites" xml:space="preserve">
+    <value>Clean invalid favorites</value>
   </data>
   <data name="PinnedGroupTextBlock.Text" xml:space="preserve">
     <value>Favorites</value>
