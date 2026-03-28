@@ -368,16 +368,11 @@ namespace FileExplorerUI
 
         private void TraceWindowSize(string node, string detail)
         {
-            string presenterState = AppWindow?.Presenter is OverlappedPresenter presenter
-                ? presenter.State.ToString()
-                : "unknown";
             string liveSize = AppWindow is null
                 ? "null"
                 : $"{AppWindow.Size.Width}x{AppWindow.Size.Height}";
             string message =
-                $"[WINDOW-SIZE] node={node} detail={detail} cached={_lastRestoredWindowWidth}x{_lastRestoredWindowHeight} " +
-                $"pending={_windowSizeRestorePending} settings={_appSettings.WindowWidth}x{_appSettings.WindowHeight} " +
-                $"live={liveSize} presenter={presenterState}";
+                $"[WINDOW-SIZE] node={node} detail={detail} settings={_appSettings.WindowWidth}x{_appSettings.WindowHeight} live={liveSize}";
             Debug.WriteLine(message);
             AppendWindowSizeLog(message);
         }
@@ -391,10 +386,6 @@ namespace FileExplorerUI
                 TraceWindowSize(
                     "首次激活应用",
                     $"state={args.WindowActivationState} handleReady={_windowHandle != IntPtr.Zero}");
-            }
-            else
-            {
-                TraceWindowSize("窗口激活事件", $"state={args.WindowActivationState}");
             }
 
             if (_windowHandle == IntPtr.Zero)

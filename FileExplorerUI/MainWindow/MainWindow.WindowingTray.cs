@@ -111,7 +111,6 @@ namespace FileExplorerUI
             }
 
             SizeInt32 liveSize = AppWindow.Size;
-            TraceWindowSize("保存到设置", $"live-sampled width={liveSize.Width} height={liveSize.Height}");
             if (liveSize.Width < MinPersistedWindowWidth || liveSize.Height < MinPersistedWindowHeight)
             {
                 TraceWindowSize(
@@ -134,9 +133,6 @@ namespace FileExplorerUI
                 "保存到设置",
                 $"save-request width={_appSettings.WindowWidth} height={_appSettings.WindowHeight}");
             _appSettingsService.Save(_appSettings);
-            TraceWindowSize(
-                "保存到设置",
-                $"saved width={_appSettings.WindowWidth} height={_appSettings.WindowHeight}");
         }
 
         private void UpdateTrayIcon()

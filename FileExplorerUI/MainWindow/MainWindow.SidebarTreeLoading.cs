@@ -252,15 +252,6 @@ namespace FileExplorerUI
                         rowHeight = boundsInViewport.Height > 0 ? boundsInViewport.Height : item.ActualHeight;
                         wasAboveViewport = boundsInViewport.Top < -edgeTolerance;
                         wasBelowViewport = boundsInViewport.Bottom > treeScrollViewer.ViewportHeight + edgeTolerance;
-                        TraceTreeScroll(
-                            $"phase=measure path=\"{nodePath}\" top={boundsInViewport.Top:F2} bottom={boundsInViewport.Bottom:F2} " +
-                            $"viewportH={treeScrollViewer.ViewportHeight:F2} viewerH={treeScrollViewer.ActualHeight:F2} " +
-                            $"scrollable={treeScrollViewer.ScrollableHeight:F2} offset={treeScrollViewer.VerticalOffset:F2} " +
-                            $"rowH={rowHeight:F2} above={wasAboveViewport} below={wasBelowViewport}");
-                    }
-                    else
-                    {
-                        TraceTreeScroll($"phase=measure path=\"{nodePath}\" viewer=null-or-item-size-invalid");
                     }
 
                     if (wasAboveViewport)
@@ -285,7 +276,6 @@ namespace FileExplorerUI
                     }
                     else
                     {
-                        TraceTreeScroll($"phase=bring path=\"{nodePath}\" mode=skip-in-viewport");
                         return;
                     }
 
@@ -301,15 +291,11 @@ namespace FileExplorerUI
                         item.ActualHeight > 0 &&
                         item.ActualWidth > 0)
                     {
-                        Rect postBounds = item.TransformToVisual(treeScrollViewer)
-                            .TransformBounds(new Rect(0, 0, item.ActualWidth, item.ActualHeight));
-                        TraceTreeScroll(
-                            $"phase=post-bring path=\"{nodePath}\" top={postBounds.Top:F2} bottom={postBounds.Bottom:F2} " +
-                            $"viewportH={treeScrollViewer.ViewportHeight:F2} offset={treeScrollViewer.VerticalOffset:F2}");
+                        // no-op: keep post-bring validation silent in normal flow.
                     }
                     else
                     {
-                        TraceTreeScroll($"phase=post-bring path=\"{nodePath}\" skipped=true reason=viewer-null-or-item-size");
+                        TraceTreeScroll($"phase=post-bring path=\"{nodePath}\" skipped reason=viewer-null-or-item-size");
                     }
 
                     return;

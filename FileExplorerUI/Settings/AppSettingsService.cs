@@ -93,7 +93,6 @@ public sealed class AppSettingsService
                 localSettings.Values[nameof(AppSettings.WindowHeight)] = settings.WindowHeight;
                 localSettings.Values[nameof(AppSettings.FavoritesInitialized)] = settings.FavoritesInitialized;
                 localSettings.Values[nameof(AppSettings.Favorites)] = JsonSerializer.Serialize(settings.Favorites ?? new List<FavoriteItem>());
-                TraceWindowSizeSettings("保存到设置", $"target=local-settings-done width={settings.WindowWidth} height={settings.WindowHeight}");
                 return;
             }
         }
@@ -224,7 +223,6 @@ public sealed class AppSettingsService
     {
         TraceWindowSizeSettings("保存到设置", $"target=file width={settings.WindowWidth} height={settings.WindowHeight} path=\"{_fallbackSettingsPath}\"");
         ExportToPath(settings, _fallbackSettingsPath);
-        TraceWindowSizeSettings("保存到设置", $"target=file-done width={settings.WindowWidth} height={settings.WindowHeight} path=\"{_fallbackSettingsPath}\"");
     }
 
     private static void TraceWindowSizeSettings(string node, string detail)
