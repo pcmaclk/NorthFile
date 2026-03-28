@@ -61,15 +61,24 @@ namespace FileExplorerUI
             Settings
         }
 
+        private enum EntriesContextOrigin
+        {
+            EntriesList,
+            SidebarPinned,
+            SidebarTree
+        }
+
         private sealed record EntriesContextRequest(
             UIElement Anchor,
             Point Position,
             EntryViewModel? Entry,
-            bool IsItemTarget);
+            bool IsItemTarget,
+            EntriesContextOrigin Origin = EntriesContextOrigin.EntriesList);
 
         private sealed record PendingEntriesContextCommand(
             string CommandId,
-            FileCommandTarget Target);
+            FileCommandTarget Target,
+            EntriesContextOrigin Origin);
 
         private enum CommandDockSide
         {

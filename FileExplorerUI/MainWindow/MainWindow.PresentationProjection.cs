@@ -151,7 +151,7 @@ namespace FileExplorerUI
 
         private bool CanApplyPresentationFastPath(PresentationReloadReason reason)
         {
-            if (_presentationSourceEntries.Count > 0)
+            if (_presentationSourceInitialized)
             {
                 return true;
             }
@@ -177,7 +177,7 @@ namespace FileExplorerUI
 
         private void EnsurePresentationSourceCacheFromCurrentEntries()
         {
-            if (_presentationSourceEntries.Count > 0)
+            if (_presentationSourceInitialized)
             {
                 return;
             }
@@ -229,6 +229,7 @@ namespace FileExplorerUI
         private void InvalidatePresentationSourceCache()
         {
             _presentationSourceEntries.Clear();
+            _presentationSourceInitialized = false;
             _presentationSourceVersion++;
             InvalidateProjectionCaches();
         }
@@ -237,6 +238,7 @@ namespace FileExplorerUI
         {
             _presentationSourceEntries.Clear();
             _presentationSourceEntries.AddRange(entries);
+            _presentationSourceInitialized = true;
             _presentationSourceVersion++;
             InvalidateProjectionCaches();
         }

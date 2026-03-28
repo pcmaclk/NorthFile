@@ -331,5 +331,40 @@ namespace FileExplorerUI
                     break;
             }
         }
+
+        private void StyledSidebarView_PinnedContextRequested(object? sender, SidebarPinnedContextRequestedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(e.Path))
+            {
+                return;
+            }
+
+            FocusSidebarSurface();
+            ClearListSelectionAndAnchor();
+
+            var contextEntry = new EntryViewModel
+            {
+                Name = e.Label,
+                DisplayName = e.Label,
+                PendingName = e.Label,
+                FullPath = e.Path,
+                Type = GetEntryTypeText(e.Label, isDirectory: true, isLink: false),
+                IconGlyph = GetFavoriteGlyph(e.Path),
+                IconForeground = GetEntryIconBrush(isDirectory: true, isLink: false, e.Label),
+                SizeText = string.Empty,
+                ModifiedText = string.Empty,
+                IsDirectory = true,
+                IsLink = false,
+                IsLoaded = true,
+                IsMetadataLoaded = true
+            };
+
+            ShowEntriesContextFlyout(new EntriesContextRequest(
+                e.Anchor,
+                e.Position,
+                contextEntry,
+                IsItemTarget: true,
+                Origin: EntriesContextOrigin.SidebarPinned));
+        }
     }
 }

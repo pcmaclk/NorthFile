@@ -831,6 +831,12 @@
   <data name="CommonOpenTarget" xml:space="preserve">
     <value>打开目标位置</value>
   </data>
+  <data name="CommonExpand" xml:space="preserve">
+    <value>展开</value>
+  </data>
+  <data name="CommonCollapse" xml:space="preserve">
+    <value>收起</value>
+  </data>
   <data name="CommonPinToSidebar" xml:space="preserve">
     <value>添加到收藏</value>
   </data>

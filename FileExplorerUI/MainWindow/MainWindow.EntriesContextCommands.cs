@@ -36,37 +36,67 @@ namespace FileExplorerUI
             }
 
             bool flyoutActive = _entriesFlyoutOpen || (_activeEntriesContextFlyout?.IsOpen ?? false);
+            EntriesContextOrigin origin = _entriesContextRequest?.Origin ?? EntriesContextOrigin.EntriesList;
             if (flyoutActive)
             {
-                _pendingEntriesContextCommand = new PendingEntriesContextCommand(commandId, target);
+                _pendingEntriesContextCommand = new PendingEntriesContextCommand(commandId, target, origin);
                 HideActiveEntriesContextFlyout();
                 return;
             }
 
-            _ = ExecuteEntriesContextCommandAsync(commandId, target);
+            _ = ExecuteEntriesContextCommandAsync(commandId, target, origin);
         }
 
-        private async Task ExecuteEntriesContextCommandAsync(string commandId, FileCommandTarget target)
+        private async Task ExecuteEntriesContextCommandAsync(string commandId, FileCommandTarget target, EntriesContextOrigin origin)
         {
+            bool isSidebarTreeContext = origin == EntriesContextOrigin.SidebarTree;
             switch (commandId)
             {
                 case FileCommandIds.Open:
                     await ExecuteOpenEntriesContextTargetAsync(target);
                     break;
                 case FileCommandIds.Copy:
-                    ExecuteCopy();
+                    if (isSidebarTreeContext)
+                    {
+                        ExecuteCopyOrCutContextTarget(target, FileTransferMode.Copy);
+                    }
+                    else
+                    {
+                        ExecuteCopy();
+                    }
                     break;
                 case FileCommandIds.Cut:
-                    ExecuteCut();
+                    if (isSidebarTreeContext)
+                    {
+                        ExecuteCopyOrCutContextTarget(target, FileTransferMode.Cut);
+                    }
+                    else
+                    {
+                        ExecuteCut();
+                    }
                     break;
                 case FileCommandIds.Paste:
                     await ExecutePasteForTargetAsync(target);
                     break;
                 case FileCommandIds.Rename:
-                    await ExecuteRenameSelectedAsync();
+                    if (isSidebarTreeContext)
+                    {
+                        await ExecuteRenameSidebarTreeContextTargetAsync(target);
+                    }
+                    else
+                    {
+                        await ExecuteRenameSelectedAsync();
+                    }
                     break;
                 case FileCommandIds.Delete:
-                    await ExecuteDeleteSelectedAsync();
+                    if (isSidebarTreeContext)
+                    {
+                        await ExecuteDeleteSidebarTreeContextTargetAsync(target);
+                    }
+                    else
+                    {
+                        await ExecuteDeleteSelectedAsync();
+                    }
                     break;
                 case FileCommandIds.NewFile:
                     await ExecuteNewFileAsync();
@@ -139,16 +169,31 @@ namespace FileExplorerUI
                 return false;
             }
 
+            bool isSidebarContext = _entriesContextRequest?.Origin is EntriesContextOrigin.SidebarPinned or EntriesContextOrigin.SidebarTree;
             return commandId switch
             {
                 FileCommandIds.Open => !string.IsNullOrWhiteSpace(target.Path),
-                FileCommandIds.Copy => CanCopySelectedEntry(),
-                FileCommandIds.Cut => CanCutSelectedEntry(),
+                FileCommandIds.Copy => isSidebarContext
+                    ? !string.IsNullOrWhiteSpace(target.Path) && _explorerService.PathExists(target.Path)
+                    : CanCopySelectedEntry() && IsEntriesContextSelectionAligned(target),
+                FileCommandIds.Cut => isSidebarContext
+                    ? !string.IsNullOrWhiteSpace(target.Path) &&
+                        !IsDriveRoot(target.Path) &&
+                        _explorerService.PathExists(target.Path)
+                    : CanCutSelectedEntry() && IsEntriesContextSelectionAligned(target),
                 FileCommandIds.Paste => !string.IsNullOrWhiteSpace(target.Path) &&
                     !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
                     _fileManagementCoordinator.HasAvailablePasteItems(),
-                FileCommandIds.Rename => CanRenameSelectedEntry(),
-                FileCommandIds.Delete => CanDeleteSelectedEntry(),
+                FileCommandIds.Rename => isSidebarContext
+                    ? !string.IsNullOrWhiteSpace(target.Path) &&
+                        !IsDriveRoot(target.Path) &&
+                        _explorerService.PathExists(target.Path)
+                    : CanRenameSelectedEntry() && IsEntriesContextSelectionAligned(target),
+                FileCommandIds.Delete => isSidebarContext
+                    ? !string.IsNullOrWhiteSpace(target.Path) &&
+                        !IsDriveRoot(target.Path) &&
+                        _explorerService.PathExists(target.Path)
+                    : CanDeleteSelectedEntry() && IsEntriesContextSelectionAligned(target),
                 FileCommandIds.NewFile or FileCommandIds.NewFolder =>
                     !string.IsNullOrWhiteSpace(target.Path) &&
                     string.Equals(target.Path, _currentPath, StringComparison.OrdinalIgnoreCase) &&
@@ -186,6 +231,118 @@ namespace FileExplorerUI
                     !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
                 _ => false
             };
+        }
+
+        private bool IsEntriesContextSelectionAligned(FileCommandTarget target)
+        {
+            if (_entriesContextRequest?.Origin == EntriesContextOrigin.SidebarTree)
+            {
+                return true;
+            }
+
+            if (_entriesContextRequest is not { IsItemTarget: true, Entry: not null })
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(target.Path) || string.IsNullOrWhiteSpace(_selectedEntryPath))
+            {
+                return false;
+            }
+
+            return string.Equals(_selectedEntryPath, target.Path, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ExecuteCopyOrCutContextTarget(FileCommandTarget target, FileTransferMode mode)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                UpdateStatusKey(mode == FileTransferMode.Copy ? "StatusCopyFailedSelectLoaded" : "StatusCutFailedSelectLoaded");
+                return;
+            }
+
+            if (mode == FileTransferMode.Cut && IsDriveRoot(target.Path))
+            {
+                UpdateStatusKey("StatusCutFailedDriveRootsUnsupported");
+                return;
+            }
+
+            _fileManagementCoordinator.SetClipboard(new[] { target.Path }, mode);
+            UpdateFileCommandStates();
+            UpdateStatusKey(mode == FileTransferMode.Copy ? "StatusCopyReady" : "StatusCutReady", target.DisplayName);
+        }
+
+        private Task ExecuteRenameSidebarTreeContextTargetAsync(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path) ||
+                FindSidebarTreeNodeByPath(target.Path)?.Content is not SidebarTreeEntry treeEntry)
+            {
+                UpdateStatusKey("StatusRenameFailedSelectTreeNode");
+                return Task.CompletedTask;
+            }
+
+            _pendingSidebarTreeContextEntry = treeEntry;
+            return BeginSidebarTreeRenameAsync(treeEntry);
+        }
+
+        private async Task ExecuteDeleteSidebarTreeContextTargetAsync(FileCommandTarget target)
+        {
+            if (string.IsNullOrWhiteSpace(target.Path))
+            {
+                UpdateStatusKey("StatusDeleteFailedSelectLoaded");
+                return;
+            }
+
+            if (IsDriveRoot(target.Path))
+            {
+                UpdateStatusKey("StatusDeleteFailedWithReason", S("StatusCutFailedDriveRootsUnsupported"));
+                return;
+            }
+
+            bool recursive = true;
+            if (_appSettings.ConfirmDelete && !await ConfirmDeleteAsync(target.DisplayName, recursive))
+            {
+                UpdateStatusKey("StatusDeleteCanceled");
+                return;
+            }
+
+            FileOperationResult<bool> deleteResult = await _fileManagementCoordinator.TryDeleteEntryAsync(target.Path, recursive);
+            FileOperationsController.DeleteDecision deleteDecision = _fileOperationsController.AnalyzeDeleteResult(deleteResult, target.Path);
+            if (!deleteDecision.Succeeded)
+            {
+                if (deleteDecision.Canceled)
+                {
+                    UpdateStatusKey("StatusDeleteCanceled");
+                    return;
+                }
+
+                UpdateStatusKey("StatusDeleteFailedWithReason", deleteDecision.FailureMessage ?? S("ErrorFileOperationUnknown"));
+                return;
+            }
+
+            TryRemoveFavoritesForDeletedPath(target.Path);
+            if (FindSidebarTreeNodeByPath(target.Path) is TreeViewNode node && node.Parent is TreeViewNode parentNode)
+            {
+                parentNode.Children.Remove(node);
+            }
+
+            if (IsPathWithin(_currentPath, target.Path))
+            {
+                string? parentPath = Path.GetDirectoryName(target.Path.TrimEnd('\\'));
+                if (string.IsNullOrWhiteSpace(parentPath))
+                {
+                    parentPath = Path.GetPathRoot(target.Path);
+                }
+
+                if (string.IsNullOrWhiteSpace(parentPath))
+                {
+                    parentPath = ShellMyComputerPath;
+                }
+
+                await NavigateToPathAsync(parentPath, pushHistory: true, focusEntriesAfterNavigation: false);
+            }
+
+            UpdateStatusKey("StatusDeleteSuccess", target.DisplayName, recursive);
         }
 
         private async Task ExecuteOpenEntriesContextTargetAsync(FileCommandTarget target)

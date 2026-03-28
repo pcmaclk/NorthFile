@@ -41,16 +41,12 @@ namespace FileExplorerUI
         private bool _showNetworkSection = true;
         private bool _showTagsSection = true;
         private string? _selectedPath;
+        private string? _explicitPinnedSelectionPath;
         private bool _isSelectionActive = true;
         private TreeView? _attachedTreeView;
         private readonly CompactSidebarMenuController _compactMenuController = new();
-        private readonly MenuFlyout _pinnedItemContextFlyout = new();
-        private readonly MenuFlyoutItem _removePinnedItemMenuItem = new();
-        private readonly MenuFlyoutItem _movePinnedItemUpMenuItem = new();
-        private readonly MenuFlyoutItem _movePinnedItemDownMenuItem = new();
         private readonly Dictionary<SidebarNavItemModel, FrameworkElement> _pinnedItemHosts = new();
         private bool _compactButtonsAttached;
-        private SidebarNavItemModel? _contextPinnedItem;
         private SidebarNavItemModel? _pendingPinnedDragItem;
         private FrameworkElement? _pendingPinnedDragHost;
         private Point _pendingPinnedDragStartPoint;
@@ -65,6 +61,7 @@ namespace FileExplorerUI
 
         public event EventHandler<SidebarNavigateRequestedEventArgs>? NavigateRequested;
         public event EventHandler<SidebarFavoriteActionRequestedEventArgs>? FavoriteActionRequested;
+        public event EventHandler<SidebarPinnedContextRequestedEventArgs>? PinnedContextRequested;
         public event EventHandler? SettingsRequested;
 
         public SidebarView()
@@ -103,27 +100,12 @@ namespace FileExplorerUI
             ToolTipService.SetToolTip(TagsGroupBorder, S("SidebarTags"));
             ToolTipService.SetToolTip(TreeCompactBorder, S("SidebarMyComputer"));
 
-            _removePinnedItemMenuItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE74D" };
-            _movePinnedItemUpMenuItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE74A" };
-            _movePinnedItemDownMenuItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe Fluent Icons"), Glyph = "\uE74B" };
-            _removePinnedItemMenuItem.Click += PinnedItemContextRemove_Click;
-            _movePinnedItemUpMenuItem.Click += PinnedItemContextMoveUp_Click;
-            _movePinnedItemDownMenuItem.Click += PinnedItemContextMoveDown_Click;
-            _pinnedItemContextFlyout.Items.Add(_removePinnedItemMenuItem);
-            _pinnedItemContextFlyout.Items.Add(new MenuFlyoutSeparator());
-            _pinnedItemContextFlyout.Items.Add(_movePinnedItemUpMenuItem);
-            _pinnedItemContextFlyout.Items.Add(_movePinnedItemDownMenuItem);
-            UpdatePinnedContextMenuText();
             UpdatePinnedDragPreviewTheme();
         }
 
         public void SetPinnedItems(IEnumerable<SidebarNavItemModel> items, bool refreshSelection = true)
         {
             ResetStaticItems(PinnedItems, items.ToArray());
-            if (_contextPinnedItem is not null && !PinnedItems.Contains(_contextPinnedItem))
-            {
-                _contextPinnedItem = null;
-            }
             ApplyPinnedSelection(null);
             if (refreshSelection)
             {
@@ -202,7 +184,6 @@ namespace FileExplorerUI
             {
                 toolTip.Content = S("SidebarSettingsButtonToolTip.Content");
             }
-            UpdatePinnedContextMenuText();
         }
 
         private void RefreshAuxiliaryItems()
@@ -376,7 +357,13 @@ namespace FileExplorerUI
             }
 
             string current = NormalizePath(path);
-            SidebarNavItemModel? selectedPinnedItem = FindBestPinnedItem(current);
+            if (!string.IsNullOrWhiteSpace(_explicitPinnedSelectionPath)
+                && !string.Equals(_explicitPinnedSelectionPath, current, StringComparison.OrdinalIgnoreCase))
+            {
+                _explicitPinnedSelectionPath = null;
+            }
+
+            SidebarNavItemModel? selectedPinnedItem = FindExplicitPinnedItem(current);
             if (selectedPinnedItem is not null)
             {
                 if (!_isPinnedExpanded)
@@ -395,6 +382,11 @@ namespace FileExplorerUI
 
             foreach (SidebarVisualItem item in _visualItems)
             {
+                if (item.Section == SidebarSection.Pinned)
+                {
+                    continue;
+                }
+
                 if (!item.Selectable)
                 {
                     continue;
@@ -677,9 +669,7 @@ namespace FileExplorerUI
             if (properties.IsRightButtonPressed)
             {
                 CancelPinnedDrag();
-                _contextPinnedItem = item;
-                UpdatePinnedContextMenuState(item);
-                _pinnedItemContextFlyout.ShowAt(element);
+                RaisePinnedContextRequested(element, item, e.GetCurrentPoint(element).Position);
                 e.Handled = true;
                 return;
             }
@@ -784,44 +774,15 @@ namespace FileExplorerUI
                 return;
             }
 
-            _contextPinnedItem = item;
-            UpdatePinnedContextMenuState(item);
-            _pinnedItemContextFlyout.ShowAt(element);
-            args.Handled = true;
-        }
-
-        private void PinnedItemContextRemove_Click(object sender, RoutedEventArgs e)
-        {
-            RaisePinnedFavoriteAction(SidebarFavoriteAction.Remove);
-        }
-
-        private void PinnedItemContextMoveUp_Click(object sender, RoutedEventArgs e)
-        {
-            RaisePinnedFavoriteAction(SidebarFavoriteAction.MoveUp);
-        }
-
-        private void PinnedItemContextMoveDown_Click(object sender, RoutedEventArgs e)
-        {
-            RaisePinnedFavoriteAction(SidebarFavoriteAction.MoveDown);
-        }
-
-        private void RaisePinnedFavoriteAction(SidebarFavoriteAction action)
-        {
-            if (_contextPinnedItem is null || string.IsNullOrWhiteSpace(_contextPinnedItem.Path))
+            Point position = default;
+            bool hasPosition = args.TryGetPosition(element, out Point requestedPoint);
+            if (hasPosition)
             {
-                return;
+                position = requestedPoint;
             }
 
-            FavoriteActionRequested?.Invoke(
-                this,
-                new SidebarFavoriteActionRequestedEventArgs(action, _contextPinnedItem.Path!, _contextPinnedItem.Label));
-        }
-
-        private void UpdatePinnedContextMenuText()
-        {
-            _removePinnedItemMenuItem.Text = S("CommonUnpinFromSidebar");
-            _movePinnedItemUpMenuItem.Text = S("CommonMoveUp");
-            _movePinnedItemDownMenuItem.Text = S("CommonMoveDown");
+            RaisePinnedContextRequested(element, item, hasPosition ? position : null);
+            args.Handled = true;
         }
 
         private void SidebarView_ActualThemeChanged(FrameworkElement sender, object args)
@@ -1014,12 +975,17 @@ namespace FileExplorerUI
             HidePinnedDragOverlay();
         }
 
-        private void UpdatePinnedContextMenuState(SidebarNavItemModel item)
+        private void RaisePinnedContextRequested(FrameworkElement anchor, SidebarNavItemModel item, Point? position)
         {
-            int index = PinnedItems.IndexOf(item);
-            _removePinnedItemMenuItem.IsEnabled = index >= 0;
-            _movePinnedItemUpMenuItem.IsEnabled = index > 0;
-            _movePinnedItemDownMenuItem.IsEnabled = index >= 0 && index < PinnedItems.Count - 1;
+            if (string.IsNullOrWhiteSpace(item.Path))
+            {
+                return;
+            }
+
+            Point resolvedPosition = position ?? new Point(Math.Max(0, anchor.ActualWidth / 2), Math.Max(0, anchor.ActualHeight / 2));
+            PinnedContextRequested?.Invoke(
+                this,
+                new SidebarPinnedContextRequestedEventArgs(item.Path!, item.Label, anchor, resolvedPosition));
         }
 
         private void DynamicItem_Click(object sender, PointerRoutedEventArgs e)
@@ -1029,6 +995,7 @@ namespace FileExplorerUI
                 return;
             }
 
+            _explicitPinnedSelectionPath = NormalizePath(item.Path);
             SetSelectedPath(item.Path);
             NavigateRequested?.Invoke(this, new SidebarNavigateRequestedEventArgs(item.Path));
         }
@@ -1160,10 +1127,50 @@ namespace FileExplorerUI
                 return false;
             }
 
+            if (item.Section == SidebarSection.Pinned)
+            {
+                if (string.IsNullOrWhiteSpace(_explicitPinnedSelectionPath))
+                {
+                    return false;
+                }
+
+                string pinnedPath = NormalizePath(itemPath);
+                return string.Equals(pinnedPath, _explicitPinnedSelectionPath, StringComparison.OrdinalIgnoreCase);
+            }
+
             string current = NormalizePath(_selectedPath);
             string candidate = NormalizePath(itemPath);
             return string.Equals(candidate, current, StringComparison.OrdinalIgnoreCase)
                 || current.StartsWith(candidate + "\\", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private SidebarNavItemModel? FindExplicitPinnedItem(string currentPath)
+        {
+            if (string.IsNullOrWhiteSpace(_explicitPinnedSelectionPath))
+            {
+                return null;
+            }
+
+            if (!string.Equals(_explicitPinnedSelectionPath, currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            foreach (SidebarNavItemModel item in PinnedItems)
+            {
+                if (string.IsNullOrWhiteSpace(item.Path))
+                {
+                    continue;
+                }
+
+                string candidate = NormalizePath(item.Path);
+                if (string.Equals(candidate, currentPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return item;
+                }
+            }
+
+            return null;
         }
 
         private static string NormalizePath(string path)
@@ -1463,5 +1470,21 @@ namespace FileExplorerUI
         public string Label { get; }
         public string? TargetPath { get; }
         public bool InsertAfter { get; }
+    }
+
+    public sealed class SidebarPinnedContextRequestedEventArgs : EventArgs
+    {
+        public SidebarPinnedContextRequestedEventArgs(string path, string label, UIElement anchor, Point position)
+        {
+            Path = path;
+            Label = label;
+            Anchor = anchor;
+            Position = position;
+        }
+
+        public string Path { get; }
+        public string Label { get; }
+        public UIElement Anchor { get; }
+        public Point Position { get; }
     }
 }

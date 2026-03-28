@@ -825,6 +825,12 @@
   <data name="CommonOpenTarget" xml:space="preserve">
     <value>Open Target</value>
   </data>
+  <data name="CommonExpand" xml:space="preserve">
+    <value>Expand</value>
+  </data>
+  <data name="CommonCollapse" xml:space="preserve">
+    <value>Collapse</value>
+  </data>
   <data name="CommonPinToSidebar" xml:space="preserve">
     <value>Add to favorites</value>
   </data>

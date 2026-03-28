@@ -68,6 +68,7 @@ namespace FileExplorerUI
             ApplyTitleBarTheme();
             StyledSidebarView.NavigateRequested += StyledSidebarView_NavigateRequested;
             StyledSidebarView.FavoriteActionRequested += StyledSidebarView_FavoriteActionRequested;
+            StyledSidebarView.PinnedContextRequested += StyledSidebarView_PinnedContextRequested;
             StyledSidebarView.SettingsRequested += StyledSidebarView_SettingsRequested;
             SettingsViewControl.VisibleSectionChanged += SettingsViewControl_VisibleSectionChanged;
             SettingsViewControl.SidebarSectionVisibilityChanged += SettingsViewControl_SidebarSectionVisibilityChanged;

@@ -89,6 +89,11 @@ namespace FileExplorerUI
             return _sidebarTreeView is null ? null : FindTreeViewItemForNode(_sidebarTreeView, targetNode);
         }
 
+        private TreeViewItem? FindTreeViewItemByPath(string path)
+        {
+            return _sidebarTreeView is null ? null : FindTreeViewItemByPath(_sidebarTreeView, path);
+        }
+
         private static TreeViewItem? FindTreeViewItemForNode(DependencyObject root, TreeViewNode targetNode)
         {
             if (root is TreeViewItem item &&
@@ -102,6 +107,43 @@ namespace FileExplorerUI
             {
                 DependencyObject child = VisualTreeHelper.GetChild(root, i);
                 TreeViewItem? hit = FindTreeViewItemForNode(child, targetNode);
+                if (hit is not null)
+                {
+                    return hit;
+                }
+            }
+
+            return null;
+        }
+
+        private static TreeViewItem? FindTreeViewItemByPath(DependencyObject root, string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            if (root is TreeViewItem item)
+            {
+                SidebarTreeEntry? itemEntry = item.DataContext switch
+                {
+                    SidebarTreeEntry entry => entry,
+                    TreeViewNode node when node.Content is SidebarTreeEntry nodeEntry => nodeEntry,
+                    _ => item.Content as SidebarTreeEntry
+                };
+
+                if (itemEntry is not null &&
+                    string.Equals(itemEntry.FullPath, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    return item;
+                }
+            }
+
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(root, i);
+                TreeViewItem? hit = FindTreeViewItemByPath(child, path);
                 if (hit is not null)
                 {
                     return hit;

@@ -38,6 +38,7 @@ namespace FileExplorerUI
 
             TreeViewNode? node = FindSidebarTreeNodeByPath(entry.FullPath);
             TreeViewItem? item = node is not null ? FindTreeViewItemForNode(node) : null;
+            item ??= FindTreeViewItemByPath(entry.FullPath);
             if (item is null)
             {
                 UpdateStatusKey("StatusRenameFailedTreeItemUnavailable");
@@ -111,6 +112,7 @@ namespace FileExplorerUI
         {
             if (_sidebarTreeRenameOverlayCanvas is not null && _sidebarTreeRenameOverlayBorder is not null && _sidebarTreeRenameTextBox is not null)
             {
+                SyncSidebarTreeRenameOverlayTheme();
                 return;
             }
 
@@ -133,11 +135,15 @@ namespace FileExplorerUI
                 BorderBrush = new SolidColorBrush(Colors.Transparent),
                 BorderThickness = new Thickness(0),
                 FontSize = 14,
+                Foreground = RenameOverlayTextBox.Foreground,
+                FocusVisualPrimaryThickness = RenameOverlayTextBox.FocusVisualPrimaryThickness,
+                FocusVisualSecondaryThickness = RenameOverlayTextBox.FocusVisualSecondaryThickness,
                 HorizontalContentAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, -1, 0, 0),
+                Margin = OffsetTop(RenameOverlayTextBox.Margin, SidebarTreeRenameTextMarginTopOffset),
                 MinHeight = 24,
                 Padding = new Thickness(0),
                 TextAlignment = TextAlignment.Left,
+                UseSystemFocusVisuals = RenameOverlayTextBox.UseSystemFocusVisuals,
                 VerticalContentAlignment = VerticalAlignment.Center
             };
             if (GetRenameOverlayTextBoxTemplate() is ControlTemplate renameOverlayTextBoxTemplate)
@@ -154,22 +160,51 @@ namespace FileExplorerUI
             _sidebarTreeRenameTextBox.KeyDown += SidebarTreeRenameTextBox_KeyDown;
             _sidebarTreeRenameTextBox.LostFocus += SidebarTreeRenameTextBox_LostFocus;
 
-            Brush selectionBrush = (Brush)Application.Current.Resources["ListViewItemSelectionIndicatorBrush"];
+            Brush selectionBrush = RenameOverlayBorder.BorderBrush;
+            Brush renameBackgroundBrush = RenameOverlayBorder.Background;
             _sidebarTreeRenameOverlayBorder = new Border
             {
                 Width = 160,
                 Height = 24,
-                Background = new SolidColorBrush(Colors.White),
+                Background = renameBackgroundBrush,
                 BorderBrush = selectionBrush,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(0),
-                Padding = new Thickness(1, 0, 0, 1),
+                Padding = RenameOverlayBorder.Padding,
                 Child = _sidebarTreeRenameTextBox,
                 Visibility = Visibility.Collapsed
             };
 
             _sidebarTreeRenameOverlayCanvas.Children.Add(_sidebarTreeRenameOverlayBorder);
             hostPanel.Children.Add(_sidebarTreeRenameOverlayCanvas);
+            SyncSidebarTreeRenameOverlayTheme();
+        }
+
+        private void SyncSidebarTreeRenameOverlayTheme()
+        {
+            if (_sidebarTreeRenameOverlayBorder is null || _sidebarTreeRenameTextBox is null)
+            {
+                return;
+            }
+
+            _sidebarTreeRenameTextBox.Foreground = RenameOverlayTextBox.Foreground;
+            _sidebarTreeRenameTextBox.FocusVisualPrimaryThickness = RenameOverlayTextBox.FocusVisualPrimaryThickness;
+            _sidebarTreeRenameTextBox.FocusVisualSecondaryThickness = RenameOverlayTextBox.FocusVisualSecondaryThickness;
+            _sidebarTreeRenameTextBox.Margin = OffsetTop(RenameOverlayTextBox.Margin, SidebarTreeRenameTextMarginTopOffset);
+            _sidebarTreeRenameTextBox.UseSystemFocusVisuals = RenameOverlayTextBox.UseSystemFocusVisuals;
+            if (GetRenameOverlayTextBoxTemplate() is ControlTemplate renameOverlayTextBoxTemplate)
+            {
+                _sidebarTreeRenameTextBox.Template = renameOverlayTextBoxTemplate;
+            }
+
+            _sidebarTreeRenameOverlayBorder.Background = RenameOverlayBorder.Background;
+            _sidebarTreeRenameOverlayBorder.BorderBrush = RenameOverlayBorder.BorderBrush;
+            _sidebarTreeRenameOverlayBorder.Padding = RenameOverlayBorder.Padding;
+        }
+
+        private static Thickness OffsetTop(Thickness source, double topOffset)
+        {
+            return new Thickness(source.Left, source.Top + topOffset, source.Right, source.Bottom);
         }
 
         private async void SidebarTreeRenameTextBox_KeyDown(object sender, KeyRoutedEventArgs e)

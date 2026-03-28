@@ -41,6 +41,7 @@ namespace FileExplorerUI
         private TreeView? _sidebarTreeView;
         private CancellationTokenSource? _sidebarTreeCts;
         private bool _suppressSidebarTreeSelection;
+        private int _sidebarTreeScrollRequestVersion;
         private readonly Dictionary<string, string> _sidebarTreeSelectionMemory = new(StringComparer.OrdinalIgnoreCase);
         private bool _suppressSidebarNavSelection;
         private EntryViewModel? _pendingContextRenameEntry;
@@ -59,8 +60,11 @@ namespace FileExplorerUI
         private InlineEditSession? _entriesRenameInlineSession;
         private InlineEditSession? _sidebarTreeRenameInlineSession;
         private InlineEditSession? _addressInlineSession;
-        private MenuFlyout? _sidebarTreeContextFlyout;
         private SidebarTreeEntry? _pendingSidebarTreeContextEntry;
+        private TreeViewNode? _activeSidebarTreeContextNode;
+        private MenuFlyoutItem? _sidebarTreeExpandMenuItem;
+        private MenuFlyoutItem? _sidebarTreeCollapseMenuItem;
+        private MenuFlyoutSeparator? _sidebarTreeExpandCollapseSeparator;
         private Canvas? _sidebarTreeRenameOverlayCanvas;
         private Border? _sidebarTreeRenameOverlayBorder;
         private TextBox? _sidebarTreeRenameTextBox;
@@ -83,6 +87,7 @@ namespace FileExplorerUI
         private const string ShellMyComputerPath = "shell:mycomputer";
         private const double SidebarTreeRenameOffsetX = -2;
         private const double SidebarTreeRenameOffsetY = 0;
+        private const double SidebarTreeRenameTextMarginTopOffset = 1;
         private const double SidebarTreeRenameMinWidth = 140;
         private const double SidebarTreeRenameWidthPadding = 12;
         private const double SidebarTreeRenameRightMargin = 8;
@@ -96,6 +101,7 @@ namespace FileExplorerUI
         private readonly BatchObservableCollection<EntryViewModel> _entries = new();
         private readonly ObservableCollection<GroupedEntryColumnViewModel> _groupedEntryColumns = new();
         private readonly List<EntryViewModel> _presentationSourceEntries = new();
+        private bool _presentationSourceInitialized;
         private List<GroupedEntryColumnViewModel>? _groupedColumnsProjectionCache;
         private int _presentationSourceVersion;
         private int _groupedColumnsCacheSourceVersion = -1;
@@ -164,6 +170,7 @@ namespace FileExplorerUI
         private FileSystemWatcher? _dirWatcher;
         private CancellationTokenSource? _watcherDebounceCts;
         private readonly Dictionary<string, FileSystemWatcher> _favoriteWatchers = new(StringComparer.OrdinalIgnoreCase);
+        private CancellationTokenSource? _navigationLoadCts;
         private CancellationTokenSource? _directoryLoadCts;
         private CancellationTokenSource? _metadataPrefetchCts;
         private bool _localizedUiRefreshScheduled;

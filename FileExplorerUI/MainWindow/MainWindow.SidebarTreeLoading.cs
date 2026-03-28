@@ -4,8 +4,10 @@ using Microsoft.UI.Xaml.Markup;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.Foundation;
 
 namespace FileExplorerUI
 {
@@ -33,11 +35,6 @@ namespace FileExplorerUI
             _sidebarTreeView.ItemInvoked += SidebarTree_ItemInvoked;
             _sidebarTreeView.ContextRequested += SidebarTree_ContextRequested;
             StyledSidebarView.AttachTreeView(_sidebarTreeView);
-
-            _sidebarTreeContextFlyout = new MenuFlyout();
-            var renameItem = new MenuFlyoutItem { Text = S("CommonRename") };
-            renameItem.Click += SidebarTreeContextRename_Click;
-            _sidebarTreeContextFlyout.Items.Add(renameItem);
         }
 
         private async Task PopulateSidebarTreeRootsAsync()
@@ -84,9 +81,9 @@ namespace FileExplorerUI
                     if (node.Content is SidebarTreeEntry entry &&
                         string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
                     {
-                        _suppressSidebarTreeSelection = true;
-                        _sidebarTreeView.SelectedNode = node;
-                        _suppressSidebarTreeSelection = false;
+                        SelectSidebarTreeNode(node);
+                        int requestVersion = ++_sidebarTreeScrollRequestVersion;
+                        await BringSidebarTreeNodeIntoViewAsync(node, requestVersion);
                         return;
                     }
                 }
@@ -120,9 +117,9 @@ namespace FileExplorerUI
             current = computer;
             if (!computer.IsExpanded)
             {
-                _suppressSidebarTreeSelection = true;
-                _sidebarTreeView.SelectedNode = current;
-                _suppressSidebarTreeSelection = false;
+                SelectSidebarTreeNode(current);
+                int requestVersion = ++_sidebarTreeScrollRequestVersion;
+                await BringSidebarTreeNodeIntoViewAsync(current, requestVersion);
                 return;
             }
 
@@ -204,9 +201,161 @@ namespace FileExplorerUI
                 }
             }
 
+            SelectSidebarTreeNode(current);
+            int finalRequestVersion = ++_sidebarTreeScrollRequestVersion;
+            await BringSidebarTreeNodeIntoViewAsync(current, finalRequestVersion);
+        }
+
+        private void SelectSidebarTreeNode(TreeViewNode node)
+        {
+            if (_sidebarTreeView is null)
+            {
+                return;
+            }
+
             _suppressSidebarTreeSelection = true;
-            _sidebarTreeView.SelectedNode = current;
+            _sidebarTreeView.SelectedNode = node;
             _suppressSidebarTreeSelection = false;
+        }
+
+        private async Task BringSidebarTreeNodeIntoViewAsync(TreeViewNode node, int requestVersion)
+        {
+            if (_sidebarTreeView is null)
+            {
+                return;
+            }
+
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                if (requestVersion != _sidebarTreeScrollRequestVersion)
+                {
+                    return;
+                }
+
+                _sidebarTreeView.UpdateLayout();
+                TreeViewItem? item = FindTreeViewItemForNode(node);
+                if (item is not null)
+                {
+                    ScrollViewer? treeScrollViewer = ResolveSidebarTreeScrollViewer(item);
+                    const double edgeTolerance = 0.5;
+                    bool wasAboveViewport = false;
+                    bool wasBelowViewport = false;
+                    double rowHeight = item.ActualHeight;
+                    string nodePath = (node.Content as SidebarTreeEntry)?.FullPath ?? "<unknown>";
+
+                    if (treeScrollViewer is not null &&
+                        item.ActualHeight > 0 &&
+                        item.ActualWidth > 0)
+                    {
+                        Rect boundsInViewport = item.TransformToVisual(treeScrollViewer)
+                            .TransformBounds(new Rect(0, 0, item.ActualWidth, item.ActualHeight));
+                        rowHeight = boundsInViewport.Height > 0 ? boundsInViewport.Height : item.ActualHeight;
+                        wasAboveViewport = boundsInViewport.Top < -edgeTolerance;
+                        wasBelowViewport = boundsInViewport.Bottom > treeScrollViewer.ViewportHeight + edgeTolerance;
+                        TraceTreeScroll(
+                            $"phase=measure path=\"{nodePath}\" top={boundsInViewport.Top:F2} bottom={boundsInViewport.Bottom:F2} " +
+                            $"viewportH={treeScrollViewer.ViewportHeight:F2} viewerH={treeScrollViewer.ActualHeight:F2} " +
+                            $"scrollable={treeScrollViewer.ScrollableHeight:F2} offset={treeScrollViewer.VerticalOffset:F2} " +
+                            $"rowH={rowHeight:F2} above={wasAboveViewport} below={wasBelowViewport}");
+                    }
+                    else
+                    {
+                        TraceTreeScroll($"phase=measure path=\"{nodePath}\" viewer=null-or-item-size-invalid");
+                    }
+
+                    if (wasAboveViewport)
+                    {
+                        item.StartBringIntoView(new BringIntoViewOptions
+                        {
+                            VerticalAlignmentRatio = 0,
+                            VerticalOffset = rowHeight,
+                            AnimationDesired = false
+                        });
+                        TraceTreeScroll($"phase=bring path=\"{nodePath}\" mode=top offset={rowHeight:F2}");
+                    }
+                    else if (wasBelowViewport)
+                    {
+                        item.StartBringIntoView(new BringIntoViewOptions
+                        {
+                            VerticalAlignmentRatio = 1,
+                            VerticalOffset = -rowHeight,
+                            AnimationDesired = false
+                        });
+                        TraceTreeScroll($"phase=bring path=\"{nodePath}\" mode=bottom offset={-rowHeight:F2}");
+                    }
+                    else
+                    {
+                        TraceTreeScroll($"phase=bring path=\"{nodePath}\" mode=skip-in-viewport");
+                        return;
+                    }
+
+                    await Task.Delay(16);
+                    _sidebarTreeView.UpdateLayout();
+                    if (requestVersion != _sidebarTreeScrollRequestVersion)
+                    {
+                        return;
+                    }
+
+                    treeScrollViewer = ResolveSidebarTreeScrollViewer(item);
+                    if (treeScrollViewer is not null &&
+                        item.ActualHeight > 0 &&
+                        item.ActualWidth > 0)
+                    {
+                        Rect postBounds = item.TransformToVisual(treeScrollViewer)
+                            .TransformBounds(new Rect(0, 0, item.ActualWidth, item.ActualHeight));
+                        TraceTreeScroll(
+                            $"phase=post-bring path=\"{nodePath}\" top={postBounds.Top:F2} bottom={postBounds.Bottom:F2} " +
+                            $"viewportH={treeScrollViewer.ViewportHeight:F2} offset={treeScrollViewer.VerticalOffset:F2}");
+                    }
+                    else
+                    {
+                        TraceTreeScroll($"phase=post-bring path=\"{nodePath}\" skipped=true reason=viewer-null-or-item-size");
+                    }
+
+                    return;
+                }
+
+                await Task.Delay(16);
+            }
+        }
+
+        private ScrollViewer? ResolveSidebarTreeScrollViewer(DependencyObject item)
+        {
+            DependencyObject? current = _sidebarTreeView;
+            ScrollViewer? fallback = null;
+            while (current is not null)
+            {
+                if (current is ScrollViewer viewer)
+                {
+                    fallback ??= viewer;
+                    if (viewer.ScrollableHeight > 0 ||
+                        viewer.VerticalScrollMode != ScrollMode.Disabled)
+                    {
+                        return viewer;
+                    }
+                }
+
+                current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(current);
+            }
+
+            if (fallback is not null)
+            {
+                return fallback;
+            }
+
+            ScrollViewer? directAncestor = FindAncestor<ScrollViewer>(item);
+            if (directAncestor is not null)
+            {
+                return directAncestor;
+            }
+
+            return FindDescendant<ScrollViewer>(_sidebarTreeView!)
+                ?? FindDescendant<ScrollViewer>(StyledSidebarView);
+        }
+
+        private static void TraceTreeScroll(string message)
+        {
+            AppendNavigationPerfLog($"[TREE-SCROLL] {message}");
         }
 
         private static TreeViewNode CreateSidebarTreeNode(SidebarTreeEntry entry, bool hasUnrealizedChildren)

@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FileExplorerUI
@@ -510,6 +511,7 @@ namespace FileExplorerUI
 
             if (sender is CommandMenuFlyout flyout)
             {
+                UpdateSidebarTreeExpandCollapseMenuItems(flyout);
                 UpdateEntriesContextFlyoutState(flyout);
             }
         }
@@ -517,6 +519,9 @@ namespace FileExplorerUI
         private void StaticEntriesContextFlyout_Closed(object sender, object e)
         {
             _entriesFlyoutOpen = false;
+            RemoveSidebarTreeExpandCollapseMenuItems();
+            _activeSidebarTreeContextNode = null;
+            _pendingSidebarTreeContextEntry = null;
 
             if (_pendingEntriesContextCommand is not null)
             {
@@ -526,7 +531,7 @@ namespace FileExplorerUI
                 _entriesContextRequest = null;
                 _lastEntriesContextItem = null;
                 _activeEntriesContextFlyout = null;
-                _ = ExecuteEntriesContextCommandAsync(pendingCommand.CommandId, pendingCommand.Target);
+                _ = ExecuteEntriesContextCommandAsync(pendingCommand.CommandId, pendingCommand.Target, pendingCommand.Origin);
                 return;
             }
 
@@ -564,10 +569,142 @@ namespace FileExplorerUI
             _pendingContextRenameEntry = null;
         }
 
+        private void UpdateSidebarTreeExpandCollapseMenuItems(CommandMenuFlyout flyout)
+        {
+            RemoveSidebarTreeExpandCollapseMenuItems();
+            if (!ReferenceEquals(flyout, FolderEntriesContextFlyout) ||
+                _entriesContextRequest?.Origin != EntriesContextOrigin.SidebarTree)
+            {
+                return;
+            }
+
+            TreeViewNode? node = _activeSidebarTreeContextNode;
+            if (node?.Content is not SidebarTreeEntry activeEntry ||
+                !string.Equals(activeEntry.FullPath, _entriesContextRequest.Entry?.FullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                node = FindSidebarTreeNodeByPath(_entriesContextRequest?.Entry?.FullPath ?? string.Empty);
+                _activeSidebarTreeContextNode = node;
+            }
+
+            if (node is null)
+            {
+                return;
+            }
+
+            _sidebarTreeExpandMenuItem ??= CreateSidebarTreeExpandCollapseMenuItem(
+                "CommonExpand",
+                "\uE70D",
+                SidebarTreeExpandMenuItem_Click);
+            _sidebarTreeCollapseMenuItem ??= CreateSidebarTreeExpandCollapseMenuItem(
+                "CommonCollapse",
+                "\uE70E",
+                SidebarTreeCollapseMenuItem_Click);
+            _sidebarTreeExpandCollapseSeparator ??= new MenuFlyoutSeparator();
+
+            _sidebarTreeExpandMenuItem.Text = S("CommonExpand");
+            _sidebarTreeCollapseMenuItem.Text = S("CommonCollapse");
+
+            bool hasChildren = node.HasUnrealizedChildren || node.Children.Count > 0;
+            bool showExpand = hasChildren && !node.IsExpanded;
+            bool showCollapse = node.IsExpanded;
+            if (!showExpand && !showCollapse)
+            {
+                return;
+            }
+
+            int insertIndex = 0;
+            if (showExpand)
+            {
+                flyout.Items.Insert(insertIndex++, _sidebarTreeExpandMenuItem);
+            }
+
+            if (showCollapse)
+            {
+                flyout.Items.Insert(insertIndex++, _sidebarTreeCollapseMenuItem);
+            }
+
+            flyout.Items.Insert(insertIndex, _sidebarTreeExpandCollapseSeparator);
+        }
+
+        private void RemoveSidebarTreeExpandCollapseMenuItems()
+        {
+            if (_sidebarTreeExpandMenuItem is not null)
+            {
+                FolderEntriesContextFlyout.Items.Remove(_sidebarTreeExpandMenuItem);
+            }
+
+            if (_sidebarTreeCollapseMenuItem is not null)
+            {
+                FolderEntriesContextFlyout.Items.Remove(_sidebarTreeCollapseMenuItem);
+            }
+
+            if (_sidebarTreeExpandCollapseSeparator is not null)
+            {
+                FolderEntriesContextFlyout.Items.Remove(_sidebarTreeExpandCollapseSeparator);
+            }
+        }
+
+        private static MenuFlyoutItem CreateSidebarTreeExpandCollapseMenuItem(string textKey, string glyph, RoutedEventHandler clickHandler)
+        {
+            var item = new MenuFlyoutItem
+            {
+                Text = S(textKey),
+                Icon = new FontIcon
+                {
+                    FontFamily = new FontFamily("Segoe Fluent Icons"),
+                    Glyph = glyph
+                }
+            };
+            item.Click += clickHandler;
+            return item;
+        }
+
+        private async void SidebarTreeExpandMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_activeSidebarTreeContextNode?.Content is not SidebarTreeEntry entry)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_activeSidebarTreeContextNode.HasUnrealizedChildren)
+                {
+                    await PopulateSidebarTreeChildrenAsync(_activeSidebarTreeContextNode, entry.FullPath, CancellationToken.None, expandAfterLoad: true);
+                }
+                else
+                {
+                    _activeSidebarTreeContextNode.IsExpanded = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStatusKey("StatusSidebarTreeExpandFailed", FileOperationErrors.ToUserMessage(ex));
+            }
+        }
+
+        private void SidebarTreeCollapseMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_activeSidebarTreeContextNode is not null)
+            {
+                _activeSidebarTreeContextNode.IsExpanded = false;
+            }
+        }
+
         private FileCommandTarget ResolveEntriesContextTarget(EntryViewModel? contextEntry)
         {
             if (contextEntry is { IsLoaded: true })
             {
+                if (_entriesContextRequest?.Origin == EntriesContextOrigin.SidebarTree && contextEntry.IsDirectory)
+                {
+                    if (IsDriveRoot(contextEntry.FullPath))
+                    {
+                        return FileCommandTargetResolver.ResolveDriveRoot(contextEntry.FullPath);
+                    }
+
+                    return FileCommandTargetResolver.ResolveEntry(contextEntry.FullPath, isDirectory: true);
+                }
+
                 if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) && contextEntry.IsDirectory)
                 {
                     return FileCommandTargetResolver.ResolveDriveRoot(contextEntry.FullPath);

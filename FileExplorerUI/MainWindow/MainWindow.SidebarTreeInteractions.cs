@@ -125,10 +125,38 @@ namespace FileExplorerUI
 
         private TreeViewNode? FindSidebarTreeNodeFromSource(DependencyObject? source)
         {
+            DependencyObject? current = source;
+            while (current is not null)
+            {
+                if (current is FrameworkElement element)
+                {
+                    if (element.DataContext is TreeViewNode nodeFromElementDataContext)
+                    {
+                        return nodeFromElementDataContext;
+                    }
+
+                    if (element.DataContext is SidebarTreeEntry entryFromElementDataContext)
+                    {
+                        TreeViewNode? resolved = FindSidebarTreeNodeByPath(entryFromElementDataContext.FullPath);
+                        if (resolved is not null)
+                        {
+                            return resolved;
+                        }
+                    }
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
             TreeViewItem? item = FindAncestor<TreeViewItem>(source);
             if (item?.DataContext is TreeViewNode nodeFromDataContext)
             {
                 return nodeFromDataContext;
+            }
+
+            if (item?.DataContext is SidebarTreeEntry entryFromDataContext)
+            {
+                return FindSidebarTreeNodeByPath(entryFromDataContext.FullPath);
             }
 
             if (item?.Content is TreeViewNode nodeFromContent)
@@ -136,7 +164,54 @@ namespace FileExplorerUI
                 return nodeFromContent;
             }
 
-            return _sidebarTreeView?.SelectedNode;
+            if (item?.Content is SidebarTreeEntry entryFromContent)
+            {
+                return FindSidebarTreeNodeByPath(entryFromContent.FullPath);
+            }
+
+            return null;
+        }
+
+        private TreeViewNode? FindSidebarTreeNodeFromPoint(Point point)
+        {
+            if (_sidebarTreeView is null)
+            {
+                return null;
+            }
+
+            foreach (TreeViewItem item in FindDescendants<TreeViewItem>(_sidebarTreeView))
+            {
+                TreeViewNode? node = item.DataContext as TreeViewNode ?? item.Content as TreeViewNode;
+                if (node is null)
+                {
+                    SidebarTreeEntry? entry = item.DataContext as SidebarTreeEntry ?? item.Content as SidebarTreeEntry;
+                    if (entry is not null)
+                    {
+                        node = FindSidebarTreeNodeByPath(entry.FullPath);
+                    }
+                }
+
+                if (node is null || item.ActualWidth <= 0 || item.ActualHeight <= 0)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    GeneralTransform transform = item.TransformToVisual(_sidebarTreeView);
+                    Rect bounds = transform.TransformBounds(new Rect(0, 0, item.ActualWidth, item.ActualHeight));
+                    if (bounds.Contains(point))
+                    {
+                        return node;
+                    }
+                }
+                catch
+                {
+                    // Ignore transient visual-tree failures and keep probing realized items.
+                }
+            }
+
+            return null;
         }
 
         private void SidebarTree_SelectionChanged(TreeView sender, TreeViewSelectionChangedEventArgs args)
@@ -219,12 +294,20 @@ namespace FileExplorerUI
 
         private void SidebarTree_ContextRequested(UIElement sender, ContextRequestedEventArgs e)
         {
-            if (_sidebarTreeView is null || _sidebarTreeContextFlyout is null)
+            if (_sidebarTreeView is null)
             {
                 return;
             }
 
+            _pendingSidebarTreeContextEntry = null;
+            _activeSidebarTreeContextNode = null;
+
             TreeViewNode? node = FindSidebarTreeNodeFromSource(e.OriginalSource as DependencyObject);
+            bool hasPosition = e.TryGetPosition(_sidebarTreeView, out Point point);
+            if (node is null && hasPosition)
+            {
+                node = FindSidebarTreeNodeFromPoint(point);
+            }
             bool isRootPath = false;
             if (node?.Content is SidebarTreeEntry candidate)
             {
@@ -237,27 +320,50 @@ namespace FileExplorerUI
                 string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) ||
                 isRootPath)
             {
+                e.Handled = true;
                 return;
             }
 
             _pendingSidebarTreeContextEntry = entry;
-            if (!ReferenceEquals(_sidebarTreeView.SelectedNode, node))
-            {
-                _suppressSidebarTreeSelection = true;
-                _sidebarTreeView.SelectedNode = node;
-                _suppressSidebarTreeSelection = false;
-            }
+            _activeSidebarTreeContextNode = node;
 
-            if (e.TryGetPosition(_sidebarTreeView, out Point point))
+            FocusSidebarSurface();
+            ClearListSelectionAndAnchor();
+
+            var contextEntry = new EntryViewModel
             {
-                _sidebarTreeContextFlyout.ShowAt(_sidebarTreeView, new FlyoutShowOptions
-                {
-                    Position = point
-                });
+                Name = entry.Name,
+                DisplayName = entry.Name,
+                PendingName = entry.Name,
+                FullPath = entry.FullPath,
+                Type = GetEntryTypeText(entry.Name, isDirectory: true, isLink: false),
+                IconGlyph = entry.IconGlyph,
+                IconForeground = GetEntryIconBrush(isDirectory: true, isLink: false, entry.Name),
+                SizeText = string.Empty,
+                ModifiedText = string.Empty,
+                IsDirectory = true,
+                IsLink = false,
+                IsLoaded = true,
+                IsMetadataLoaded = true
+            };
+
+            if (hasPosition)
+            {
+                ShowEntriesContextFlyout(new EntriesContextRequest(
+                    _sidebarTreeView,
+                    point,
+                    contextEntry,
+                    IsItemTarget: true,
+                    Origin: EntriesContextOrigin.SidebarTree));
             }
             else
             {
-                _sidebarTreeContextFlyout.ShowAt(_sidebarTreeView);
+                ShowEntriesContextFlyout(new EntriesContextRequest(
+                    _sidebarTreeView,
+                    new Point(0, 0),
+                    contextEntry,
+                    IsItemTarget: true,
+                    Origin: EntriesContextOrigin.SidebarTree));
             }
 
             e.Handled = true;

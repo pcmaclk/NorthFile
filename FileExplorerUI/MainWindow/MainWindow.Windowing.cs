@@ -354,6 +354,7 @@ namespace FileExplorerUI
         private void MainWindowRoot_ActualThemeChanged(FrameworkElement sender, object args)
         {
             ApplyTitleBarTheme();
+            SyncSidebarTreeRenameOverlayTheme();
         }
 
         private static void AppendWindowSizeLog(string message)

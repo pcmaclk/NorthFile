@@ -6,13 +6,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
-        private async Task LoadFirstPageAsync()
+        private async Task LoadFirstPageAsync(CancellationToken cancellationToken = default)
         {
             NavigationPerfSession? perf = TryGetCurrentNavigationPerfSession();
             perf?.Mark("load-first-page.enter");
@@ -54,10 +55,10 @@ namespace FileExplorerUI
             perf?.Mark("load-first-page.pipeline-selected", UsesClientPresentationPipeline() ? "client" : "paged");
             if (UsesClientPresentationPipeline())
             {
-                await LoadAllEntriesForPresentationAsync(_currentPath, perf);
+                await LoadAllEntriesForPresentationAsync(_currentPath, perf, cancellationToken);
                 return;
             }
-            await LoadPageAsync(_currentPath, cursor: 0, append: false, perf);
+            await LoadPageAsync(_currentPath, cursor: 0, append: false, perf, cancellationToken);
         }
 
         private async Task NavigateToPathAsync(string path, bool pushHistory, bool focusEntriesAfterNavigation = true)
@@ -78,19 +79,20 @@ namespace FileExplorerUI
                         target,
                         pushHistory);
 
-                    _currentPath = ShellMyComputerPath;
-                    _pendingHistoryStateRestorePath = pushHistory ? null : ShellMyComputerPath;
-                    PathTextBox.Text = GetDisplayPathText(ShellMyComputerPath);
-                    _currentQuery = string.Empty;
-                    SearchTextBox.Text = string.Empty;
-                    UpdateBreadcrumbs(_currentPath);
-                    UpdateNavButtonsState();
-                    _ = SelectSidebarTreePathAsync(_currentPath);
-                    await LoadFirstPageAsync();
-                    ClearListSelection();
-                    if (focusEntriesAfterNavigation)
-                    {
-                        _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                _currentPath = ShellMyComputerPath;
+                _pendingHistoryStateRestorePath = pushHistory ? null : ShellMyComputerPath;
+                PathTextBox.Text = GetDisplayPathText(ShellMyComputerPath);
+                _currentQuery = string.Empty;
+                SearchTextBox.Text = string.Empty;
+                UpdateBreadcrumbs(_currentPath);
+                UpdateNavButtonsState();
+                _ = SelectSidebarTreePathAsync(_currentPath);
+                await WaitForLoadIdleAsync();
+                await LoadFirstPageAsync();
+                ClearListSelection();
+                if (focusEntriesAfterNavigation)
+                {
+                    _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
                     }
                     perf.Mark("navigate.completed");
                     return;
@@ -121,6 +123,7 @@ namespace FileExplorerUI
                 UpdateBreadcrumbs(target);
                 UpdateNavButtonsState();
                 _ = SelectSidebarTreePathAsync(_currentPath);
+                await WaitForLoadIdleAsync();
                 await LoadFirstPageAsync();
                 ClearListSelection();
                 if (focusEntriesAfterNavigation)
@@ -144,6 +147,21 @@ namespace FileExplorerUI
             }
 
             await LoadPageAsync(_currentPath, _nextCursor, append: true);
+        }
+
+        private CancellationTokenSource BeginNavigationLoadTransition()
+        {
+            CancelAndDispose(ref _navigationLoadCts);
+            _navigationLoadCts = new CancellationTokenSource();
+            return _navigationLoadCts;
+        }
+
+        private async Task WaitForLoadIdleAsync()
+        {
+            while (_isLoading)
+            {
+                await Task.Delay(16);
+            }
         }
 
         private async Task<bool> CanReadDirectoryAsync(string path)
@@ -204,11 +222,17 @@ namespace FileExplorerUI
                 : _explorerService.CreateSearchResultSet(path, query, _currentSortMode);
         }
 
-        private async Task LoadPageAsync(string path, ulong cursor, bool append, NavigationPerfSession? perf = null)
+        private async Task LoadPageAsync(string path, ulong cursor, bool append, NavigationPerfSession? perf = null, CancellationToken cancellationToken = default)
         {
             if (_isLoading)
             {
                 perf?.Mark("load-page.skipped", "already-loading");
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                perf?.Mark("load-page.skipped", "cancelled-before-start");
                 return;
             }
 
@@ -255,6 +279,12 @@ namespace FileExplorerUI
                         return (success, p, code, msg);
                     }
                 );
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    perf?.Mark("load-page.skipped", "cancelled-or-stale");
+                    return;
+                }
 
                 if (!ok)
                 {
@@ -377,6 +407,12 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    perf?.Mark("load-page.cancelled", ex.Message);
+                    return;
+                }
+
                 _lastTitleWasReadFailed = true;
                 UpdateWindowTitle();
                 UpdateStatusKey("StatusPathError", path, FileOperationErrors.ToUserMessage(ex));
@@ -393,11 +429,17 @@ namespace FileExplorerUI
             }
         }
 
-        private async Task LoadAllEntriesForPresentationAsync(string path, NavigationPerfSession? perf = null)
+        private async Task LoadAllEntriesForPresentationAsync(string path, NavigationPerfSession? perf = null, CancellationToken cancellationToken = default)
         {
             if (_isLoading)
             {
                 perf?.Mark("load-all.skipped", "already-loading");
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                perf?.Mark("load-all.skipped", "cancelled-before-start");
                 return;
             }
 
@@ -442,6 +484,12 @@ namespace FileExplorerUI
                         return (success, p, code, msg);
                     });
 
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        perf?.Mark("load-all.skipped", "cancelled-or-stale");
+                        return;
+                    }
+
                     if (!ok)
                     {
                         throw new InvalidOperationException($"Rust error {rustErrorCode}: {rustErrorMessage}");
@@ -465,6 +513,7 @@ namespace FileExplorerUI
                     perf?.Mark("load-all.batch", $"loaded={loadedEntries.Count} total={totalEntries} hasMore={hasMore}");
                 } while (hasMore);
 
+                ResetEntriesViewport();
                 SetPresentationSourceEntries(loadedEntries);
                 perf?.Mark("load-all.fetch-completed", $"loaded={loadedEntries.Count}");
                 ApplyCurrentPresentation(perf);
@@ -484,6 +533,12 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    perf?.Mark("load-all.cancelled", ex.Message);
+                    return;
+                }
+
                 UpdateStatusKey("StatusLoadFailedWithReason", FileOperationErrors.ToUserMessage(ex));
                 perf?.Mark("load-all.failed", ex.Message);
             }
@@ -498,5 +553,6 @@ namespace FileExplorerUI
                 perf?.Mark("load-all.exit");
             }
         }
+
     }
 }

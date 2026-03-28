@@ -194,6 +194,7 @@ namespace FileExplorerUI
                 }
 
                 _activeRenameOverlayEntry = entry;
+                entry.IsNameEditing = true;
                 RenameOverlayTextBox.Text = entry.Name;
                 RenameOverlayBorder.Visibility = Visibility.Visible;
                 _entriesRenameInlineSession ??= new InlineEditSession(
@@ -474,6 +475,11 @@ namespace FileExplorerUI
             if (_entriesRenameInlineSession is not null)
             {
                 _inlineEditCoordinator.ClearSession(_entriesRenameInlineSession);
+            }
+
+            if (_activeRenameOverlayEntry is not null)
+            {
+                _activeRenameOverlayEntry.IsNameEditing = false;
             }
             _activeRenameOverlayEntry = null;
             RenameOverlayBorder.Visibility = Visibility.Collapsed;

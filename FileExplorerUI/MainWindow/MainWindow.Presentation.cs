@@ -205,7 +205,7 @@ namespace FileExplorerUI
         private void ApplyCurrentPresentation(NavigationPerfSession? perf = null)
         {
             perf?.Mark("apply-presentation.enter", $"view={_currentViewMode} group={_currentGroupField} sort={_currentSortField}/{_currentSortDirection}");
-            List<EntryViewModel> sourceEntries = _presentationSourceEntries.Count > 0
+            List<EntryViewModel> sourceEntries = _presentationSourceInitialized
                 ? _presentationSourceEntries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList()
                 : _entries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList();
 

@@ -91,7 +91,8 @@ public sealed partial class EntryNameCell : UserControl
         if (e.PropertyName is not (nameof(FileExplorerUI.EntryViewModel.DisplayName)
             or nameof(FileExplorerUI.EntryViewModel.IconGlyph)
             or nameof(FileExplorerUI.EntryViewModel.IconForeground)
-            or nameof(FileExplorerUI.EntryViewModel.IconOpacity)))
+            or nameof(FileExplorerUI.EntryViewModel.IconOpacity)
+            or nameof(FileExplorerUI.EntryViewModel.IsNameEditing)))
         {
             return;
         }
@@ -122,6 +123,7 @@ public sealed partial class EntryNameCell : UserControl
         EntryNameTextBlock.Margin = new Thickness(0, 0, metrics.NameTrailingSpacing, 0);
         EntryNameTextBlock.FontSize = metrics.NameFontSize;
         EntryNameTextBlock.Text = entry?.DisplayName ?? string.Empty;
+        EntryNameTextBlock.Visibility = entry?.IsNameEditing == true ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void EntryNameCell_Unloaded(object sender, RoutedEventArgs e)
