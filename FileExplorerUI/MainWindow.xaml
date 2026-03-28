@@ -409,6 +409,7 @@
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Center"
                                     FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                     Opacity="0.72" />
                                 <TextBlock
                                     x:Name="TypeHeaderTextBlock"
@@ -418,6 +419,7 @@
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Center"
                                     FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                     Opacity="0.72" />
                                 <TextBlock
                                     x:Name="SizeHeaderTextBlock"
@@ -427,6 +429,7 @@
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Center"
                                     FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                     Opacity="0.72" />
                                 <TextBlock
                                     x:Name="ModifiedHeaderTextBlock"
@@ -436,6 +439,7 @@
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Center"
                                     FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                     Opacity="0.72" />
 
                                 <local:ColumnSplitter
@@ -584,71 +588,48 @@
                             PointerPressed="GroupedEntriesView_PointerPressedPreview"
                             RightTapped="GroupedEntriesView_RightTapped"
                             Visibility="{x:Bind GroupedColumnsVisibility, Mode=OneWay}">
-                            <ItemsControl x:Name="GroupedEntriesColumnsView" ItemsSource="{x:Bind GroupedEntryColumns, Mode=OneWay}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="16" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
+                            <ItemsRepeater x:Name="GroupedEntriesRepeater" ItemsSource="{x:Bind _entries, Mode=OneWay}">
+                                <ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Spacing="0">
+                                        <Grid>
                                             <Border
                                                 Background="Transparent"
                                                 DoubleTapped="GroupedListHeader_DoubleTapped"
                                                 PointerPressed="GroupedListHeader_PointerPressed"
-                                                RightTapped="GroupedListHeader_RightTapped">
-                                                <Border.Visibility>
-                                                    <Binding Path="HeaderVisibility" />
-                                                </Border.Visibility>
+                                                RightTapped="GroupedListHeader_RightTapped"
+                                                Visibility="{Binding HeaderRowVisibility}">
                                                 <controls:EntryGroupHeader
-                                                    ContentPadding="6,0,6,0"
-                                                    CountText="{Binding CountText}"
+                                                    ContentPadding="12,0,6,0"
+                                                    CountText="{Binding GroupCountText}"
                                                     HeaderOpacity="0.72"
-                                                    HeaderText="{Binding HeaderText}"
+                                                    HeaderText="{Binding GroupHeaderText}"
                                                     Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
                                                     ShowExpandGlyph="False" />
                                             </Border>
-                                            <ItemsControl ItemsSource="{Binding ItemColumns}">
-                                                <ItemsControl.ItemsPanel>
-                                                    <ItemsPanelTemplate>
-                                                        <StackPanel Orientation="Horizontal" Spacing="0" />
-                                                    </ItemsPanelTemplate>
-                                                </ItemsControl.ItemsPanel>
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <ItemsControl ItemsSource="{Binding Items}">
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate>
-                                                                    <controls:EntryItemHost
-                                                                        Margin="0,2,0,2"
-                                                                        MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
-                                                                        Padding="0,3,0,3"
-                                                                        Background="Transparent"
-                                                                        IndicatorBrush="{Binding SelectionIndicatorBrush, Mode=OneWay}"
-                                                                        IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
-                                                                        IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
-                                                                        AnchorBorderBrush="{Binding SelectionIndicatorBrush, Mode=OneWay}"
-                                                                        HorizontalAlignment="Stretch"
-                                                                        PointerPressed="EntryRow_PointerPressed"
-                                                                        SelectedBackground="{Binding RowBackground}"
-                                                                        SelectedPointerOverBackground="{Binding RowBackground}"
-                                                                        SelectedPressedBackground="{Binding RowBackground}">
-                                                                        <controls:EntryNameCell
-                                                                            ContentMargin="12,0,0,0"
-                                                                            Entry="{Binding}"
-                                                                            Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}" />
-                                                                    </controls:EntryItemHost>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
+                                            <controls:EntryItemHost
+                                                Margin="0,2,0,2"
+                                                MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
+                                                Padding="0,3,0,3"
+                                                Background="Transparent"
+                                                IndicatorBrush="{Binding SelectionIndicatorBrush, Mode=OneWay}"
+                                                IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
+                                                IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
+                                                AnchorBorderBrush="{Binding SelectionIndicatorBrush, Mode=OneWay}"
+                                                HorizontalAlignment="Stretch"
+                                                PointerPressed="EntryRow_PointerPressed"
+                                                SelectedBackground="{Binding RowBackground}"
+                                                SelectedPointerOverBackground="{Binding RowBackground}"
+                                                SelectedPressedBackground="{Binding RowBackground}"
+                                                Visibility="{Binding ListRowVisibility}">
+                                                <controls:EntryNameCell
+                                                    ContentMargin="12,0,0,0"
+                                                    Entry="{Binding}"
+                                                    Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}" />
+                                            </controls:EntryItemHost>
+                                        </Grid>
                                     </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
                         </ScrollViewer>
 
                         <Grid Grid.Row="1" Visibility="Collapsed">
@@ -891,11 +872,13 @@
                     <TextBlock
                         x:Name="StatusTextBlock"
                         x:Uid="StatusTextBlock"
-                        Margin="18,0,18,0"
+                        Margin="22,0,18,0"
                         VerticalAlignment="Center"
                         FontSize="11"
+                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                         LineHeight="11"
                         LineStackingStrategy="BlockLineHeight"
+                        Opacity="0.72"
                         TextTrimming="CharacterEllipsis"
                         TextWrapping="NoWrap" />
                 </Grid>

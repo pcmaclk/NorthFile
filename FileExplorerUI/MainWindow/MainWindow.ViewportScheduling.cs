@@ -109,7 +109,12 @@ namespace FileExplorerUI
 
         private void GroupedEntriesScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            RefreshGroupedColumnsForViewport();
+            if (!UsesColumnsListPresentation())
+            {
+                return;
+            }
+
+            GroupedEntriesRepeater.InvalidateMeasure();
         }
 
         private void InvalidateDetailsViewportRealization(bool preferMinimalBuffer = false, bool forceSynchronous = false)

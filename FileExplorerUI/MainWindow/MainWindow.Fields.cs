@@ -111,6 +111,8 @@ namespace FileExplorerUI
         private readonly EntriesPresentationBuilder _entriesPresentationBuilder = new();
         private readonly EntriesRepeaterLayoutProfile _detailsRepeaterLayoutProfile;
         private readonly FixedExtentVirtualizingLayout _detailsVirtualizingLayout;
+        private readonly GroupedListRepeaterLayoutProfile _groupedRepeaterLayoutProfile;
+        private readonly GroupedListVirtualizingLayout _groupedVirtualizingLayout;
         private IEntriesViewHost? _detailsEntriesViewHost;
         private IEntriesViewHost? _groupedEntriesViewHost;
         private NavigationPerfSession? _activeNavigationPerfSession;
@@ -191,6 +193,14 @@ namespace FileExplorerUI
         private int _lastRestoredWindowHeight;
         private bool _windowSizeRestorePending;
         private bool _hasSeenFirstActivation;
+        private bool _groupedColumnsRefreshQueued;
+        private CancellationTokenSource? _groupedColumnsResizeDebounceCts;
+        private int _groupedColumnsRefreshVersion;
+        private long _lastGroupedColumnsRefreshAppliedStamp;
+        private double _lastWindowWidth = double.NaN;
+        private double _lastWindowHeight = double.NaN;
+        private double _lastGroupedViewportHeight = double.NaN;
+        private long _lastGroupedColumnsLiveResizeRefreshTick;
         private readonly Dictionary<string, NavigationViewItem> _sidebarPathButtons = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _sidebarQuickAccessPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _sidebarDrivePaths = new(StringComparer.OrdinalIgnoreCase);

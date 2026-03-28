@@ -33,6 +33,7 @@ namespace FileExplorerUI
             RegisterColumnSplitterHandlers(HeaderSplitter4);
             RegisterSidebarSplitterHandlers(SidebarSplitter);
             DetailsEntriesRepeater.Layout = _detailsVirtualizingLayout;
+            GroupedEntriesRepeater.Layout = _groupedVirtualizingLayout;
             RegisterEntriesKeyHandlers(DetailsEntriesScrollViewer);
             RegisterEntriesKeyHandlers(GroupedEntriesScrollViewer);
             DetailsEntriesScrollViewer.ViewChanged += DetailsEntriesScrollViewer_ViewChanged;
@@ -46,7 +47,11 @@ namespace FileExplorerUI
                 DetailsEntriesRepeater,
                 _detailsRepeaterLayoutProfile);
             _detailsEntriesViewHost.SetItems(_entries);
-            _groupedEntriesViewHost = new GroupedColumnsEntriesViewHost(GroupedEntriesScrollViewer);
+            _groupedEntriesViewHost = new GroupedRepeaterEntriesViewHost(
+                GroupedEntriesScrollViewer,
+                GroupedEntriesRepeater,
+                _groupedVirtualizingLayout);
+            _groupedEntriesViewHost.SetItems(_entries);
             UpdateEntriesContextOverlayTargets();
             SizeChanged += MainWindow_SizeChanged;
             Activated += MainWindow_Activated;

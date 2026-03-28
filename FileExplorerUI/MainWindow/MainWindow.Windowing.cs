@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using FileExplorerUI.Workspace;
 using Windows.Graphics;
 using WinRT.Interop;
 
@@ -318,15 +319,43 @@ namespace FileExplorerUI
 
         private void MainWindow_SizeChanged(object sender, WindowSizeChangedEventArgs args)
         {
-            ApplySidebarWidthLayout();
-            UpdateEstimatedItemHeight();
-            RequestViewportWork();
-            RefreshGroupedColumnsForViewport();
-            UpdateVisibleBreadcrumbs();
+            bool widthChanged = double.IsNaN(_lastWindowWidth) || Math.Abs(args.Size.Width - _lastWindowWidth) > 0.5;
+            _lastWindowWidth = args.Size.Width;
+            _lastWindowHeight = args.Size.Height;
+
+            if (widthChanged)
+            {
+                ApplySidebarWidthLayout();
+            }
+
+            if (_currentViewMode == EntryViewMode.Details)
+            {
+                UpdateEstimatedItemHeight();
+                RequestViewportWork();
+            }
+            if (UsesColumnsListPresentation())
+            {
+                long now = Environment.TickCount64;
+                const int liveRefreshIntervalMs = 240;
+                if (now - _lastGroupedColumnsLiveResizeRefreshTick >= liveRefreshIntervalMs)
+                {
+                    _lastGroupedColumnsLiveResizeRefreshTick = now;
+                    RequestGroupedColumnsRefresh(force: false);
+                }
+
+                RequestGroupedColumnsRefreshDebounced(delayMs: 90, force: true);
+            }
+            if (widthChanged)
+            {
+                UpdateVisibleBreadcrumbs();
+            }
             UpdateRenameOverlayPosition();
             TryResetSystemCursorToArrow();
-            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
-            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
+            if (widthChanged)
+            {
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
+            }
         }
 
         private static void TryResetSystemCursorToArrow()
