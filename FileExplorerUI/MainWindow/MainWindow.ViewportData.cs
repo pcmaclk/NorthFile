@@ -264,6 +264,7 @@ namespace FileExplorerUI
         private void InvalidateEntriesLayouts()
         {
             DetailsEntriesRepeater.InvalidateMeasure();
+            GroupedEntriesRepeater.InvalidateMeasure();
         }
 
         private async Task EnsureDataForViewportAsync(int startIndex, int endIndex, bool preferMinimalPage = false)

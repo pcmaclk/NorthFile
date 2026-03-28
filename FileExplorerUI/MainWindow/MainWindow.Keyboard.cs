@@ -338,19 +338,39 @@ namespace FileExplorerUI
         private List<IReadOnlyList<EntryViewModel>> GetListNavigationColumns()
         {
             var columns = new List<IReadOnlyList<EntryViewModel>>();
-            foreach (GroupedEntryColumnViewModel groupColumn in _groupedEntryColumns)
+
+            int rowsPerColumn = Math.Max(1, GetGroupedListRowsPerColumn());
+            var currentGroupItems = new List<EntryViewModel>();
+            void FlushCurrentGroup()
             {
-                foreach (GroupedEntryItemColumnViewModel itemColumn in groupColumn.ItemColumns)
+                if (currentGroupItems.Count == 0)
                 {
-                    List<EntryViewModel> items = itemColumn.Items
-                        .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
-                        .ToList();
-                    if (items.Count > 0)
-                    {
-                        columns.Add(items);
-                    }
+                    return;
+                }
+
+                foreach (EntryViewModel[] chunk in currentGroupItems.Chunk(rowsPerColumn))
+                {
+                    columns.Add(chunk);
+                }
+
+                currentGroupItems.Clear();
+            }
+
+            foreach (EntryViewModel entry in _entries)
+            {
+                if (entry.IsGroupHeader)
+                {
+                    FlushCurrentGroup();
+                    continue;
+                }
+
+                if (entry.IsLoaded)
+                {
+                    currentGroupItems.Add(entry);
                 }
             }
+
+            FlushCurrentGroup();
 
             if (columns.Count > 0)
             {
@@ -358,7 +378,7 @@ namespace FileExplorerUI
             }
 
             return GetSelectableEntriesInPresentationOrder()
-                .Chunk(Math.Max(1, GetGroupedListRowsPerColumn()))
+                .Chunk(rowsPerColumn)
                 .Select(chunk => (IReadOnlyList<EntryViewModel>)chunk.ToList())
                 .ToList();
         }

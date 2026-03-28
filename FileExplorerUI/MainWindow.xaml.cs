@@ -30,6 +30,25 @@ namespace FileExplorerUI
                     return Math.Max(1, viewportHeight);
                 });
             _detailsVirtualizingLayout = new FixedExtentVirtualizingLayout(_detailsRepeaterLayoutProfile);
+            _groupedRepeaterLayoutProfile = new GroupedListRepeaterLayoutProfile(
+                itemsProvider: () => _entries,
+                itemWidthProvider: () => Math.Max(1, EntryContainerWidth),
+                rowExtentProvider: () => Math.Max(1, EntryItemMetrics.RowHeight + 4),
+                headerExtentProvider: () => Math.Max(1, EntryItemMetrics.GroupHeaderHeight),
+                rowsPerColumnProvider: () =>
+                {
+                    int rowsPerColumn = Math.Max(1, GetGroupedListRowsPerColumn());
+                    _groupedListRowsPerColumn = rowsPerColumn;
+                    return rowsPerColumn;
+                },
+                viewportHeightProvider: () =>
+                {
+                    double viewportHeight = GroupedEntriesScrollViewer.ViewportHeight > 0
+                        ? GroupedEntriesScrollViewer.ViewportHeight
+                        : GroupedEntriesScrollViewer.ActualHeight;
+                    return Math.Max(1, viewportHeight);
+                });
+            _groupedVirtualizingLayout = new GroupedListVirtualizingLayout(_groupedRepeaterLayoutProfile);
             _workspaceLayoutHost = new WorkspaceLayoutHost(_workspaceShellState);
             _fileManagementCoordinator = new FileManagementCoordinator(_explorerService);
             _entriesContextCommand = new DelegateCommand(ExecuteEntriesContextCommand);

@@ -374,6 +374,8 @@ namespace FileExplorerUI
             }
         }
 
+        public string GroupCountText => _groupItemCount > 0 ? $"({_groupItemCount})" : string.Empty;
+
         public Visibility HeaderRowVisibility
         {
             get => _headerRowVisibility;
@@ -563,8 +565,6 @@ namespace FileExplorerUI
         public Visibility NameDisplayVisibility => _isNameEditing ? Visibility.Collapsed : Visibility.Visible;
 
         public Visibility NameEditorVisibility => _isNameEditing ? Visibility.Visible : Visibility.Collapsed;
-
-        public string GroupCountText => _groupItemCount > 0 ? $"({_groupItemCount})" : string.Empty;
 
         public string GroupExpandGlyph => _isGroupExpanded ? "\uE70D" : "\uE76C";
 

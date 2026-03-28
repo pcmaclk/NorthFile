@@ -87,6 +87,7 @@ namespace FileExplorerUI
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntryContainerWidth)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesListVisibility)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GroupedColumnsVisibility)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsItemsVisibility)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsHeaderVisibility)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameHeaderMargin)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsNameCellMargin)));
@@ -144,12 +145,23 @@ namespace FileExplorerUI
             }
 
             _currentViewMode = mode;
+            if (mode == EntryViewMode.List)
+            {
+                _groupedListRowsPerColumn = -1;
+                _lastGroupedViewportHeight = double.NaN;
+            }
             NotifyPresentationModeChanged();
             await ReloadCurrentPresentationAsync(PresentationReloadReason.ViewModeSwitch);
             _ = DispatcherQueue.TryEnqueue(() =>
             {
                 UpdateEntriesContextOverlayTargets();
                 GetVisibleEntriesRoot().UpdateLayout();
+                if (_currentViewMode == EntryViewMode.List)
+                {
+                    // Ensure details->list switch gets a correct first layout immediately.
+                    RequestGroupedColumnsRefresh(force: true);
+                    RequestGroupedColumnsRefreshDebounced(delayMs: 48, force: true);
+                }
                 FocusEntriesList();
             });
         }
@@ -214,25 +226,15 @@ namespace FileExplorerUI
             string? selectedPath = _selectedEntryPath;
             if (UsesColumnsListPresentation())
             {
+                List<EntryViewModel> presentedEntries = BuildPresentedEntries(sourceEntries);
                 _groupedListRowsPerColumn = GetGroupedListRowsPerColumn();
-                ApplyEntryViewState(sourceEntries);
-
-                if (!MatchesCurrentVisibleEntries(sourceEntries))
+                if (!MatchesCurrentVisibleEntries(presentedEntries))
                 {
-                    ReplaceVisibleEntries(sourceEntries);
+                    ReplaceVisibleEntries(presentedEntries);
                 }
 
-                if (TryUseGroupedColumnsCache())
-                {
-                    ApplyGroupedColumnsProjection(_groupedColumnsProjectionCache!);
-                    perf?.Mark("apply-presentation.columns-cache-hit", $"columns={_groupedEntryColumns.Count}");
-                }
-                else
-                {
-                    RebuildGroupedEntryColumns(sourceEntries);
-                    perf?.Mark("apply-presentation.columns-rebuilt", $"columns={_groupedEntryColumns.Count}");
-                }
-                _ = DispatcherQueue.TryEnqueue(RefreshGroupedColumnsForViewport);
+                _groupedEntryColumns.Clear();
+                RequestGroupedColumnsRefresh();
             }
             else
             {

@@ -1,5 +1,20 @@
 # WinUI 内容区多视图与双面板重构计划
 
+## 当前进度（2026-03-28）
+
+- 列表模式已从多层 `ItemsControl` 分列实现迁移到 `ItemsRepeater + 自定义 VirtualizingLayout`：
+  - `GroupedEntriesColumnsView` 已移除，列表模式当前直接绑定 `_entries`。
+  - 新增 `GroupedListRepeaterLayoutProfile`、`GroupedListVirtualizingLayout`、`GroupedRepeaterEntriesViewHost`。
+  - 分组头与分组项都作为同一条 repeater 数据流中的真实 item 渲染，不再先投影成“列集合 + 列内 items”。
+- 列表模式 resize 与首帧排布已做第一轮收口：
+  - 切换到列表模式后会立即请求一次布局刷新。
+  - `GroupedEntriesScrollViewer` 尺寸变化会直接触发 repeater 重新测量。
+  - 列表整体 extent 改为按所有可见元素的最大 `bottom/right` 计算，避免最后一列不满时底部留空。
+- 键盘列导航已切到基于当前 `_entries` 和 `rowsPerColumn` 的即时列投影，不再依赖旧的 `_groupedEntryColumns`。
+- 当前分支结论：
+  - 列表模式的主问题已经从“多层 `ItemsControl` 的排布和重建抖动”转到后续可继续优化的阈值/刷新策略问题。
+  - 窗口 resize 时边缘透明条已通过空白项目复现，确认不是本项目自定义内容树或列表迁移引入的问题，本分支不继续处理这条系统层现象。
+
 ## 当前进度（2026-03-20）
 
 - Phase 1 已完成：

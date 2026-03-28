@@ -2,15 +2,18 @@ using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
-        private void RebuildGroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries)
+        private void RebuildGroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries, bool applyEntryState = true)
         {
-            List<GroupedEntryColumnViewModel> projection = BuildGroupedEntryColumns(orderedEntries);
+            List<GroupedEntryColumnViewModel> projection = BuildGroupedEntryColumns(orderedEntries, applyEntryState);
             _groupedColumnsProjectionCache = projection;
             ApplyGroupedColumnsProjection(projection);
             UpdateGroupedColumnsCacheStamp();
@@ -25,12 +28,12 @@ namespace FileExplorerUI
             }
         }
 
-        private List<GroupedEntryColumnViewModel> BuildGroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries)
+        private List<GroupedEntryColumnViewModel> BuildGroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries, bool applyEntryState)
         {
             int rowsPerColumn = GetGroupedListRowsPerColumn();
             if (_currentGroupField == EntryGroupField.None)
             {
-                return BuildUngroupedEntryColumns(orderedEntries, rowsPerColumn);
+                return BuildUngroupedEntryColumns(orderedEntries, rowsPerColumn, applyEntryState);
             }
 
             var buckets = new Dictionary<string, EntryGroupBucket>(StringComparer.OrdinalIgnoreCase);
@@ -49,14 +52,17 @@ namespace FileExplorerUI
             return buckets.Values
                 .OrderBy(bucket => bucket.Descriptor.OrderKey, StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(bucket => bucket.Descriptor.Label, StringComparer.CurrentCultureIgnoreCase)
-                .Select(bucket => CreateGroupedEntryColumn(bucket, rowsPerColumn))
+                .Select(bucket => CreateGroupedEntryColumn(bucket, rowsPerColumn, applyEntryState))
                 .ToList();
         }
 
-        private List<GroupedEntryColumnViewModel> BuildUngroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries, int rowsPerColumn)
+        private List<GroupedEntryColumnViewModel> BuildUngroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries, int rowsPerColumn, bool applyEntryState)
         {
             IReadOnlyList<EntryViewModel> items = orderedEntries.ToList();
-            ApplyEntryViewState(items);
+            if (applyEntryState)
+            {
+                ApplyEntryViewState(items);
+            }
 
             return BuildGroupedEntryItemColumns(items, rowsPerColumn)
                 .Select((column, index) => new GroupedEntryColumnViewModel
@@ -70,10 +76,13 @@ namespace FileExplorerUI
                 .ToList();
         }
 
-        private GroupedEntryColumnViewModel CreateGroupedEntryColumn(EntryGroupBucket bucket, int rowsPerColumn)
+        private GroupedEntryColumnViewModel CreateGroupedEntryColumn(EntryGroupBucket bucket, int rowsPerColumn, bool applyEntryState)
         {
             IReadOnlyList<EntryViewModel> items = bucket.Items.ToList();
-            ApplyEntryViewState(items);
+            if (applyEntryState)
+            {
+                ApplyEntryViewState(items);
+            }
             return new GroupedEntryColumnViewModel
             {
                 GroupKey = bucket.Descriptor.StateKey,
@@ -89,9 +98,10 @@ namespace FileExplorerUI
             var columns = new List<GroupedEntryItemColumnViewModel>((items.Count + safeRowsPerColumn - 1) / safeRowsPerColumn);
             for (int i = 0; i < items.Count; i += safeRowsPerColumn)
             {
+                int count = Math.Min(safeRowsPerColumn, items.Count - i);
                 columns.Add(new GroupedEntryItemColumnViewModel
                 {
-                    Items = items.Skip(i).Take(safeRowsPerColumn).ToList()
+                    Items = new EntryRangeList(items, i, count)
                 });
             }
 
@@ -117,24 +127,153 @@ namespace FileExplorerUI
             }
 
             double availableHeight = Math.Max(rowPitch, viewportHeight - verticalPadding - headerHeight);
-            return Math.Max(1, (int)Math.Floor(availableHeight / rowPitch));
+            int floorRows = Math.Max(1, (int)Math.Floor(availableHeight / rowPitch));
+            int ceilRows = Math.Max(1, (int)Math.Ceiling(availableHeight / rowPitch));
+
+            // Keep a small hysteresis band so resize feels responsive without oscillation.
+            const double hysteresisFactor = 0.35;
+            double hysteresis = rowPitch * hysteresisFactor;
+            int currentRows = _groupedListRowsPerColumn > 0 ? _groupedListRowsPerColumn : floorRows;
+
+            if (double.IsNaN(_lastGroupedViewportHeight))
+            {
+                _lastGroupedViewportHeight = viewportHeight;
+            }
+
+            bool growing = viewportHeight > _lastGroupedViewportHeight + 0.5;
+            bool shrinking = viewportHeight < _lastGroupedViewportHeight - 0.5;
+            _lastGroupedViewportHeight = viewportHeight;
+
+            int targetRows = currentRows;
+            if (currentRows < floorRows)
+            {
+                targetRows = floorRows;
+            }
+            else if (currentRows > ceilRows)
+            {
+                targetRows = ceilRows;
+            }
+
+            if (growing && currentRows < ceilRows)
+            {
+                double nextRowsThreshold = currentRows * rowPitch + hysteresis;
+                if (availableHeight >= nextRowsThreshold)
+                {
+                    targetRows = Math.Min(ceilRows, currentRows + 1);
+                }
+            }
+
+            if (shrinking && currentRows > floorRows)
+            {
+                double keepRowsThreshold = currentRows * rowPitch - hysteresis;
+                if (availableHeight <= keepRowsThreshold)
+                {
+                    targetRows = Math.Max(floorRows, currentRows - 1);
+                }
+            }
+
+            return targetRows;
         }
 
-        private void RefreshGroupedColumnsForViewport()
+        private void RefreshGroupedColumnsForViewport(int refreshVersion = -1, bool force = false)
         {
+            var sw = Stopwatch.StartNew();
+            if (refreshVersion >= 0 && refreshVersion != _groupedColumnsRefreshVersion)
+            {
+                return;
+            }
+
             if (!UsesColumnsListPresentation())
             {
                 return;
             }
 
+            long nowStamp = Stopwatch.GetTimestamp();
+            if (_lastGroupedColumnsRefreshAppliedStamp != 0)
+            {
+                double elapsedMs = (nowStamp - _lastGroupedColumnsRefreshAppliedStamp) * 1000.0 / Stopwatch.Frequency;
+                if (elapsedMs < 20)
+                {
+                    return;
+                }
+            }
+
             int rowsPerColumn = GetGroupedListRowsPerColumn();
-            if (rowsPerColumn == _groupedListRowsPerColumn)
+            int previousRowsPerColumn = _groupedListRowsPerColumn;
+            if (!force && rowsPerColumn == _groupedListRowsPerColumn)
             {
                 return;
             }
 
             _groupedListRowsPerColumn = rowsPerColumn;
-            RebuildGroupedEntryColumns(_entries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList());
+            if (refreshVersion >= 0 && refreshVersion != _groupedColumnsRefreshVersion)
+            {
+                return;
+            }
+            GroupedEntriesRepeater.InvalidateMeasure();
+            if (force)
+            {
+                GroupedEntriesScrollViewer.UpdateLayout();
+            }
+            _lastGroupedColumnsRefreshAppliedStamp = nowStamp;
+            TraceListResize(
+                $"refresh-done rows={previousRowsPerColumn}->{rowsPerColumn} force={force} visible={_entries.Count} " +
+                $"elapsed={sw.ElapsedMilliseconds}ms");
+        }
+
+        private void RequestGroupedColumnsRefresh(bool force = false)
+        {
+            if (!UsesColumnsListPresentation())
+            {
+                CancelAndDispose(ref _groupedColumnsResizeDebounceCts);
+                _groupedColumnsRefreshQueued = false;
+                return;
+            }
+
+            if (_groupedColumnsRefreshQueued)
+            {
+                return;
+            }
+
+            int refreshVersion = Interlocked.Increment(ref _groupedColumnsRefreshVersion);
+            _groupedColumnsRefreshQueued = true;
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                _groupedColumnsRefreshQueued = false;
+                RefreshGroupedColumnsForViewport(refreshVersion, force);
+            });
+        }
+
+        private void RequestGroupedColumnsRefreshDebounced(int delayMs = 90, bool force = true)
+        {
+            if (!UsesColumnsListPresentation())
+            {
+                CancelAndDispose(ref _groupedColumnsResizeDebounceCts);
+                return;
+            }
+
+            CancelAndDispose(ref _groupedColumnsResizeDebounceCts);
+            var cts = new CancellationTokenSource();
+            _groupedColumnsResizeDebounceCts = cts;
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    await Task.Delay(Math.Max(40, delayMs), cts.Token);
+                }
+                catch (TaskCanceledException)
+                {
+                    return;
+                }
+
+                if (cts.IsCancellationRequested || !ReferenceEquals(_groupedColumnsResizeDebounceCts, cts))
+                {
+                    return;
+                }
+
+                CancelAndDispose(ref _groupedColumnsResizeDebounceCts);
+                RequestGroupedColumnsRefresh(force);
+            });
         }
 
         private bool TryApplyPresentationFastPath(PresentationReloadReason reason)
@@ -193,9 +332,14 @@ namespace FileExplorerUI
 
         private List<EntryViewModel> GetLoadedEntriesFromCurrentCollection()
         {
-            List<EntryViewModel> loadedEntries = _entries
-                .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
-                .ToList();
+            var loadedEntries = new List<EntryViewModel>(_entries.Count);
+            foreach (EntryViewModel entry in _entries)
+            {
+                if (entry.IsLoaded && !entry.IsGroupHeader)
+                {
+                    loadedEntries.Add(entry);
+                }
+            }
             return loadedEntries;
         }
 
@@ -241,6 +385,38 @@ namespace FileExplorerUI
             _presentationSourceInitialized = true;
             _presentationSourceVersion++;
             InvalidateProjectionCaches();
+        }
+
+        private sealed class EntryRangeList : IReadOnlyList<EntryViewModel>
+        {
+            private readonly IReadOnlyList<EntryViewModel> _source;
+            private readonly int _start;
+
+            public EntryRangeList(IReadOnlyList<EntryViewModel> source, int start, int count)
+            {
+                _source = source;
+                _start = start;
+                Count = count;
+            }
+
+            public int Count { get; }
+
+            public EntryViewModel this[int index] => _source[_start + index];
+
+            public IEnumerator<EntryViewModel> GetEnumerator()
+            {
+                for (int i = 0; i < Count; i++)
+                {
+                    yield return _source[_start + i];
+                }
+            }
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        }
+
+        private static void TraceListResize(string message)
+        {
+            AppendNavigationPerfLog($"[LIST-RESIZE] {message}");
         }
     }
 }
