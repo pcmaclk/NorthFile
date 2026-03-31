@@ -348,96 +348,158 @@ namespace FileExplorerUI
 
             try
             {
-                FilePasteOperationResult pasteOperation = await _fileManagementCoordinator.TryPasteAsync(targetDirectoryPath);
-                if (!pasteOperation.Succeeded || pasteOperation.PasteResult is null)
+                while (true)
                 {
-                    UpdateStatusKey("StatusPasteFailedWithReason", pasteOperation.Failure?.Message ?? S("ErrorFileOperationUnknown"));
-                    return;
-                }
-
-                FilePasteResult result = pasteOperation.PasteResult;
-                int appliedCount = 0;
-                int conflictCount = 0;
-                int samePathCount = 0;
-                int failureCount = 0;
-                string? firstAppliedPath = null;
-                bool appliedDirectory = false;
-
-                foreach (FilePasteItemResult item in result.Items)
-                {
-                    if (item.Applied)
+                    FilePasteOperationResult pasteOperation = await _fileManagementCoordinator.TryPasteAsync(targetDirectoryPath);
+                    if (!pasteOperation.Succeeded || pasteOperation.PasteResult is null)
                     {
-                        appliedCount++;
-                        firstAppliedPath ??= item.TargetPath;
-                        appliedDirectory |= item.IsDirectory;
+                        string failureMessage = pasteOperation.Failure?.Message ?? S("ErrorFileOperationUnknown");
+                        await ShowOperationFailureDialogAsync(
+                            "PasteFailureDialogTitle",
+                            SF("StatusPasteFailedWithReason", failureMessage));
+                        return;
+                    }
+
+                    FilePasteResult result = pasteOperation.PasteResult;
+                    int appliedCount = 0;
+                    int conflictCount = 0;
+                    int samePathCount = 0;
+                    int failureCount = 0;
+                    string? firstAppliedPath = null;
+                    bool appliedDirectory = false;
+
+                    foreach (FilePasteItemResult item in result.Items)
+                    {
+                        if (item.Applied)
+                        {
+                            appliedCount++;
+                            firstAppliedPath ??= item.TargetPath;
+                            appliedDirectory |= item.IsDirectory;
+                            continue;
+                        }
+
+                        if (item.Conflict)
+                        {
+                            conflictCount++;
+                            continue;
+                        }
+
+                        if (item.SamePath)
+                        {
+                            samePathCount++;
+                            continue;
+                        }
+
+                        failureCount++;
+                    }
+
+                    if (appliedCount == 0)
+                    {
+                        if (conflictCount > 0)
+                        {
+                            FilePasteItemResult? firstConflict = result.Items.FirstOrDefault(item => item.Conflict);
+                            string conflictName = Path.GetFileName(firstConflict?.TargetPath ?? string.Empty);
+                            PasteConflictDialogDecision decision = await ShowPasteConflictDialogAsync(
+                                conflictName,
+                                firstConflict?.IsDirectory ?? false,
+                                conflictCount);
+                            if (decision == PasteConflictDialogDecision.Replace)
+                            {
+                                FilePasteOperationResult replaceOperation = await _fileManagementCoordinator.TryResolvePasteConflictsAsync(result);
+                                if (!replaceOperation.Succeeded || replaceOperation.PasteResult is null)
+                                {
+                                    string failureMessage = replaceOperation.Failure?.Message ?? S("ErrorFileOperationUnknown");
+                                    await ShowOperationFailureDialogAsync(
+                                        "PasteFailureDialogTitle",
+                                        SF("StatusPasteFailedWithReason", failureMessage));
+                                    return;
+                                }
+
+                                result = replaceOperation.PasteResult;
+                            }
+                            else
+                            {
+                                return;
+                            }
+                        }
+                        else if (samePathCount > 0)
+                        {
+                            UpdateStatusKey("StatusPasteSkippedSamePath");
+                            return;
+                        }
+                        else if (failureCount > 0 && result.Items.Count > 0)
+                        {
+                            string? message = result.Items[0].ErrorMessage;
+                            await ShowOperationFailureDialogAsync(
+                                "PasteFailureDialogTitle",
+                                SF("StatusPasteFailedWithReason", message ?? S("ErrorFileOperationUnknown")));
+                        }
+                        else
+                        {
+                            UpdateStatusKey("StatusPasteSkippedNothingApplied");
+                            return;
+                        }
                         continue;
                     }
 
-                    if (item.Conflict)
-                    {
-                        conflictCount++;
-                        continue;
-                    }
-
-                    if (item.SamePath)
-                    {
-                        samePathCount++;
-                        continue;
-                    }
-
-                    failureCount++;
-                }
-
-                if (appliedCount == 0)
-                {
                     if (conflictCount > 0)
                     {
-                        UpdateStatusKey("StatusPasteSkippedConflicts", conflictCount);
+                        FilePasteItemResult? firstConflict = result.Items.FirstOrDefault(item => item.Conflict);
+                        string conflictName = Path.GetFileName(firstConflict?.TargetPath ?? string.Empty);
+                        PasteConflictDialogDecision decision = await ShowPasteConflictDialogAsync(
+                            conflictName,
+                            firstConflict?.IsDirectory ?? false,
+                            conflictCount);
+                        if (decision == PasteConflictDialogDecision.Replace)
+                        {
+                            FilePasteOperationResult replaceOperation = await _fileManagementCoordinator.TryResolvePasteConflictsAsync(result);
+                            if (!replaceOperation.Succeeded || replaceOperation.PasteResult is null)
+                            {
+                                string failureMessage = replaceOperation.Failure?.Message ?? S("ErrorFileOperationUnknown");
+                                await ShowOperationFailureDialogAsync(
+                                    "PasteFailureDialogTitle",
+                                    SF("StatusPasteFailedWithReason", failureMessage));
+                                return;
+                            }
+
+                            result = replaceOperation.PasteResult;
+                            continue;
+                        }
                     }
-                    else if (samePathCount > 0)
+
+                    if (!result.TargetChanged)
                     {
-                        UpdateStatusKey("StatusPasteSkippedSamePath");
+                        EnsurePersistentRefreshFallbackInvalidation(targetDirectoryPath, result.Mode == FileTransferMode.Cut ? "cut-paste" : "copy-paste");
                     }
-                    else if (failureCount > 0 && result.Items.Count > 0)
+
+                    if (selectPastedEntry && appliedCount == 1 && !string.IsNullOrWhiteSpace(firstAppliedPath))
                     {
-                        string? message = result.Items[0].ErrorMessage;
-                        UpdateStatusKey("StatusPasteFailedWithReason", message ?? string.Empty);
+                        _selectedEntryPath = firstAppliedPath;
                     }
-                    else
+
+                    await LoadFirstPageAsync();
+
+                    if (appliedDirectory &&
+                        FindSidebarTreeNodeByPath(targetDirectoryPath) is TreeViewNode parentNode &&
+                        parentNode.IsExpanded)
                     {
-                        UpdateStatusKey("StatusPasteSkippedNothingApplied");
+                        await PopulateSidebarTreeChildrenAsync(parentNode, targetDirectoryPath, CancellationToken.None, expandAfterLoad: true);
                     }
+
+                    _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+
+                    UpdateFileCommandStates();
+                    string modeText = result.Mode == FileTransferMode.Cut ? S("OperationMove") : S("OperationPaste");
+                    UpdateStatusKey("StatusTransferSuccess", modeText, appliedCount, 0, samePathCount, failureCount);
                     return;
+
                 }
-
-                if (!result.TargetChanged)
-                {
-                    EnsurePersistentRefreshFallbackInvalidation(targetDirectoryPath, result.Mode == FileTransferMode.Cut ? "cut-paste" : "copy-paste");
-                }
-
-                if (selectPastedEntry && appliedCount == 1 && !string.IsNullOrWhiteSpace(firstAppliedPath))
-                {
-                    _selectedEntryPath = firstAppliedPath;
-                }
-
-                await LoadFirstPageAsync();
-
-                if (appliedDirectory &&
-                    FindSidebarTreeNodeByPath(targetDirectoryPath) is TreeViewNode parentNode &&
-                    parentNode.IsExpanded)
-                {
-                    await PopulateSidebarTreeChildrenAsync(parentNode, targetDirectoryPath, CancellationToken.None, expandAfterLoad: true);
-                }
-
-                _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
-
-                UpdateFileCommandStates();
-                string modeText = result.Mode == FileTransferMode.Cut ? S("OperationMove") : S("OperationPaste");
-                UpdateStatusKey("StatusTransferSuccess", modeText, appliedCount, conflictCount, samePathCount, failureCount);
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusPasteFailedWithReason", FileOperationErrors.ToUserMessage(ex));
+                await ShowOperationFailureDialogAsync(
+                    "PasteFailureDialogTitle",
+                    SF("StatusPasteFailedWithReason", FileOperationErrors.ToUserMessage(ex)));
             }
         }
 
@@ -456,36 +518,53 @@ namespace FileExplorerUI
                 return;
             }
 
-            try
+            while (true)
             {
-                SuppressNextWatcherRefresh(_currentPath);
-                FileOperationResult<CreatedEntryInfo> createResult = await _fileManagementCoordinator.TryCreateEntryAsync(_currentPath, isDirectory);
-                if (!createResult.Succeeded)
+                try
                 {
-                    UpdateStatusKey("StatusCreateFailed", createResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    SuppressNextWatcherRefresh(_currentPath);
+                    FileOperationResult<CreatedEntryInfo> createResult = await _fileManagementCoordinator.TryCreateEntryAsync(_currentPath, isDirectory);
+                    if (!createResult.Succeeded)
+                    {
+                        if (!await ShowOperationFailureDialogAsync(
+                                "CreateFailureDialogGenericTitle",
+                                SF("StatusCreateFailed", createResult.Failure?.Message ?? S("ErrorFileOperationUnknown")),
+                                allowRetry: true))
+                        {
+                            return;
+                        }
+
+                        continue;
+                    }
+                    CreatedEntryInfo created = createResult.Value!;
+                    if (!created.ChangeNotified)
+                    {
+                        EnsurePersistentRefreshFallbackInvalidation(_currentPath, isDirectory ? "create-folder" : "create-file");
+                    }
+
+                    EntryViewModel entry = CreateLocalCreatedEntryModel(created.Name, created.IsDirectory);
+                    int insertIndex = FindInsertIndexForEntry(entry);
+                    if (!IsIndexInCurrentViewport(insertIndex))
+                    {
+                        await EnsureCreateInsertVisibleAsync(insertIndex);
+                    }
+
+                    InsertLocalCreatedEntry(entry, insertIndex);
+                    _pendingCreatedEntrySelection = entry;
+                    UpdateStatusKey("StatusCreateSuccess", created.Name);
+                    await StartRenameForCreatedEntryAsync(entry, insertIndex);
                     return;
                 }
-                CreatedEntryInfo created = createResult.Value!;
-                if (!created.ChangeNotified)
+                catch (Exception ex)
                 {
-                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, isDirectory ? "create-folder" : "create-file");
+                    if (!await ShowOperationFailureDialogAsync(
+                            "CreateFailureDialogGenericTitle",
+                            SF("StatusCreateFailed", FileOperationErrors.ToUserMessage(ex)),
+                            allowRetry: true))
+                    {
+                        return;
+                    }
                 }
-
-                EntryViewModel entry = CreateLocalCreatedEntryModel(created.Name, created.IsDirectory);
-                int insertIndex = FindInsertIndexForEntry(entry);
-                if (!IsIndexInCurrentViewport(insertIndex))
-                {
-                    await EnsureCreateInsertVisibleAsync(insertIndex);
-                }
-
-                InsertLocalCreatedEntry(entry, insertIndex);
-                _pendingCreatedEntrySelection = entry;
-                UpdateStatusKey("StatusCreateSuccess", created.Name);
-                await StartRenameForCreatedEntryAsync(entry, insertIndex);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatusKey("StatusCreateFailed", FileOperationErrors.ToUserMessage(ex));
             }
         }
 

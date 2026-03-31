@@ -1,5 +1,6 @@
 using FileExplorerUI.Commands;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
@@ -194,7 +195,102 @@ namespace FileExplorerUI
             }
         }
 
-        private void UpdateStatusKey(string key, params object[] args) => UpdateStatus(SF(key, args));
+        private void UpdateStatusKey(string key, params object[] args)
+        {
+            string message = SF(key, args);
+            switch (GetStatusFeedbackKind(key))
+            {
+                case StatusFeedbackKind.DialogWarning:
+                    ShowStatusDialog(message, warning: true);
+                    return;
+                case StatusFeedbackKind.DialogError:
+                    ShowStatusDialog(message, warning: false);
+                    return;
+                case StatusFeedbackKind.None:
+                    return;
+                default:
+                    UpdateStatus(message);
+                    return;
+            }
+        }
+
+        private static StatusFeedbackKind GetStatusFeedbackKind(string key) => key switch
+        {
+            "StatusCopyFailedSelectLoaded" => StatusFeedbackKind.DialogError,
+            "StatusCopyFailedDriveRootsUnsupported" => StatusFeedbackKind.DialogError,
+            "StatusCutFailedSelectLoaded" => StatusFeedbackKind.DialogError,
+            "StatusCutFailedDriveRootsUnsupported" => StatusFeedbackKind.DialogError,
+            "StatusDeleteCanceled" => StatusFeedbackKind.None,
+            "StatusDeleteFailedSelectLoaded" => StatusFeedbackKind.DialogError,
+            "StatusDeleteFailedInvalidIndex" => StatusFeedbackKind.DialogError,
+            "StatusNewFailedOpenFolderFirst" => StatusFeedbackKind.DialogError,
+            "StatusNoMoreEntries" => StatusFeedbackKind.DialogWarning,
+            "StatusPasteFailedClipboardEmpty" => StatusFeedbackKind.DialogError,
+            "StatusPasteFailedOpenFolderFirst" => StatusFeedbackKind.DialogError,
+            "StatusPasteSkippedConflicts" => StatusFeedbackKind.DialogWarning,
+            "StatusPasteSkippedNothingApplied" => StatusFeedbackKind.DialogWarning,
+            "StatusPasteSkippedSamePath" => StatusFeedbackKind.DialogWarning,
+            "StatusPathAccessDenied" => StatusFeedbackKind.DialogError,
+            "StatusPathAccessDeniedSkip" => StatusFeedbackKind.DialogError,
+            "StatusPathInvalidateWarning" => StatusFeedbackKind.DialogWarning,
+            "StatusPathError" => StatusFeedbackKind.DialogError,
+            "StatusPathRustError" => StatusFeedbackKind.DialogError,
+            "StatusRenameFailedCouldNotStartInlineEditor" => StatusFeedbackKind.DialogError,
+            "StatusRenameFailedInvalidIndex" => StatusFeedbackKind.DialogError,
+            "StatusRenameFailedSelectLoaded" => StatusFeedbackKind.DialogError,
+            "StatusRenameFailedSelectTreeNode" => StatusFeedbackKind.DialogError,
+            "StatusRenameFailedTreeItemUnavailable" => StatusFeedbackKind.DialogError,
+            "StatusRenameFailedTreeOverlayUnavailable" => StatusFeedbackKind.DialogError,
+            "StatusRenameFailedTreeTextAnchorUnavailable" => StatusFeedbackKind.DialogError,
+            "StatusCopyPathFailed" => StatusFeedbackKind.DialogError,
+            "StatusCreateShortcutFailed" => StatusFeedbackKind.DialogError,
+            "StatusOpenFailed" => StatusFeedbackKind.DialogError,
+            "StatusLoadFailedWithReason" => StatusFeedbackKind.DialogError,
+            "StatusOpenInNewWindowFailed" => StatusFeedbackKind.DialogError,
+            "StatusOpenTargetFailed" => StatusFeedbackKind.DialogError,
+            "StatusOpenTerminalFailed" => StatusFeedbackKind.DialogError,
+            "StatusOpenWithFailed" => StatusFeedbackKind.DialogError,
+            "StatusPropertiesFailed" => StatusFeedbackKind.DialogError,
+            "StatusRunAsAdministratorFailed" => StatusFeedbackKind.DialogError,
+            "StatusSidebarNavFailed" => StatusFeedbackKind.DialogError,
+            "StatusSidebarNavIgnoredLoading" => StatusFeedbackKind.DialogWarning,
+            "StatusSidebarTreeExpandFailed" => StatusFeedbackKind.DialogError,
+            "StatusSidebarTreeNavFailed" => StatusFeedbackKind.DialogError,
+            "StatusSidebarTreeNavIgnoredLoading" => StatusFeedbackKind.DialogWarning,
+            "StatusAlreadyAtRoot" => StatusFeedbackKind.Info,
+            "StatusCompressZipSuccess" => StatusFeedbackKind.Info,
+            "StatusCopyPathReady" => StatusFeedbackKind.Info,
+            "StatusCopyReady" => StatusFeedbackKind.Info,
+            "StatusCreateShortcutSuccess" => StatusFeedbackKind.Info,
+            "StatusCreateSuccess" => StatusFeedbackKind.Info,
+            "StatusCutReady" => StatusFeedbackKind.Info,
+            "StatusDeleteSuccess" => StatusFeedbackKind.Info,
+            "StatusExtractZipSuccess" => StatusFeedbackKind.Info,
+            "StatusOpened" => StatusFeedbackKind.Info,
+            "StatusOpenedInNewWindow" => StatusFeedbackKind.Info,
+            "StatusOpenTerminalSuccess" => StatusFeedbackKind.Info,
+            "StatusOpenWithOpened" => StatusFeedbackKind.Info,
+            "StatusPropertiesOpened" => StatusFeedbackKind.Info,
+            "StatusRenameSuccess" => StatusFeedbackKind.Info,
+            "StatusRunAsAdministratorStarted" => StatusFeedbackKind.Info,
+            "StatusSettingsExported" => StatusFeedbackKind.Info,
+            "StatusSettingsImported" => StatusFeedbackKind.Info,
+            "StatusShareOpened" => StatusFeedbackKind.Info,
+            "StatusTransferSuccess" => StatusFeedbackKind.Info,
+            _ when key.Contains("Skipped", StringComparison.OrdinalIgnoreCase) => StatusFeedbackKind.DialogWarning,
+            _ when key.Contains("Warning", StringComparison.OrdinalIgnoreCase) => StatusFeedbackKind.DialogWarning,
+            _ when key.Contains("Failed", StringComparison.OrdinalIgnoreCase) => StatusFeedbackKind.DialogError,
+            _ when key.Contains("Error", StringComparison.OrdinalIgnoreCase) => StatusFeedbackKind.DialogError,
+            _ => StatusFeedbackKind.Info
+        };
+
+        private enum StatusFeedbackKind
+        {
+            None,
+            Info,
+            DialogWarning,
+            DialogError
+        }
 
         private static string CreateKindLabel(bool isDirectory) => S(isDirectory ? "CreateKindFolder" : "CreateKindFile");
     }

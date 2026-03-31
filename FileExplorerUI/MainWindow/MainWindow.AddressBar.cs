@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using System;
 using System.Threading.Tasks;
 
 namespace FileExplorerUI
@@ -36,6 +38,14 @@ namespace FileExplorerUI
         {
             if (IsFocusedElementWithinAddressEdit())
             {
+                return;
+            }
+
+            string targetPath = NormalizeAddressInputPath(PathTextBox.Text);
+            if (!string.Equals(targetPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
+                !_explorerService.DirectoryExists(targetPath))
+            {
+                CancelAddressEdit();
                 return;
             }
 
@@ -94,13 +104,73 @@ namespace FileExplorerUI
             }
 
             string targetPath = NormalizeAddressInputPath(PathTextBox.Text);
+            if (!string.Equals(targetPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
+                !_explorerService.DirectoryExists(targetPath))
+            {
+                ShowAddressInputTeachingTip(
+                    S("AddressInputNotFoundTeachingTipTitle"),
+                    SF("AddressInputNotFoundTeachingTipMessage", targetPath));
+                PathTextBox.Focus(FocusState.Programmatic);
+                PathTextBox.SelectAll();
+                return;
+            }
+
             await NavigateToPathAsync(targetPath, pushHistory: true);
             ExitAddressEditMode(commit: true);
         }
 
         private void CancelAddressEdit()
         {
+            HideAddressInputTeachingTip();
             ExitAddressEditMode(commit: false);
+        }
+
+        private void PathTextBox_TextChanging(TextBox sender, TextBoxTextChangingEventArgs args)
+        {
+            HideAddressInputTeachingTip();
+        }
+
+        private void ShowAddressInputTeachingTip(string title, string message)
+        {
+            if (AddressInputTeachingTip is null)
+            {
+                return;
+            }
+
+            EnsureAddressInputTeachingTipTimer();
+            _addressInputTeachingTipTimer!.Stop();
+            AddressInputTeachingTip.IsOpen = false;
+            AddressInputTeachingTip.Target = PathTextBox;
+            AddressInputTeachingTip.Title = title;
+            AddressInputTeachingTip.Subtitle = message;
+            AddressInputTeachingTip.IsOpen = true;
+            _addressInputTeachingTipTimer.Interval = TimeSpan.FromSeconds(5);
+            _addressInputTeachingTipTimer.Start();
+        }
+
+        private void HideAddressInputTeachingTip()
+        {
+            _addressInputTeachingTipTimer?.Stop();
+            if (AddressInputTeachingTip is not null)
+            {
+                AddressInputTeachingTip.IsOpen = false;
+            }
+        }
+
+        private void EnsureAddressInputTeachingTipTimer()
+        {
+            if (_addressInputTeachingTipTimer is not null)
+            {
+                return;
+            }
+
+            _addressInputTeachingTipTimer = new DispatcherTimer();
+            _addressInputTeachingTipTimer.Tick += AddressInputTeachingTipTimer_Tick;
+        }
+
+        private void AddressInputTeachingTipTimer_Tick(object? sender, object e)
+        {
+            HideAddressInputTeachingTip();
         }
 
         private bool IsFocusedElementWithinAddressEdit()

@@ -157,6 +157,8 @@ namespace FileExplorerUI
             _sidebarTreeRenameTextBox.Resources["TextControlBorderBrush"] = new SolidColorBrush(Colors.Transparent);
             _sidebarTreeRenameTextBox.Resources["TextControlBorderBrushFocused"] = new SolidColorBrush(Colors.Transparent);
             _sidebarTreeRenameTextBox.Resources["TextControlBorderBrushPointerOver"] = new SolidColorBrush(Colors.Transparent);
+            _sidebarTreeRenameTextBox.BeforeTextChanging += RenameOverlayTextBox_BeforeTextChanging;
+            _sidebarTreeRenameTextBox.TextChanging += RenameOverlayTextBox_TextChanging;
             _sidebarTreeRenameTextBox.KeyDown += SidebarTreeRenameTextBox_KeyDown;
             _sidebarTreeRenameTextBox.LostFocus += SidebarTreeRenameTextBox_LostFocus;
 
@@ -273,14 +275,13 @@ namespace FileExplorerUI
 
                 if (!TryValidateTreeRename(entry, newName, out string validationError))
                 {
-                    UpdateStatus(validationError);
+                    ShowRenameValidationTeachingTip(_sidebarTreeRenameTextBox, validationError);
                     await Task.Yield();
                     _sidebarTreeRenameTextBox.Focus(FocusState.Programmatic);
                     _sidebarTreeRenameTextBox.SelectAll();
                     return;
                 }
 
-                CancelSidebarTreeRename();
                 await RenameSidebarTreeEntryAsync(entry, newName);
             }
             finally
@@ -350,64 +351,84 @@ namespace FileExplorerUI
         {
             string sourcePath = entry.FullPath;
             string parentPath = Path.GetDirectoryName(sourcePath.TrimEnd(Path.DirectorySeparatorChar)) ?? string.Empty;
-            string targetPath = Path.Combine(parentPath, newName);
             bool wasSelectedInTree = _sidebarTreeView?.SelectedNode?.Content is SidebarTreeEntry selectedEntry &&
                 string.Equals(selectedEntry.FullPath, sourcePath, StringComparison.OrdinalIgnoreCase);
-            try
+            while (true)
             {
-                FileOperationResult<RenamedEntryInfo> renameResult = await _fileManagementCoordinator.TryRenameEntryAsync(parentPath, entry.Name, newName);
-                if (!renameResult.Succeeded)
-                {
-                    UpdateStatusKey("StatusRenameFailedWithReason", renameResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
-                    return;
-                }
-
-                RenamedEntryInfo renamed = renameResult.Value!;
                 try
                 {
-                    _explorerService.MarkPathChanged(parentPath);
-                }
-                catch
-                {
-                    EnsurePersistentRefreshFallbackInvalidation(parentPath, "tree-rename");
-                }
+                    FileOperationResult<RenamedEntryInfo> renameResult = await _fileManagementCoordinator.TryRenameEntryAsync(parentPath, entry.Name, newName);
+                    if (!renameResult.Succeeded)
+                    {
+                        if (!await ShowRenameFailureDialogAsync(
+                            entry.Name,
+                            renameResult.Failure?.Error ?? FileOperationError.Unknown,
+                            renameResult.Failure?.Message ?? S("ErrorFileOperationUnknown")))
+                        {
+                            await Task.Yield();
+                            _sidebarTreeRenameTextBox?.Focus(FocusState.Programmatic);
+                            _sidebarTreeRenameTextBox?.SelectAll();
+                            return;
+                        }
 
-                TreeViewNode? renamedNode = FindSidebarTreeNodeByPath(sourcePath);
-                if (renamedNode is not null)
-                {
-                    UpdateSidebarTreeNodePath(renamedNode, renamed.SourcePath, renamed.TargetPath, newName);
-                }
-                else if (FindSidebarTreeNodeByPath(parentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
-                {
-                    await PopulateSidebarTreeChildrenAsync(parentNode, parentPath, CancellationToken.None, expandAfterLoad: true);
-                }
+                        continue;
+                    }
 
-                if (IsPathWithin(_currentPath, renamed.SourcePath))
-                {
-                    string suffix = _currentPath.Length > renamed.SourcePath.Length
-                        ? _currentPath[renamed.SourcePath.Length..]
-                        : string.Empty;
-                    _currentPath = renamed.TargetPath + suffix;
-                    PathTextBox.Text = GetDisplayPathText(_currentPath);
-                    UpdateBreadcrumbs(_currentPath);
-                    UpdateNavButtonsState();
-                    StyledSidebarView.SetSelectedPath(_currentPath);
-                    await LoadFirstPageAsync();
-                }
-                else if (wasSelectedInTree)
-                {
-                    await SelectSidebarTreePathAsync(renamed.TargetPath);
-                }
+                    RenamedEntryInfo renamed = renameResult.Value!;
+                    try
+                    {
+                        _explorerService.MarkPathChanged(parentPath);
+                    }
+                    catch
+                    {
+                        EnsurePersistentRefreshFallbackInvalidation(parentPath, "tree-rename");
+                    }
 
-                TryUpdateFavoritePathsForRename(renamed.SourcePath, renamed.TargetPath);
-                UpdateListEntryNameForCurrentDirectory(renamed.SourcePath, newName);
+                    TreeViewNode? renamedNode = FindSidebarTreeNodeByPath(sourcePath);
+                    if (renamedNode is not null)
+                    {
+                        UpdateSidebarTreeNodePath(renamedNode, renamed.SourcePath, renamed.TargetPath, newName);
+                    }
+                    else if (FindSidebarTreeNodeByPath(parentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
+                    {
+                        await PopulateSidebarTreeChildrenAsync(parentNode, parentPath, CancellationToken.None, expandAfterLoad: true);
+                    }
 
-                UpdateStatusKey("StatusRenameSuccess", entry.Name, newName);
-                _ = DispatcherQueue.TryEnqueue(FocusSidebarSurface);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatusKey("StatusRenameFailedWithReason", FileOperationErrors.ToUserMessage(ex));
+                    if (IsPathWithin(_currentPath, renamed.SourcePath))
+                    {
+                        string suffix = _currentPath.Length > renamed.SourcePath.Length
+                            ? _currentPath[renamed.SourcePath.Length..]
+                            : string.Empty;
+                        _currentPath = renamed.TargetPath + suffix;
+                        PathTextBox.Text = GetDisplayPathText(_currentPath);
+                        UpdateBreadcrumbs(_currentPath);
+                        UpdateNavButtonsState();
+                        StyledSidebarView.SetSelectedPath(_currentPath);
+                        await LoadFirstPageAsync();
+                    }
+                    else if (wasSelectedInTree)
+                    {
+                        await SelectSidebarTreePathAsync(renamed.TargetPath);
+                    }
+
+                    TryUpdateFavoritePathsForRename(renamed.SourcePath, renamed.TargetPath);
+                    UpdateListEntryNameForCurrentDirectory(renamed.SourcePath, newName);
+
+                    CancelSidebarTreeRename();
+                    UpdateStatusKey("StatusRenameSuccess", entry.Name, newName);
+                    _ = DispatcherQueue.TryEnqueue(FocusSidebarSurface);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    if (!await ShowRenameFailureDialogAsync(entry.Name, FileOperationErrors.Classify(ex), FileOperationErrors.ToUserMessage(ex)))
+                    {
+                        await Task.Yield();
+                        _sidebarTreeRenameTextBox?.Focus(FocusState.Programmatic);
+                        _sidebarTreeRenameTextBox?.SelectAll();
+                        return;
+                    }
+                }
             }
         }
     }

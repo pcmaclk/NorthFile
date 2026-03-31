@@ -302,47 +302,56 @@ namespace FileExplorerUI
             bool recursive = true;
             if (_appSettings.ConfirmDelete && !await ConfirmDeleteAsync(target.DisplayName, recursive))
             {
-                UpdateStatusKey("StatusDeleteCanceled");
                 return;
             }
 
-            FileOperationResult<bool> deleteResult = await _fileManagementCoordinator.TryDeleteEntryAsync(target.Path, recursive);
-            FileOperationsController.DeleteDecision deleteDecision = _fileOperationsController.AnalyzeDeleteResult(deleteResult, target.Path);
-            if (!deleteDecision.Succeeded)
+            while (true)
             {
-                if (deleteDecision.Canceled)
+                FileOperationResult<bool> deleteResult = await _fileManagementCoordinator.TryDeleteEntryAsync(target.Path, recursive);
+                FileOperationsController.DeleteDecision deleteDecision = _fileOperationsController.AnalyzeDeleteResult(deleteResult, target.Path);
+                if (!deleteDecision.Succeeded)
                 {
-                    UpdateStatusKey("StatusDeleteCanceled");
-                    return;
+                    if (deleteDecision.Canceled)
+                    {
+                        return;
+                    }
+
+                    if (!await ShowDeleteFailureDialogAsync(
+                            target.DisplayName,
+                            deleteResult.Failure?.Error ?? FileOperationError.Unknown,
+                            deleteDecision.FailureMessage ?? S("ErrorFileOperationUnknown")))
+                    {
+                        return;
+                    }
+
+                    continue;
                 }
 
-                UpdateStatusKey("StatusDeleteFailedWithReason", deleteDecision.FailureMessage ?? S("ErrorFileOperationUnknown"));
+                TryRemoveFavoritesForDeletedPath(target.Path);
+                if (FindSidebarTreeNodeByPath(target.Path) is TreeViewNode node && node.Parent is TreeViewNode parentNode)
+                {
+                    parentNode.Children.Remove(node);
+                }
+
+                if (IsPathWithin(_currentPath, target.Path))
+                {
+                    string? parentPath = Path.GetDirectoryName(target.Path.TrimEnd('\\'));
+                    if (string.IsNullOrWhiteSpace(parentPath))
+                    {
+                        parentPath = Path.GetPathRoot(target.Path);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(parentPath))
+                    {
+                        parentPath = ShellMyComputerPath;
+                    }
+
+                    await NavigateToPathAsync(parentPath, pushHistory: true, focusEntriesAfterNavigation: false);
+                }
+
+                UpdateStatusKey("StatusDeleteSuccess", target.DisplayName, recursive);
                 return;
             }
-
-            TryRemoveFavoritesForDeletedPath(target.Path);
-            if (FindSidebarTreeNodeByPath(target.Path) is TreeViewNode node && node.Parent is TreeViewNode parentNode)
-            {
-                parentNode.Children.Remove(node);
-            }
-
-            if (IsPathWithin(_currentPath, target.Path))
-            {
-                string? parentPath = Path.GetDirectoryName(target.Path.TrimEnd('\\'));
-                if (string.IsNullOrWhiteSpace(parentPath))
-                {
-                    parentPath = Path.GetPathRoot(target.Path);
-                }
-
-                if (string.IsNullOrWhiteSpace(parentPath))
-                {
-                    parentPath = ShellMyComputerPath;
-                }
-
-                await NavigateToPathAsync(parentPath, pushHistory: true, focusEntriesAfterNavigation: false);
-            }
-
-            UpdateStatusKey("StatusDeleteSuccess", target.DisplayName, recursive);
         }
 
         private async Task ExecuteOpenEntriesContextTargetAsync(FileCommandTarget target)

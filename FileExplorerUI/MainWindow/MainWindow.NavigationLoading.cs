@@ -100,12 +100,9 @@ namespace FileExplorerUI
 
                 if (!_explorerService.DirectoryExists(target))
                 {
-                    SetPathInputInvalid();
-                    UpdateStatusKey("StatusPathNotFound", target);
                     perf.Mark("navigate.path-missing");
                     return;
                 }
-                SetPathInputValid();
                 perf.Mark("navigate.validated");
 
                 _directorySessionController.ApplyPushHistoryIfNeeded(

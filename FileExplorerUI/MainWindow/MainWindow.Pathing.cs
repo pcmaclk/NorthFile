@@ -1,6 +1,4 @@
 using FileExplorerUI.Settings;
-using Microsoft.UI;
-using Microsoft.UI.Xaml.Media;
 using System;
 
 namespace FileExplorerUI
@@ -71,16 +69,6 @@ namespace FileExplorerUI
 
             _appSettings.LastOpenedPath = _currentPath;
             _appSettingsService.Save(_appSettings);
-        }
-
-        private void SetPathInputInvalid()
-        {
-            PathTextBox.BorderBrush = new SolidColorBrush(Colors.IndianRed);
-        }
-
-        private void SetPathInputValid()
-        {
-            PathTextBox.BorderBrush = _pathDefaultBorderBrush;
         }
     }
 }

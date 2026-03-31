@@ -378,6 +378,23 @@ public sealed class ExplorerService
         });
     }
 
+    public Task DeleteExistingPathForReplaceAsync(string path)
+    {
+        return Task.Run(() =>
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        });
+    }
+
     public Task MovePathAsync(string sourcePath, string targetPath)
     {
         return Task.Run(() =>

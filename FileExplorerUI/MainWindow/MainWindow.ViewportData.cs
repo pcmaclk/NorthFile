@@ -224,7 +224,7 @@ namespace FileExplorerUI
             if (_currentViewMode == EntryViewMode.List)
             {
                 int rowsPerColumn = Math.Max(1, GetGroupedListRowsPerColumn());
-                double columnStride = Math.Max(1, EntryContainerWidth + 16);
+                double columnStride = Math.Max(1, EntryContainerWidth + GroupedListColumnSpacing);
                 int columnIndex = (int)Math.Floor(viewer.HorizontalOffset / columnStride);
                 return Math.Clamp(columnIndex * rowsPerColumn, 0, logicalCount - 1);
             }
@@ -238,7 +238,7 @@ namespace FileExplorerUI
         {
             int topIndex = EstimateViewportIndex(viewer);
             int visibleCount = _currentViewMode == EntryViewMode.List
-                ? Math.Max(1, GetGroupedListRowsPerColumn() * Math.Max(1, (int)Math.Ceiling(viewer.ViewportWidth / Math.Max(1, EntryContainerWidth + 16))))
+                ? Math.Max(1, GetGroupedListRowsPerColumn() * Math.Max(1, (int)Math.Ceiling(viewer.ViewportWidth / Math.Max(1, EntryContainerWidth + GroupedListColumnSpacing))))
                 : Math.Max(1, (int)Math.Ceiling(viewer.ViewportHeight / _estimatedItemHeight));
             int bottom = topIndex + visibleCount;
             return Math.Min(GetLogicalEntryCount() - 1, Math.Max(0, bottom));

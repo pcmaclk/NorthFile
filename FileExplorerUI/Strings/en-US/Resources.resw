@@ -550,37 +550,37 @@
     <value>Paste</value>
   </data>
   <data name="StatusNewFailedOpenFolderFirst" xml:space="preserve">
-    <value>New {0} failed: open a folder first.</value>
+    <value>Open a folder before creating a new {0}.</value>
   </data>
   <data name="StatusNewFailedWithReason" xml:space="preserve">
-    <value>New {0} failed: {1}</value>
+    <value>The {0} couldn't be created: {1}</value>
   </data>
   <data name="StatusRenameFailedSelectLoaded" xml:space="preserve">
-    <value>Rename failed: select a loaded entry first.</value>
+    <value>Select an item first.</value>
   </data>
   <data name="StatusRenameFailedInvalidIndex" xml:space="preserve">
-    <value>Rename failed: invalid selected index.</value>
+    <value>This item can't be renamed right now.</value>
   </data>
   <data name="StatusDeleteFailedSelectLoaded" xml:space="preserve">
-    <value>Delete failed: select a loaded entry first.</value>
+    <value>Select an item first.</value>
   </data>
   <data name="StatusDeleteFailedInvalidIndex" xml:space="preserve">
-    <value>Delete failed: invalid selected index.</value>
+    <value>This item can't be deleted right now.</value>
   </data>
   <data name="StatusDeleteCanceled" xml:space="preserve">
     <value>Delete canceled by user.</value>
   </data>
   <data name="StatusCopyFailedSelectLoaded" xml:space="preserve">
-    <value>Copy failed: select a loaded entry first.</value>
+    <value>Select an item first.</value>
   </data>
   <data name="StatusCutFailedSelectLoaded" xml:space="preserve">
-    <value>Cut failed: select a loaded entry first.</value>
+    <value>Select an item first.</value>
   </data>
   <data name="StatusCopyFailedDriveRootsUnsupported" xml:space="preserve">
-    <value>Copy failed: drive roots are not supported yet.</value>
+    <value>Drive roots can't be copied here.</value>
   </data>
   <data name="StatusCutFailedDriveRootsUnsupported" xml:space="preserve">
-    <value>Cut failed: drive roots are not supported yet.</value>
+    <value>Drive roots can't be cut here.</value>
   </data>
   <data name="StatusCopyReady" xml:space="preserve">
     <value>Copy ready: {0}</value>
@@ -589,31 +589,31 @@
     <value>Cut ready: {0}</value>
   </data>
   <data name="StatusPasteFailedOpenFolderFirst" xml:space="preserve">
-    <value>Paste failed: open a folder first.</value>
+    <value>Open a folder before pasting.</value>
   </data>
   <data name="StatusPasteFailedWithReason" xml:space="preserve">
-    <value>Paste failed: {0}</value>
+    <value>The items couldn't be pasted: {0}</value>
   </data>
   <data name="StatusPasteFailedClipboardEmpty" xml:space="preserve">
-    <value>Paste failed: clipboard is empty.</value>
+    <value>There’s nothing in the clipboard to paste.</value>
   </data>
   <data name="StatusPasteSkippedConflicts" xml:space="preserve">
-    <value>Paste skipped: {0} target item(s) already exist.</value>
+    <value>{0} item(s) weren't pasted because items with the same name already exist in the destination.</value>
   </data>
   <data name="StatusPasteSkippedSamePath" xml:space="preserve">
-    <value>Paste skipped: source and target are the same.</value>
+    <value>The source and destination are the same, so nothing was pasted.</value>
   </data>
   <data name="StatusPasteSkippedNothingApplied" xml:space="preserve">
-    <value>Paste skipped: nothing was applied.</value>
+    <value>There’s nothing to paste.</value>
   </data>
   <data name="StatusTransferSuccess" xml:space="preserve">
-    <value>{0} success: {1} item(s), conflicts {2}, same-path {3}, failures {4}.</value>
+    <value>{0} {1} item(s). Conflicts: {2}. Same location: {3}. Couldn't complete: {4}.</value>
   </data>
   <data name="StatusCreateSuccess" xml:space="preserve">
-    <value>Create success: {0}</value>
+    <value>Created \"{0}\".</value>
   </data>
   <data name="StatusCreateFailed" xml:space="preserve">
-    <value>Create failed: {0}</value>
+    <value>\"{0}\" couldn't be created.</value>
   </data>
   <data name="StatusPathNotFound" xml:space="preserve">
     <value>Path not found: {0}</value>
@@ -622,25 +622,25 @@
     <value>No more entries.</value>
   </data>
   <data name="StatusPathAccessDeniedSkip" xml:space="preserve">
-    <value>Path: {0} | Access denied. Skip current directory.</value>
+    <value>Access to \"{0}\" is denied.</value>
   </data>
   <data name="StatusPathError" xml:space="preserve">
-    <value>Path: {0} | Error: {1}</value>
+    <value>\"{0}\" can't be opened: {1}</value>
   </data>
   <data name="StatusPathInvalidateWarning" xml:space="preserve">
-    <value>Path: {0} | Invalidate warning({1}): {2}</value>
+    <value>There was a problem refreshing \"{0}\": {2}</value>
   </data>
   <data name="StatusPathAccessDenied" xml:space="preserve">
-    <value>Path: {0} | Access denied.</value>
+    <value>Access to \"{0}\" is denied.</value>
   </data>
   <data name="StatusPathRustError" xml:space="preserve">
-    <value>Path: {0} | Error: Rust error {1}: {2}</value>
+    <value>\"{0}\" can't be opened: {2}</value>
   </data>
   <data name="StatusSidebarTreeExpandFailed" xml:space="preserve">
-    <value>Sidebar tree expand failed: {0}</value>
+    <value>This location can't be expanded: {0}</value>
   </data>
   <data name="StatusRenameFailedSelectTreeNode" xml:space="preserve">
-    <value>Rename failed: select a tree node first.</value>
+    <value>Select an item first.</value>
   </data>
   <data name="StatusFavoritesCleaned" xml:space="preserve">
     <value>Cleaned {0} invalid favorites.</value>
@@ -649,106 +649,106 @@
     <value>No invalid favorites to clean.</value>
   </data>
   <data name="StatusSidebarTreeNavIgnoredLoading" xml:space="preserve">
-    <value>Sidebar tree nav ignored: loading in progress.</value>
+    <value>Please wait until loading finishes.</value>
   </data>
   <data name="StatusSidebarTreeNavFailed" xml:space="preserve">
-    <value>Sidebar tree nav failed: {0}</value>
+    <value>This location can't be opened: {0}</value>
   </data>
   <data name="StatusSidebarNavIgnoredLoading" xml:space="preserve">
-    <value>Sidebar nav ignored: loading in progress.</value>
+    <value>Please wait until loading finishes.</value>
   </data>
   <data name="StatusSidebarNavFailed" xml:space="preserve">
-    <value>Sidebar nav failed: {0}</value>
+    <value>This location can't be opened: {0}</value>
   </data>
   <data name="StatusRenameFailedCouldNotStartInlineEditor" xml:space="preserve">
-    <value>Rename failed: could not start inline editor.</value>
+    <value>This item can't be renamed right now.</value>
   </data>
   <data name="StatusRenameFailedTreeItemUnavailable" xml:space="preserve">
-    <value>Rename failed: tree item is not available.</value>
+    <value>This item can't be renamed right now.</value>
   </data>
   <data name="StatusRenameFailedTreeOverlayUnavailable" xml:space="preserve">
-    <value>Rename failed: tree rename overlay is not available.</value>
+    <value>This item can't be renamed right now.</value>
   </data>
   <data name="StatusRenameFailedTreeTextAnchorUnavailable" xml:space="preserve">
-    <value>Rename failed: tree text anchor is not available.</value>
+    <value>This item can't be renamed right now.</value>
   </data>
   <data name="StatusOpened" xml:space="preserve">
     <value>Opened: {0}</value>
   </data>
   <data name="StatusOpenFailed" xml:space="preserve">
-    <value>Open failed: {0}</value>
+    <value>This item couldn't be opened: {0}</value>
   </data>
   <data name="StatusCopyPathReady" xml:space="preserve">
     <value>Copied path: {0}</value>
   </data>
   <data name="StatusCopyPathFailed" xml:space="preserve">
-    <value>Copy path failed: {0}</value>
+    <value>The path couldn't be copied: {0}</value>
   </data>
   <data name="StatusSettingsExported" xml:space="preserve">
     <value>Settings exported: {0}</value>
   </data>
   <data name="StatusSettingsExportFailed" xml:space="preserve">
-    <value>Export settings failed: {0}</value>
+    <value>Settings couldn't be exported: {0}</value>
   </data>
   <data name="StatusSettingsImported" xml:space="preserve">
     <value>Settings imported: {0}</value>
   </data>
   <data name="StatusSettingsImportFailed" xml:space="preserve">
-    <value>Import settings failed: {0}</value>
+    <value>Settings couldn't be imported: {0}</value>
   </data>
   <data name="StatusCreateShortcutSuccess" xml:space="preserve">
     <value>Created shortcut: {0}</value>
   </data>
   <data name="StatusCreateShortcutFailed" xml:space="preserve">
-    <value>Create shortcut failed: {0}</value>
+    <value>The shortcut couldn't be created: {0}</value>
   </data>
   <data name="StatusOpenTargetFailed" xml:space="preserve">
-    <value>Open target failed: {0}</value>
+    <value>The target location couldn't be opened: {0}</value>
   </data>
   <data name="StatusRunAsAdministratorStarted" xml:space="preserve">
     <value>Run as administrator started: {0}</value>
   </data>
   <data name="StatusRunAsAdministratorFailed" xml:space="preserve">
-    <value>Run as administrator failed: {0}</value>
+    <value>This item couldn't be run as administrator: {0}</value>
   </data>
   <data name="StatusOpenWithOpened" xml:space="preserve">
     <value>Opened with dialog: {0}</value>
   </data>
   <data name="StatusOpenWithFailed" xml:space="preserve">
-    <value>Open with failed: {0}</value>
+    <value>The Open with dialog couldn't be shown: {0}</value>
   </data>
   <data name="StatusOpenedInNewWindow" xml:space="preserve">
     <value>Opened in new window: {0}</value>
   </data>
   <data name="StatusOpenInNewWindowFailed" xml:space="preserve">
-    <value>Open in new window failed: {0}</value>
+    <value>This item couldn't be opened in a new window: {0}</value>
   </data>
   <data name="StatusOpenTerminalSuccess" xml:space="preserve">
     <value>Opened terminal: {0}</value>
   </data>
   <data name="StatusOpenTerminalFailed" xml:space="preserve">
-    <value>Open terminal failed: {0}</value>
+    <value>The terminal couldn't be opened: {0}</value>
   </data>
   <data name="StatusPropertiesOpened" xml:space="preserve">
     <value>Opened properties: {0}</value>
   </data>
   <data name="StatusPropertiesFailed" xml:space="preserve">
-    <value>Open properties failed: {0}</value>
+    <value>The properties window couldn't be opened: {0}</value>
   </data>
   <data name="StatusAlreadyAtRoot" xml:space="preserve">
     <value>Already at root.</value>
   </data>
   <data name="StatusRenameSuccess" xml:space="preserve">
-    <value>Rename success: {0} -&gt; {1}</value>
+    <value>Renamed \"{0}\" to \"{1}\".</value>
   </data>
   <data name="StatusRenameFailedWithReason" xml:space="preserve">
-    <value>Rename failed: {0}</value>
+    <value>This item couldn't be renamed: {0}</value>
   </data>
   <data name="StatusDeleteSuccess" xml:space="preserve">
-    <value>Delete success: {0} (recursive: {1})</value>
+    <value>Deleted \"{0}\".</value>
   </data>
   <data name="StatusDeleteFailedWithReason" xml:space="preserve">
-    <value>Delete failed: {0}</value>
+    <value>This item couldn't be deleted: {0}</value>
   </data>
   <data name="FileTypeGeneric" xml:space="preserve">
     <value>File</value>
@@ -772,28 +772,28 @@
     <value>New Folder</value>
   </data>
   <data name="ErrorNameEmpty" xml:space="preserve">
-    <value>Name failed: name is empty.</value>
+    <value>The name can't be empty.</value>
   </data>
   <data name="ErrorNameReserved" xml:space="preserve">
-    <value>Name failed: '{0}' is reserved.</value>
+    <value>\"{0}\" can't be used as a name.</value>
   </data>
   <data name="ErrorNameInvalidChars" xml:space="preserve">
-    <value>Name failed: '{0}' contains invalid characters.</value>
+    <value>\"{0}\" contains characters that can't be used.</value>
   </data>
   <data name="ErrorNameAlreadyExists" xml:space="preserve">
-    <value>Name failed: '{0}' already exists.</value>
+    <value>\"{0}\" already exists in this location.</value>
   </data>
   <data name="ErrorRenameNameEmpty" xml:space="preserve">
-    <value>Rename failed: name is empty.</value>
+    <value>The name can't be empty.</value>
   </data>
   <data name="ErrorRenameReservedName" xml:space="preserve">
-    <value>Rename failed: '{0}' is reserved.</value>
+    <value>\"{0}\" can't be used as a name.</value>
   </data>
   <data name="ErrorRenameInvalidChars" xml:space="preserve">
-    <value>Rename failed: '{0}' contains invalid characters.</value>
+    <value>\"{0}\" contains characters that can't be used.</value>
   </data>
   <data name="ErrorRenameAlreadyExists" xml:space="preserve">
-    <value>Rename failed: '{0}' already exists.</value>
+    <value>\"{0}\" already exists in this location.</value>
   </data>
   <data name="WindowTitleItemsFormat" xml:space="preserve">
     <value>NorthFile | Engine {0} | Items: {1}</value>
@@ -821,6 +821,12 @@
   </data>
   <data name="DialogCancelButton" xml:space="preserve">
     <value>Cancel</value>
+  </data>
+  <data name="DialogCloseButton" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="DialogRetryButton" xml:space="preserve">
+    <value>Retry</value>
   </data>
   <data name="CommonOpenTarget" xml:space="preserve">
     <value>Open Target</value>
@@ -1006,10 +1012,10 @@
     <value>NTFS probe failed ({0})</value>
   </data>
   <data name="InteropMemoryInvalidateDirFailed" xml:space="preserve">
-    <value>Memory invalidate directory failed: {0}</value>
+    <value>The memory directory couldn't be refreshed: {0}</value>
   </data>
   <data name="InteropMemoryClearCacheFailed" xml:space="preserve">
-    <value>Memory clear cache failed: {0}</value>
+    <value>The memory cache couldn't be cleared: {0}</value>
   </data>
   <data name="InteropDeletePathFailed" xml:space="preserve">
     <value>Delete path failed ({0}): {1}</value>
@@ -1071,6 +1077,93 @@
   <data name="ErrorFileOperationInUse" xml:space="preserve">
     <value>The item is currently in use.</value>
   </data>
+  <data name="RenameFailureDialogInUseTitle" xml:space="preserve">
+    <value>File in use</value>
+  </data>
+  <data name="RenameFailureDialogInUseBody" xml:space="preserve">
+    <value>The action can't be completed because \"{0}\" is open in another program. Close the file and try again.</value>
+  </data>
+  <data name="RenameFailureDialogAccessDeniedTitle" xml:space="preserve">
+    <value>This item can't be renamed</value>
+  </data>
+  <data name="RenameFailureDialogAccessDeniedBody" xml:space="preserve">
+    <value>You don't have permission to rename \"{0}\".</value>
+  </data>
+  <data name="RenameFailureDialogGenericTitle" xml:space="preserve">
+    <value>This item can't be renamed</value>
+  </data>
+  <data name="RenameFailureDialogGenericBody" xml:space="preserve">
+    <value>\"{0}\" couldn't be renamed. Change the name and try again.</value>
+  </data>
+  <data name="DeleteFailureDialogInUseTitle" xml:space="preserve">
+    <value>File in use</value>
+  </data>
+  <data name="DeleteFailureDialogInUseBody" xml:space="preserve">
+    <value>The action can't be completed because \"{0}\" is open in another program. Close the file and try again.</value>
+  </data>
+  <data name="DeleteFailureDialogAccessDeniedTitle" xml:space="preserve">
+    <value>This item can't be deleted</value>
+  </data>
+  <data name="DeleteFailureDialogAccessDeniedBody" xml:space="preserve">
+    <value>You don't have permission to delete \"{0}\".</value>
+  </data>
+  <data name="DeleteFailureDialogGenericTitle" xml:space="preserve">
+    <value>This item can't be deleted</value>
+  </data>
+  <data name="DeleteFailureDialogGenericBody" xml:space="preserve">
+    <value>\"{0}\" couldn't be deleted. Try again.</value>
+  </data>
+  <data name="CreateFailureDialogInUseTitle" xml:space="preserve">
+    <value>This item can't be created</value>
+  </data>
+  <data name="CreateFailureDialogInUseBody" xml:space="preserve">
+    <value>The action can't be completed because \"{0}\" is in use. Change the name or close the related app, then try again.</value>
+  </data>
+  <data name="CreateFailureDialogAccessDeniedTitle" xml:space="preserve">
+    <value>This item can't be created</value>
+  </data>
+  <data name="CreateFailureDialogAccessDeniedBody" xml:space="preserve">
+    <value>You don't have permission to create \"{0}\".</value>
+  </data>
+  <data name="CreateFailureDialogGenericTitle" xml:space="preserve">
+    <value>This item can't be created</value>
+  </data>
+  <data name="CreateFailureDialogGenericBody" xml:space="preserve">
+    <value>\"{0}\" couldn't be created. Change the name and try again.</value>
+  </data>
+  <data name="PasteFailureDialogTitle" xml:space="preserve">
+    <value>Paste couldn't be completed</value>
+  </data>
+  <data name="PasteConflictDialogTitle" xml:space="preserve">
+    <value>Replace or skip files</value>
+  </data>
+  <data name="PasteConflictDialogPrimarySingleFile" xml:space="preserve">
+    <value>The destination already has a file named "{0}".</value>
+  </data>
+  <data name="PasteConflictDialogPrimarySingleFolder" xml:space="preserve">
+    <value>The destination already has a folder named "{0}".</value>
+  </data>
+  <data name="PasteConflictDialogPrimaryMultiple" xml:space="preserve">
+    <value>The destination already has {0} items with the same name.</value>
+  </data>
+  <data name="PasteConflictDialogReplaceSingleButton" xml:space="preserve">
+    <value>Replace the item in the destination</value>
+  </data>
+  <data name="PasteConflictDialogReplaceMultipleButton" xml:space="preserve">
+    <value>Replace the items in the destination</value>
+  </data>
+  <data name="PasteConflictDialogSkipSingleButton" xml:space="preserve">
+    <value>Skip this item</value>
+  </data>
+  <data name="PasteConflictDialogSkipMultipleButton" xml:space="preserve">
+    <value>Skip these items</value>
+  </data>
+  <data name="CompressZipFailureDialogTitle" xml:space="preserve">
+    <value>ZIP archive couldn't be created</value>
+  </data>
+  <data name="ExtractZipFailureDialogTitle" xml:space="preserve">
+    <value>ZIP archive couldn't be extracted</value>
+  </data>
   <data name="ErrorFileOperationDiskFull" xml:space="preserve">
     <value>There is not enough disk space.</value>
   </data>
@@ -1084,22 +1177,22 @@
     <value>An unknown file operation error occurred.</value>
   </data>
   <data name="StatusShareOpened" xml:space="preserve">
-    <value>Opened share UI for: {0}</value>
+    <value>The Share window is ready.</value>
   </data>
   <data name="StatusShareFailed" xml:space="preserve">
-    <value>Share failed: {0}</value>
+    <value>This item couldn't be shared: {0}</value>
   </data>
   <data name="StatusCompressZipSuccess" xml:space="preserve">
-    <value>Created zip archive: {0}</value>
+    <value>Created the archive \"{0}\".</value>
   </data>
   <data name="StatusCompressZipFailed" xml:space="preserve">
-    <value>Failed to create zip archive: {0}</value>
+    <value>The ZIP archive couldn't be created: {0}</value>
   </data>
   <data name="StatusExtractZipSuccess" xml:space="preserve">
-    <value>Extracted zip archive: {0}</value>
+    <value>Extracted \"{0}\".</value>
   </data>
   <data name="StatusExtractZipFailed" xml:space="preserve">
-    <value>Failed to extract zip archive: {0}</value>
+    <value>The ZIP archive couldn't be extracted: {0}</value>
   </data>
   <data name="SettingsPageTitle" xml:space="preserve">
     <value>Settings</value>
@@ -1334,5 +1427,38 @@
   </data>
   <data name="DialogDeleteFolderContent" xml:space="preserve">
     <value>Delete folder '{0}' and its contents?</value>
+  </data>
+  <data name="TransientFeedbackErrorTitle" xml:space="preserve">
+    <value>Something went wrong</value>
+  </data>
+  <data name="TransientFeedbackWarningTitle" xml:space="preserve">
+    <value>Please review</value>
+  </data>
+  <data name="TransientFeedbackInfoTitle" xml:space="preserve">
+    <value>Heads up</value>
+  </data>
+  <data name="TransientFeedbackSuccessTitle" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="StatusDialogErrorTitle" xml:space="preserve">
+    <value>This action couldn't be completed</value>
+  </data>
+  <data name="StatusDialogWarningTitle" xml:space="preserve">
+    <value>Please review this</value>
+  </data>
+  <data name="RenameInvalidCharTeachingTipTitle" xml:space="preserve">
+    <value>Special characters are not allowed</value>
+  </data>
+  <data name="RenameInvalidCharTeachingTipMessage" xml:space="preserve">
+    <value>File names cannot contain \ / : * ? " &lt; &gt; |</value>
+  </data>
+  <data name="RenameValidationTeachingTipTitle" xml:space="preserve">
+    <value>This name can't be used</value>
+  </data>
+  <data name="AddressInputNotFoundTeachingTipTitle" xml:space="preserve">
+    <value>We can't find this location</value>
+  </data>
+  <data name="AddressInputNotFoundTeachingTipMessage" xml:space="preserve">
+    <value>{0}</value>
   </data>
 </root>

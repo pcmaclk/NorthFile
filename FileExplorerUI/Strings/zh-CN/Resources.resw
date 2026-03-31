@@ -550,37 +550,37 @@
     <value>粘贴</value>
   </data>
   <data name="StatusNewFailedOpenFolderFirst" xml:space="preserve">
-    <value>新建{0}失败：请先打开一个文件夹。</value>
+    <value>请先打开一个文件夹，然后再新建{0}。</value>
   </data>
   <data name="StatusNewFailedWithReason" xml:space="preserve">
-    <value>新建{0}失败：{1}</value>
+    <value>无法新建{0}：{1}</value>
   </data>
   <data name="StatusRenameFailedSelectLoaded" xml:space="preserve">
-    <value>重命名失败：请先选择一个已加载项目。</value>
+    <value>请先选择一个项目。</value>
   </data>
   <data name="StatusRenameFailedInvalidIndex" xml:space="preserve">
-    <value>重命名失败：所选索引无效。</value>
+    <value>无法重命名该项目。</value>
   </data>
   <data name="StatusDeleteFailedSelectLoaded" xml:space="preserve">
-    <value>删除失败：请先选择一个已加载项目。</value>
+    <value>请先选择一个项目。</value>
   </data>
   <data name="StatusDeleteFailedInvalidIndex" xml:space="preserve">
-    <value>删除失败：所选索引无效。</value>
+    <value>无法删除该项目。</value>
   </data>
   <data name="StatusDeleteCanceled" xml:space="preserve">
     <value>已取消删除。</value>
   </data>
   <data name="StatusCopyFailedSelectLoaded" xml:space="preserve">
-    <value>复制失败：请先选择一个已加载项目。</value>
+    <value>请先选择一个项目。</value>
   </data>
   <data name="StatusCutFailedSelectLoaded" xml:space="preserve">
-    <value>剪切失败：请先选择一个已加载项目。</value>
+    <value>请先选择一个项目。</value>
   </data>
   <data name="StatusCopyFailedDriveRootsUnsupported" xml:space="preserve">
-    <value>复制失败：暂不支持驱动器根目录。</value>
+    <value>暂不支持复制驱动器根目录。</value>
   </data>
   <data name="StatusCutFailedDriveRootsUnsupported" xml:space="preserve">
-    <value>剪切失败：暂不支持驱动器根目录。</value>
+    <value>暂不支持剪切驱动器根目录。</value>
   </data>
   <data name="StatusCopyReady" xml:space="preserve">
     <value>复制就绪：{0}</value>
@@ -589,31 +589,31 @@
     <value>剪切就绪：{0}</value>
   </data>
   <data name="StatusPasteFailedOpenFolderFirst" xml:space="preserve">
-    <value>粘贴失败：请先打开一个文件夹。</value>
+    <value>请先打开一个文件夹，然后再粘贴。</value>
   </data>
   <data name="StatusPasteFailedWithReason" xml:space="preserve">
-    <value>粘贴失败：{0}</value>
+    <value>无法粘贴：{0}</value>
   </data>
   <data name="StatusPasteFailedClipboardEmpty" xml:space="preserve">
-    <value>粘贴失败：剪贴板为空。</value>
+    <value>剪贴板中没有可粘贴的内容。</value>
   </data>
   <data name="StatusPasteSkippedConflicts" xml:space="preserve">
-    <value>已跳过粘贴：{0} 个目标项已存在。</value>
+    <value>有 {0} 个项目未粘贴，因为目标位置已存在同名项目。</value>
   </data>
   <data name="StatusPasteSkippedSamePath" xml:space="preserve">
-    <value>已跳过粘贴：源路径和目标路径相同。</value>
+    <value>源位置和目标位置相同，因此未执行粘贴。</value>
   </data>
   <data name="StatusPasteSkippedNothingApplied" xml:space="preserve">
-    <value>已跳过粘贴：没有应用任何更改。</value>
+    <value>没有可粘贴的项目。</value>
   </data>
   <data name="StatusTransferSuccess" xml:space="preserve">
-    <value>{0}成功：{1} 个项目，冲突 {2}，同路径 {3}，失败 {4}。</value>
+    <value>{0}了 {1} 个项目。冲突 {2}，同路径 {3}，失败 {4}。</value>
   </data>
   <data name="StatusCreateSuccess" xml:space="preserve">
-    <value>创建成功：{0}</value>
+    <value>已创建“{0}”。</value>
   </data>
   <data name="StatusCreateFailed" xml:space="preserve">
-    <value>创建失败：{0}</value>
+    <value>无法创建“{0}”。</value>
   </data>
   <data name="StatusPathNotFound" xml:space="preserve">
     <value>路径不存在：{0}</value>
@@ -622,25 +622,25 @@
     <value>没有更多项目了。</value>
   </data>
   <data name="StatusPathAccessDeniedSkip" xml:space="preserve">
-    <value>路径：{0} | 访问被拒绝，已跳过当前目录。</value>
+    <value>无法访问“{0}”。</value>
   </data>
   <data name="StatusPathError" xml:space="preserve">
-    <value>路径：{0} | 错误：{1}</value>
+    <value>无法打开“{0}”：{1}</value>
   </data>
   <data name="StatusPathInvalidateWarning" xml:space="preserve">
-    <value>路径：{0} | 失效警告（{1}）：{2}</value>
+    <value>刷新“{0}”时出现问题：{2}</value>
   </data>
   <data name="StatusPathAccessDenied" xml:space="preserve">
-    <value>路径：{0} | 访问被拒绝。</value>
+    <value>无法访问“{0}”。</value>
   </data>
   <data name="StatusPathRustError" xml:space="preserve">
-    <value>路径：{0} | 错误：Rust 错误 {1}: {2}</value>
+    <value>无法打开“{0}”：{2}</value>
   </data>
   <data name="StatusSidebarTreeExpandFailed" xml:space="preserve">
-    <value>侧边栏树展开失败：{0}</value>
+    <value>无法展开此位置：{0}</value>
   </data>
   <data name="StatusRenameFailedSelectTreeNode" xml:space="preserve">
-    <value>重命名失败：请先选择一个树节点。</value>
+    <value>请先选择一个项目。</value>
   </data>
   <data name="StatusFavoritesCleaned" xml:space="preserve">
     <value>已清理 {0} 个失效收藏。</value>
@@ -649,106 +649,106 @@
     <value>没有可清理的失效收藏。</value>
   </data>
   <data name="StatusSidebarTreeNavIgnoredLoading" xml:space="preserve">
-    <value>侧边栏树导航已忽略：正在加载中。</value>
+    <value>正在加载，请稍候。</value>
   </data>
   <data name="StatusSidebarTreeNavFailed" xml:space="preserve">
-    <value>侧边栏树导航失败：{0}</value>
+    <value>无法打开此位置：{0}</value>
   </data>
   <data name="StatusSidebarNavIgnoredLoading" xml:space="preserve">
-    <value>侧边栏导航已忽略：正在加载中。</value>
+    <value>正在加载，请稍候。</value>
   </data>
   <data name="StatusSidebarNavFailed" xml:space="preserve">
-    <value>侧边栏导航失败：{0}</value>
+    <value>无法打开此位置：{0}</value>
   </data>
   <data name="StatusRenameFailedCouldNotStartInlineEditor" xml:space="preserve">
-    <value>重命名失败：无法启动内联编辑器。</value>
+    <value>现在无法重命名该项目。</value>
   </data>
   <data name="StatusRenameFailedTreeItemUnavailable" xml:space="preserve">
-    <value>重命名失败：树项目不可用。</value>
+    <value>现在无法重命名该项目。</value>
   </data>
   <data name="StatusRenameFailedTreeOverlayUnavailable" xml:space="preserve">
-    <value>重命名失败：树重命名浮层不可用。</value>
+    <value>现在无法重命名该项目。</value>
   </data>
   <data name="StatusRenameFailedTreeTextAnchorUnavailable" xml:space="preserve">
-    <value>重命名失败：树文本锚点不可用。</value>
+    <value>现在无法重命名该项目。</value>
   </data>
   <data name="StatusOpened" xml:space="preserve">
-    <value>已打开：{0}</value>
+    <value>已打开“{0}”。</value>
   </data>
   <data name="StatusOpenFailed" xml:space="preserve">
-    <value>打开失败：{0}</value>
+    <value>无法打开：{0}</value>
   </data>
   <data name="StatusCopyPathReady" xml:space="preserve">
-    <value>已复制路径：{0}</value>
+    <value>已复制“{0}”的路径。</value>
   </data>
   <data name="StatusCopyPathFailed" xml:space="preserve">
-    <value>复制路径失败：{0}</value>
+    <value>无法复制路径：{0}</value>
   </data>
   <data name="StatusSettingsExported" xml:space="preserve">
-    <value>设置已导出：{0}</value>
+    <value>设置已导出到“{0}”。</value>
   </data>
   <data name="StatusSettingsExportFailed" xml:space="preserve">
-    <value>导出设置失败：{0}</value>
+    <value>无法导出设置：{0}</value>
   </data>
   <data name="StatusSettingsImported" xml:space="preserve">
-    <value>设置已导入：{0}</value>
+    <value>已从“{0}”导入设置。</value>
   </data>
   <data name="StatusSettingsImportFailed" xml:space="preserve">
-    <value>导入设置失败：{0}</value>
+    <value>无法导入设置：{0}</value>
   </data>
   <data name="StatusCreateShortcutSuccess" xml:space="preserve">
-    <value>已创建快捷方式：{0}</value>
+    <value>已创建快捷方式“{0}”。</value>
   </data>
   <data name="StatusCreateShortcutFailed" xml:space="preserve">
-    <value>创建快捷方式失败：{0}</value>
+    <value>无法创建快捷方式：{0}</value>
   </data>
   <data name="StatusOpenTargetFailed" xml:space="preserve">
-    <value>打开目标位置失败：{0}</value>
+    <value>无法打开目标位置：{0}</value>
   </data>
   <data name="StatusRunAsAdministratorStarted" xml:space="preserve">
-    <value>已发起以管理员身份运行：{0}</value>
+    <value>已尝试以管理员身份运行“{0}”。</value>
   </data>
   <data name="StatusRunAsAdministratorFailed" xml:space="preserve">
-    <value>以管理员身份运行失败：{0}</value>
+    <value>无法以管理员身份运行：{0}</value>
   </data>
   <data name="StatusOpenWithOpened" xml:space="preserve">
-    <value>已打开“打开方式”对话框：{0}</value>
+    <value>已显示“打开方式”对话框。</value>
   </data>
   <data name="StatusOpenWithFailed" xml:space="preserve">
-    <value>打开方式失败：{0}</value>
+    <value>无法显示“打开方式”：{0}</value>
   </data>
   <data name="StatusOpenedInNewWindow" xml:space="preserve">
-    <value>已在新窗口中打开：{0}</value>
+    <value>已在新窗口中打开“{0}”。</value>
   </data>
   <data name="StatusOpenInNewWindowFailed" xml:space="preserve">
-    <value>在新窗口中打开失败：{0}</value>
+    <value>无法在新窗口中打开：{0}</value>
   </data>
   <data name="StatusOpenTerminalSuccess" xml:space="preserve">
-    <value>已打开终端：{0}</value>
+    <value>已打开“{0}”中的终端。</value>
   </data>
   <data name="StatusOpenTerminalFailed" xml:space="preserve">
-    <value>打开终端失败：{0}</value>
+    <value>无法打开终端：{0}</value>
   </data>
   <data name="StatusPropertiesOpened" xml:space="preserve">
-    <value>已打开属性：{0}</value>
+    <value>已打开“{0}”的属性。</value>
   </data>
   <data name="StatusPropertiesFailed" xml:space="preserve">
-    <value>打开属性失败：{0}</value>
+    <value>无法打开属性：{0}</value>
   </data>
   <data name="StatusAlreadyAtRoot" xml:space="preserve">
     <value>已经在根位置。</value>
   </data>
   <data name="StatusRenameSuccess" xml:space="preserve">
-    <value>重命名成功：{0} -&gt; {1}</value>
+    <value>已将“{0}”重命名为“{1}”。</value>
   </data>
   <data name="StatusRenameFailedWithReason" xml:space="preserve">
-    <value>重命名失败：{0}</value>
+    <value>无法重命名该项目：{0}</value>
   </data>
   <data name="StatusDeleteSuccess" xml:space="preserve">
-    <value>删除成功：{0}（递归：{1}）</value>
+    <value>已删除“{0}”。</value>
   </data>
   <data name="StatusDeleteFailedWithReason" xml:space="preserve">
-    <value>删除失败：{0}</value>
+    <value>无法删除该项目：{0}</value>
   </data>
   <data name="FileTypeGeneric" xml:space="preserve">
     <value>文件</value>
@@ -772,28 +772,28 @@
     <value>新建文件夹</value>
   </data>
   <data name="ErrorNameEmpty" xml:space="preserve">
-    <value>名称校验失败：名称为空。</value>
+    <value>名称不能为空。</value>
   </data>
   <data name="ErrorNameReserved" xml:space="preserve">
-    <value>名称校验失败：“{0}”为保留名称。</value>
+    <value>无法使用“{0}”作为名称。</value>
   </data>
   <data name="ErrorNameInvalidChars" xml:space="preserve">
-    <value>名称校验失败：“{0}”包含非法字符。</value>
+    <value>“{0}”包含不能使用的字符。</value>
   </data>
   <data name="ErrorNameAlreadyExists" xml:space="preserve">
-    <value>名称校验失败：“{0}”已存在。</value>
+    <value>目标位置已存在“{0}”。</value>
   </data>
   <data name="ErrorRenameNameEmpty" xml:space="preserve">
-    <value>重命名失败：名称为空。</value>
+    <value>名称不能为空。</value>
   </data>
   <data name="ErrorRenameReservedName" xml:space="preserve">
-    <value>重命名失败：“{0}”为保留名称。</value>
+    <value>无法使用“{0}”作为名称。</value>
   </data>
   <data name="ErrorRenameInvalidChars" xml:space="preserve">
-    <value>重命名失败：“{0}”包含非法字符。</value>
+    <value>“{0}”包含不能使用的字符。</value>
   </data>
   <data name="ErrorRenameAlreadyExists" xml:space="preserve">
-    <value>重命名失败：“{0}”已存在。</value>
+    <value>目标位置已存在“{0}”。</value>
   </data>
   <data name="WindowTitleItemsFormat" xml:space="preserve">
     <value>NorthFile | 引擎 {0} | 项目数：{1}</value>
@@ -827,6 +827,12 @@
   </data>
   <data name="DialogCancelButton" xml:space="preserve">
     <value>取消</value>
+  </data>
+  <data name="DialogCloseButton" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="DialogRetryButton" xml:space="preserve">
+    <value>重试</value>
   </data>
   <data name="CommonOpenTarget" xml:space="preserve">
     <value>打开目标位置</value>
@@ -1012,10 +1018,10 @@
     <value>NTFS 探测失败（{0}）</value>
   </data>
   <data name="InteropMemoryInvalidateDirFailed" xml:space="preserve">
-    <value>内存目录失效失败：{0}</value>
+    <value>无法刷新内存目录：{0}</value>
   </data>
   <data name="InteropMemoryClearCacheFailed" xml:space="preserve">
-    <value>内存缓存清理失败：{0}</value>
+    <value>无法清理内存缓存：{0}</value>
   </data>
   <data name="InteropDeletePathFailed" xml:space="preserve">
     <value>删除路径失败（{0}）：{1}</value>
@@ -1077,6 +1083,93 @@
   <data name="ErrorFileOperationInUse" xml:space="preserve">
     <value>目标项目正被其他程序使用。</value>
   </data>
+  <data name="RenameFailureDialogInUseTitle" xml:space="preserve">
+    <value>文件正在使用</value>
+  </data>
+  <data name="RenameFailureDialogInUseBody" xml:space="preserve">
+    <value>操作无法完成，因为“{0}”正在被其他程序使用。请关闭该文件后重试。</value>
+  </data>
+  <data name="RenameFailureDialogAccessDeniedTitle" xml:space="preserve">
+    <value>无法重命名此项目</value>
+  </data>
+  <data name="RenameFailureDialogAccessDeniedBody" xml:space="preserve">
+    <value>你没有权限重命名“{0}”。</value>
+  </data>
+  <data name="RenameFailureDialogGenericTitle" xml:space="preserve">
+    <value>无法重命名此项目</value>
+  </data>
+  <data name="RenameFailureDialogGenericBody" xml:space="preserve">
+    <value>“{0}”无法重命名。请修改名称后重试。</value>
+  </data>
+  <data name="DeleteFailureDialogInUseTitle" xml:space="preserve">
+    <value>文件正在使用</value>
+  </data>
+  <data name="DeleteFailureDialogInUseBody" xml:space="preserve">
+    <value>操作无法完成，因为“{0}”正在被其他程序使用。请关闭该文件后重试。</value>
+  </data>
+  <data name="DeleteFailureDialogAccessDeniedTitle" xml:space="preserve">
+    <value>无法删除此项目</value>
+  </data>
+  <data name="DeleteFailureDialogAccessDeniedBody" xml:space="preserve">
+    <value>你没有权限删除“{0}”。</value>
+  </data>
+  <data name="DeleteFailureDialogGenericTitle" xml:space="preserve">
+    <value>无法删除此项目</value>
+  </data>
+  <data name="DeleteFailureDialogGenericBody" xml:space="preserve">
+    <value>“{0}”无法删除。请重试。</value>
+  </data>
+  <data name="CreateFailureDialogInUseTitle" xml:space="preserve">
+    <value>无法创建此项目</value>
+  </data>
+  <data name="CreateFailureDialogInUseBody" xml:space="preserve">
+    <value>操作无法完成，因为“{0}”正在被其他程序使用。请修改名称或关闭相关程序后重试。</value>
+  </data>
+  <data name="CreateFailureDialogAccessDeniedTitle" xml:space="preserve">
+    <value>无法创建此项目</value>
+  </data>
+  <data name="CreateFailureDialogAccessDeniedBody" xml:space="preserve">
+    <value>你没有权限创建“{0}”。</value>
+  </data>
+  <data name="CreateFailureDialogGenericTitle" xml:space="preserve">
+    <value>无法创建此项目</value>
+  </data>
+  <data name="CreateFailureDialogGenericBody" xml:space="preserve">
+    <value>“{0}”无法创建。请修改名称后重试。</value>
+  </data>
+  <data name="PasteFailureDialogTitle" xml:space="preserve">
+    <value>无法完成粘贴</value>
+  </data>
+  <data name="PasteConflictDialogTitle" xml:space="preserve">
+    <value>替换或跳过文件</value>
+  </data>
+  <data name="PasteConflictDialogPrimarySingleFile" xml:space="preserve">
+    <value>目标已包含一个名为“{0}”的文件。</value>
+  </data>
+  <data name="PasteConflictDialogPrimarySingleFolder" xml:space="preserve">
+    <value>目标已包含一个名为“{0}”的文件夹。</value>
+  </data>
+  <data name="PasteConflictDialogPrimaryMultiple" xml:space="preserve">
+    <value>目标已包含 {0} 个同名项目。</value>
+  </data>
+  <data name="PasteConflictDialogReplaceSingleButton" xml:space="preserve">
+    <value>替换目标中的项目</value>
+  </data>
+  <data name="PasteConflictDialogReplaceMultipleButton" xml:space="preserve">
+    <value>替换目标中的项目</value>
+  </data>
+  <data name="PasteConflictDialogSkipSingleButton" xml:space="preserve">
+    <value>跳过此项</value>
+  </data>
+  <data name="PasteConflictDialogSkipMultipleButton" xml:space="preserve">
+    <value>跳过这些项目</value>
+  </data>
+  <data name="CompressZipFailureDialogTitle" xml:space="preserve">
+    <value>无法创建 ZIP 压缩包</value>
+  </data>
+  <data name="ExtractZipFailureDialogTitle" xml:space="preserve">
+    <value>无法解压 ZIP 压缩包</value>
+  </data>
   <data name="ErrorFileOperationDiskFull" xml:space="preserve">
     <value>磁盘空间不足。</value>
   </data>
@@ -1090,22 +1183,22 @@
     <value>发生了未知的文件操作错误。</value>
   </data>
   <data name="StatusShareOpened" xml:space="preserve">
-    <value>已打开分享窗口：{0}</value>
+    <value>已显示“共享”窗口。</value>
   </data>
   <data name="StatusShareFailed" xml:space="preserve">
-    <value>分享失败：{0}</value>
+    <value>无法分享此项目：{0}</value>
   </data>
   <data name="StatusCompressZipSuccess" xml:space="preserve">
-    <value>已创建 ZIP 压缩包：{0}</value>
+    <value>已创建压缩包“{0}”。</value>
   </data>
   <data name="StatusCompressZipFailed" xml:space="preserve">
-    <value>创建 ZIP 压缩包失败：{0}</value>
+    <value>无法创建 ZIP 压缩包：{0}</value>
   </data>
   <data name="StatusExtractZipSuccess" xml:space="preserve">
-    <value>已解压 ZIP 压缩包：{0}</value>
+    <value>已解压“{0}”。</value>
   </data>
   <data name="StatusExtractZipFailed" xml:space="preserve">
-    <value>解压 ZIP 压缩包失败：{0}</value>
+    <value>无法解压 ZIP 压缩包：{0}</value>
   </data>
   <data name="SettingsPageTitle" xml:space="preserve">
     <value>设置</value>
@@ -1334,5 +1427,38 @@
   </data>
   <data name="SettingsAboutAppVersion" xml:space="preserve">
     <value>应用版本：{0}</value>
+  </data>
+  <data name="TransientFeedbackErrorTitle" xml:space="preserve">
+    <value>出现问题</value>
+  </data>
+  <data name="TransientFeedbackWarningTitle" xml:space="preserve">
+    <value>请注意</value>
+  </data>
+  <data name="TransientFeedbackInfoTitle" xml:space="preserve">
+    <value>提示</value>
+  </data>
+  <data name="TransientFeedbackSuccessTitle" xml:space="preserve">
+    <value>已完成</value>
+  </data>
+  <data name="StatusDialogErrorTitle" xml:space="preserve">
+    <value>无法完成此操作</value>
+  </data>
+  <data name="StatusDialogWarningTitle" xml:space="preserve">
+    <value>请注意</value>
+  </data>
+  <data name="RenameInvalidCharTeachingTipTitle" xml:space="preserve">
+    <value>不能输入特殊符号</value>
+  </data>
+  <data name="RenameInvalidCharTeachingTipMessage" xml:space="preserve">
+    <value>文件名不能包含 \ / : * ? " &lt; &gt; |</value>
+  </data>
+  <data name="RenameValidationTeachingTipTitle" xml:space="preserve">
+    <value>无法使用此名称</value>
+  </data>
+  <data name="AddressInputNotFoundTeachingTipTitle" xml:space="preserve">
+    <value>找不到此位置</value>
+  </data>
+  <data name="AddressInputNotFoundTeachingTipMessage" xml:space="preserve">
+    <value>{0}</value>
   </data>
 </root>

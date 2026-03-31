@@ -7,7 +7,6 @@ using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Markup;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
@@ -15,6 +14,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace FileExplorerUI
@@ -91,6 +91,7 @@ namespace FileExplorerUI
         private const double SidebarTreeRenameMinWidth = 140;
         private const double SidebarTreeRenameWidthPadding = 12;
         private const double SidebarTreeRenameRightMargin = 8;
+        private const double GroupedListColumnSpacing = 12;
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -152,7 +153,6 @@ namespace FileExplorerUI
         private int _lastDetailsViewportIndexDelta;
         private double _estimatedItemHeight = 32.0;
         private int _groupedListRowsPerColumn = -1;
-        private Brush? _pathDefaultBorderBrush;
         private readonly Stack<string> _backStack = new();
         private readonly Stack<string> _forwardStack = new();
         private string _currentQuery = string.Empty;
@@ -217,5 +217,10 @@ namespace FileExplorerUI
         private bool _breadcrumbWidthsReady;
         private int _breadcrumbVisibleStartIndex = -1;
         private bool _lastTitleWasReadFailed;
+        private readonly SemaphoreSlim _statusDialogSemaphore = new(1, 1);
+        private DispatcherTimer? _renameInputTeachingTipTimer;
+        private DispatcherTimer? _addressInputTeachingTipTimer;
+        private bool _suppressRenameTextFiltering;
+        private Controls.ModalActionDialog? _pasteConflictDialog;
     }
 }

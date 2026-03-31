@@ -384,6 +384,58 @@ public sealed class FileManagementCoordinator
         }
     }
 
+    public async Task<FilePasteOperationResult> TryResolvePasteConflictsAsync(FilePasteResult priorResult)
+    {
+        try
+        {
+            var resolvedItems = new List<FilePasteItemResult>(priorResult.Items.Count);
+            bool targetChanged = priorResult.TargetChanged;
+            bool sourceChanged = priorResult.SourceChanged;
+
+            foreach (FilePasteItemResult item in priorResult.Items)
+            {
+                if (!item.Conflict)
+                {
+                    resolvedItems.Add(item);
+                    continue;
+                }
+
+                await _explorerService.DeleteExistingPathForReplaceAsync(item.TargetPath);
+                if (priorResult.Mode == FileTransferMode.Copy)
+                {
+                    await _explorerService.CopyPathAsync(item.SourcePath, item.TargetPath);
+                }
+                else
+                {
+                    await _explorerService.MovePathAsync(item.SourcePath, item.TargetPath);
+                    string? sourceParentPath = _explorerService.GetParentPath(item.SourcePath);
+                    if (!string.IsNullOrWhiteSpace(sourceParentPath))
+                    {
+                        sourceChanged |= TryMarkPathChanged(sourceParentPath);
+                    }
+                }
+
+                targetChanged |= TryMarkPathChanged(Path.GetDirectoryName(item.TargetPath) ?? item.TargetPath);
+                resolvedItems.Add(item with
+                {
+                    Applied = true,
+                    Conflict = false,
+                    ErrorMessage = null
+                });
+            }
+
+            return new FilePasteOperationResult(
+                new FilePasteResult(priorResult.Mode, resolvedItems, targetChanged, sourceChanged),
+                Failure: null);
+        }
+        catch (Exception ex)
+        {
+            return new FilePasteOperationResult(
+                PasteResult: null,
+                new FileOperationFailure(FileOperationErrors.Classify(ex), FileOperationErrors.ToUserMessage(ex)));
+        }
+    }
+
     private bool TryMarkPathChanged(string path)
     {
         try

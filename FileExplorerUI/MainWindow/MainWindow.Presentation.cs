@@ -501,6 +501,39 @@ namespace FileExplorerUI
             StatusTextBlock.Text = message;
         }
 
+        private void ShowStatusDialog(string message, bool warning)
+        {
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                await _statusDialogSemaphore.WaitAsync();
+                try
+                {
+                    var dialog = new ContentDialog
+                    {
+                        Title = S(warning ? "StatusDialogWarningTitle" : "StatusDialogErrorTitle"),
+                        Content = new TextBlock
+                        {
+                            Text = message,
+                            TextWrapping = TextWrapping.Wrap
+                        },
+                        CloseButtonText = S("DialogCancelButton"),
+                        DefaultButton = ContentDialogButton.Close
+                    };
+
+                    if (Content is FrameworkElement root)
+                    {
+                        dialog.XamlRoot = root.XamlRoot;
+                    }
+
+                    await dialog.ShowAsync();
+                }
+                finally
+                {
+                    _statusDialogSemaphore.Release();
+                }
+            });
+        }
+
         private void UpdateDetailsHeaders()
         {
             if (NameHeaderTextBlock is null || TypeHeaderTextBlock is null || SizeHeaderTextBlock is null || ModifiedHeaderTextBlock is null)

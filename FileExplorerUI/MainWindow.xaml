@@ -316,10 +316,18 @@
                     x:Name="PathTextBox"
                     x:Uid="PathTextBox"
                     Padding="12,7,36,8"
+                    TextChanging="PathTextBox_TextChanging"
                     Text="C:\"
                     Visibility="Collapsed"
                     KeyDown="PathTextBox_KeyDown"
                     LostFocus="PathTextBox_LostFocus" />
+
+                <TeachingTip
+                    x:Name="AddressInputTeachingTip"
+                    IsLightDismissEnabled="False"
+                    IsOpen="False"
+                    PlacementMargin="8"
+                    PreferredPlacement="Bottom" />
             </Grid>
 
             <TextBox
@@ -753,6 +761,7 @@
                                 <TextBox
                                     x:Name="RenameOverlayTextBox"
                                     Background="Transparent"
+                                    BeforeTextChanging="RenameOverlayTextBox_BeforeTextChanging"
                                     BorderBrush="Transparent"
                                     BorderThickness="0"
                                     FontSize="14"
@@ -765,6 +774,7 @@
                                     MinHeight="24"
                                     Padding="0"
                                     TextAlignment="Left"
+                                    TextChanging="RenameOverlayTextBox_TextChanging"
                                     Margin="0,-2,0,0"
                                     UseSystemFocusVisuals="False"
                                     VerticalContentAlignment="Center">
@@ -857,6 +867,13 @@
                         </Grid>
                     </StackPanel>
                 </Border>
+
+                <TeachingTip
+                    x:Name="RenameInputTeachingTip"
+                    IsLightDismissEnabled="False"
+                    IsOpen="False"
+                    PlacementMargin="8"
+                    PreferredPlacement="Top" />
 
                 <Button
                     x:Name="CommandPeekButton"

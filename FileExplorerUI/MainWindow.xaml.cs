@@ -47,7 +47,8 @@ namespace FileExplorerUI
                         ? GroupedEntriesScrollViewer.ViewportHeight
                         : GroupedEntriesScrollViewer.ActualHeight;
                     return Math.Max(1, viewportHeight);
-                });
+                },
+                groupSpacing: GroupedListColumnSpacing);
             _groupedVirtualizingLayout = new GroupedListVirtualizingLayout(_groupedRepeaterLayoutProfile);
             _workspaceLayoutHost = new WorkspaceLayoutHost(_workspaceShellState);
             _fileManagementCoordinator = new FileManagementCoordinator(_explorerService);

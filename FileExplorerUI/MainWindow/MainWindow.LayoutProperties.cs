@@ -11,7 +11,7 @@ namespace FileExplorerUI
     {
         public EntryItemMetrics EntryItemMetrics { get; private set; } = EntryItemMetrics.CreatePreset(EntryViewDensityMode.Normal);
 
-        public double EntryContainerWidth => _currentViewMode == EntryViewMode.List ? 360 : DetailsRowWidth;
+        public double EntryContainerWidth => _currentViewMode == EntryViewMode.List ? GetListEntryContainerWidth() : DetailsRowWidth;
 
         public Visibility EntriesListVisibility => Visibility.Collapsed;
 
@@ -50,6 +50,70 @@ namespace FileExplorerUI
         public Visibility ListEntryVisibility => _currentViewMode == EntryViewMode.List
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        private double GetListEntryContainerWidth()
+        {
+            double iconWidth = EntryItemMetrics.IconColumnWidth + EntryItemMetrics.IconTextSpacing;
+            double trailingWidth = 24;
+            double widestText = 0;
+            int sampled = 0;
+
+            foreach (EntryViewModel entry in _entries)
+            {
+                if (!entry.IsLoaded || entry.IsGroupHeader)
+                {
+                    continue;
+                }
+
+                widestText = Math.Max(widestText, EstimateListEntryTextWidth(entry.DisplayName));
+                if (++sampled >= 256)
+                {
+                    break;
+                }
+            }
+
+            double desiredWidth = iconWidth + widestText + trailingWidth;
+            double viewportWidth = GroupedEntriesScrollViewer is null
+                ? 0
+                : GroupedEntriesScrollViewer.ViewportWidth > 0
+                    ? GroupedEntriesScrollViewer.ViewportWidth
+                    : GroupedEntriesScrollViewer.ActualWidth;
+
+            if (viewportWidth > 0)
+            {
+                desiredWidth = Math.Min(desiredWidth, Math.Max(iconWidth + 80, viewportWidth - GroupedListColumnSpacing));
+            }
+
+            return Math.Max(iconWidth + 80, desiredWidth);
+        }
+
+        private double EstimateListEntryTextWidth(string? text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return 0;
+            }
+
+            double fontSize = EntryItemMetrics.NameFontSize;
+            double width = 0;
+            foreach (char ch in text)
+            {
+                if (char.IsWhiteSpace(ch))
+                {
+                    width += fontSize * 0.35;
+                }
+                else if (ch <= 0x7F)
+                {
+                    width += fontSize * 0.58;
+                }
+                else
+                {
+                    width += fontSize * 0.92;
+                }
+            }
+
+            return width;
+        }
 
         public Visibility ExplorerChromeVisibility => _shellMode == ShellMode.Explorer
             ? Visibility.Visible

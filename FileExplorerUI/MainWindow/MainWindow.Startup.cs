@@ -55,7 +55,6 @@ namespace FileExplorerUI
             UpdateEntriesContextOverlayTargets();
             SizeChanged += MainWindow_SizeChanged;
             Activated += MainWindow_Activated;
-            _pathDefaultBorderBrush = PathTextBox.BorderBrush;
             _appSettings = _appSettingsService.Load();
             EnsureFavoritesInitialized();
             ApplyAppSettingsToPresentationDefaults();

@@ -138,6 +138,141 @@ namespace FileExplorerUI
             }
         }
 
+        private void RenameOverlayTextBox_BeforeTextChanging(TextBox sender, TextBoxBeforeTextChangingEventArgs args)
+        {
+            HandleRenameTextBoxBeforeTextChanging(sender, args);
+        }
+
+        private void RenameOverlayTextBox_TextChanging(TextBox sender, TextBoxTextChangingEventArgs args)
+        {
+            NormalizeRenameTextBoxInput(sender);
+        }
+
+        private void HandleRenameTextBoxBeforeTextChanging(TextBox sender, TextBoxBeforeTextChangingEventArgs args)
+        {
+            if (string.IsNullOrEmpty(args.NewText) || !ContainsInvalidFileNameChars(args.NewText))
+            {
+                return;
+            }
+
+            args.Cancel = true;
+            ShowRenameInputTeachingTip(sender);
+        }
+
+        private void NormalizeRenameTextBoxInput(TextBox sender)
+        {
+            if (_suppressRenameTextFiltering)
+            {
+                return;
+            }
+
+            string currentText = sender.Text ?? string.Empty;
+            if (!ContainsInvalidFileNameChars(currentText))
+            {
+                HideRenameInputTeachingTip();
+                return;
+            }
+
+            int selectionStart = sender.SelectionStart;
+            int removedBeforeSelection = CountInvalidFileNameChars(currentText.AsSpan(0, Math.Min(selectionStart, currentText.Length)));
+            string sanitizedText = RemoveInvalidFileNameChars(currentText);
+
+            _suppressRenameTextFiltering = true;
+            try
+            {
+                sender.Text = sanitizedText;
+                sender.SelectionStart = Math.Max(0, Math.Min(sanitizedText.Length, selectionStart - removedBeforeSelection));
+                sender.SelectionLength = 0;
+            }
+            finally
+            {
+                _suppressRenameTextFiltering = false;
+            }
+
+            ShowRenameInputTeachingTip(sender);
+        }
+
+        private void ShowRenameInputTeachingTip(FrameworkElement target)
+        {
+            ShowRenameTeachingTip(
+                target,
+                S("RenameInvalidCharTeachingTipTitle"),
+                S("RenameInvalidCharTeachingTipMessage"));
+        }
+
+        private void ShowRenameValidationTeachingTip(FrameworkElement target, string message)
+        {
+            ShowRenameTeachingTip(
+                target,
+                S("RenameValidationTeachingTipTitle"),
+                message);
+        }
+
+        private void ShowRenameTeachingTip(FrameworkElement target, string title, string message)
+        {
+            if (RenameInputTeachingTip is null)
+            {
+                return;
+            }
+
+            EnsureRenameInputTeachingTipTimer();
+            _renameInputTeachingTipTimer!.Stop();
+            RenameInputTeachingTip.IsOpen = false;
+            RenameInputTeachingTip.Target = target;
+            RenameInputTeachingTip.Title = title;
+            RenameInputTeachingTip.Subtitle = message;
+            RenameInputTeachingTip.IsOpen = true;
+            _renameInputTeachingTipTimer.Interval = TimeSpan.FromSeconds(5);
+            _renameInputTeachingTipTimer.Start();
+        }
+
+        private void EnsureRenameInputTeachingTipTimer()
+        {
+            if (_renameInputTeachingTipTimer is not null)
+            {
+                return;
+            }
+
+            _renameInputTeachingTipTimer = new DispatcherTimer();
+            _renameInputTeachingTipTimer.Tick += RenameInputTeachingTipTimer_Tick;
+        }
+
+        private void RenameInputTeachingTipTimer_Tick(object? sender, object e)
+        {
+            HideRenameInputTeachingTip();
+        }
+
+        private void HideRenameInputTeachingTip()
+        {
+            _renameInputTeachingTipTimer?.Stop();
+            if (RenameInputTeachingTip is not null)
+            {
+                RenameInputTeachingTip.IsOpen = false;
+            }
+        }
+
+        private static bool ContainsInvalidFileNameChars(string text) => text.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0;
+
+        private static int CountInvalidFileNameChars(ReadOnlySpan<char> text)
+        {
+            int count = 0;
+            foreach (char ch in text)
+            {
+                if (Array.IndexOf(Path.GetInvalidFileNameChars(), ch) >= 0)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static string RemoveInvalidFileNameChars(string text)
+        {
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            return new string(Array.FindAll(text.ToCharArray(), ch => Array.IndexOf(invalidChars, ch) < 0));
+        }
+
         private async Task<bool> StartRenameForCreatedEntryAsync(EntryViewModel entry, int insertIndex)
         {
             await Task.Delay(16);
@@ -333,7 +468,7 @@ namespace FileExplorerUI
 
                     if (!_fileManagementCoordinator.TryValidateName(_currentPath, entry.Name, proposedName, out string pendingValidationError))
                     {
-                        UpdateStatus(pendingValidationError);
+                        ShowRenameValidationTeachingTip(RenameOverlayTextBox, pendingValidationError);
                         RenameOverlayTextBox.Focus(FocusState.Programmatic);
                         SelectRenameTargetText(RenameOverlayTextBox, entry);
                         return;
@@ -359,7 +494,7 @@ namespace FileExplorerUI
 
                 if (!_fileManagementCoordinator.TryValidateName(_currentPath, entry.Name, proposedName, out string validationError))
                 {
-                    UpdateStatus(validationError);
+                    ShowRenameValidationTeachingTip(RenameOverlayTextBox, validationError);
                     RenameOverlayTextBox.Focus(FocusState.Programmatic);
                     SelectRenameTargetText(RenameOverlayTextBox, entry);
                     return;
@@ -453,9 +588,17 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusCreateFailed", FileOperationErrors.ToUserMessage(ex));
-                RenameOverlayTextBox.Focus(FocusState.Programmatic);
-                SelectRenameTargetText(RenameOverlayTextBox, entry);
+                if (!await ShowCreateFailureDialogAsync(
+                    proposedName,
+                    FileOperationErrors.Classify(ex),
+                    FileOperationErrors.ToUserMessage(ex)))
+                {
+                    RenameOverlayTextBox.Focus(FocusState.Programmatic);
+                    SelectRenameTargetText(RenameOverlayTextBox, entry);
+                    return;
+                }
+
+                await CommitPendingCreateAsync(entry, index, proposedName);
             }
         }
 

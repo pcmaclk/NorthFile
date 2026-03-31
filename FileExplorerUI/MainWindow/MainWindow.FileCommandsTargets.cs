@@ -144,7 +144,9 @@ namespace FileExplorerUI
                 FileOperationResult<string> zipResult = await _fileManagementCoordinator.TryCreateZipArchiveAsync(sourcePath, archivePath);
                 if (!zipResult.Succeeded)
                 {
-                    UpdateStatusKey("StatusCompressZipFailed", zipResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    await ShowOperationFailureDialogAsync(
+                        "CompressZipFailureDialogTitle",
+                        SF("StatusCompressZipFailed", zipResult.Failure?.Message ?? S("ErrorFileOperationUnknown")));
                     return;
                 }
 
@@ -176,7 +178,9 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusCompressZipFailed", FileOperationErrors.ToUserMessage(ex));
+                await ShowOperationFailureDialogAsync(
+                    "CompressZipFailureDialogTitle",
+                    SF("StatusCompressZipFailed", FileOperationErrors.ToUserMessage(ex)));
             }
         }
 
@@ -236,7 +240,9 @@ namespace FileExplorerUI
                 FileOperationResult<ZipExtractionInfo> extractResult = await extractAsync(archivePath);
                 if (!extractResult.Succeeded)
                 {
-                    UpdateStatusKey("StatusExtractZipFailed", extractResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
+                    await ShowOperationFailureDialogAsync(
+                        "ExtractZipFailureDialogTitle",
+                        SF("StatusExtractZipFailed", extractResult.Failure?.Message ?? S("ErrorFileOperationUnknown")));
                     return;
                 }
 
@@ -281,7 +287,9 @@ namespace FileExplorerUI
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusExtractZipFailed", FileOperationErrors.ToUserMessage(ex));
+                await ShowOperationFailureDialogAsync(
+                    "ExtractZipFailureDialogTitle",
+                    SF("StatusExtractZipFailed", FileOperationErrors.ToUserMessage(ex)));
             }
         }
 
