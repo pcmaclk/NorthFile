@@ -100,16 +100,53 @@ namespace FileExplorerUI
             if (_lastTitleWasReadFailed)
             {
                 this.AppWindow.Title = SF("WindowTitleReadFailedFormat", _engineVersion);
+                NotifyTitleBarTextChanged();
                 return;
             }
 
             if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 this.AppWindow.Title = SF("WindowTitleDrivesFormat", _engineVersion, _entries.Count);
+                NotifyTitleBarTextChanged();
                 return;
             }
 
             this.AppWindow.Title = SF("WindowTitleItemsFormat", _engineVersion, _entries.Count);
+            NotifyTitleBarTextChanged();
+        }
+
+        public string CurrentTabTitleText => GetCurrentTabTitleText();
+
+        public string TitleBarTabGlyph => string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase)
+            ? "\uE7F4"
+            : "\uE8B7";
+
+        private string GetCurrentTabTitleText()
+        {
+            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return S("SidebarMyComputer");
+            }
+
+            if (string.IsNullOrWhiteSpace(_currentPath))
+            {
+                return "NorthFile";
+            }
+
+            string trimmed = _currentPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                return _currentPath;
+            }
+
+            string name = Path.GetFileName(trimmed);
+            return string.IsNullOrWhiteSpace(name) ? trimmed : name;
+        }
+
+        private void NotifyTitleBarTextChanged()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentTabTitleText)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TitleBarTabGlyph)));
         }
 
         private void RefreshLocalizedEntryPresentation()
@@ -171,35 +208,24 @@ namespace FileExplorerUI
             InvalidatePresentationSourceCache();
         }
 
+        public string ThemeToggleGlyph =>
+            (Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark
+                ? "\uE706"
+                : "\uE708";
+
         private void LanguageToggleButton_Click(object sender, RoutedEventArgs e)
         {
-            string language = LocalizedStrings.Instance.ToggleDebugLanguage();
-            _appSettings.LanguagePreference = language.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
-                ? AppLanguagePreference.ChineseSimplified
-                : AppLanguagePreference.English;
+            AppThemePreference nextPreference = (Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark
+                ? AppThemePreference.Light
+                : AppThemePreference.Dark;
+
+            _appSettings.ThemePreference = nextPreference;
             _appSettingsService.Save(_appSettings);
-            SettingsViewControl.SetGeneralSettings(
-                _appSettings.LanguagePreference,
-                _appSettings.StartupLocationPreference,
-                _appSettings.StartupSpecifiedPath);
-            string exePath = Environment.ProcessPath
-                ?? Process.GetCurrentProcess().MainModule?.FileName
-                ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
-            {
-                UpdateStatus(SF("StatusLanguageSwitched", language));
-                return;
-            }
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = exePath,
-                Arguments = $"--lang={language}",
-                UseShellExecute = true
-            });
-
-            _allowActualClose = true;
-            Close();
+            SettingsViewControl.SetAppearanceSettings(
+                _appSettings.ThemePreference,
+                _appSettings.DefaultSortField,
+                _appSettings.DefaultGroupField);
+            ApplyThemePreference(nextPreference);
         }
 
         private void RefreshLocalizedChromeControls()
@@ -230,7 +256,7 @@ namespace FileExplorerUI
             RefreshToolTip(CopyButton, "ToolTipCopy");
             RefreshToolTip(CutButton, "ToolTipCut");
             RefreshToolTip(PasteButton, "ToolTipPaste");
-            RefreshToolTip(LanguageToggleButton, "ToolTipSwitchLanguage");
+            RefreshToolTip(LanguageToggleButton, "ToolTipToggleTheme");
             RefreshToolTip(OverflowBreadcrumbButton, "ToolTipShowHiddenPathSegments");
         }
 

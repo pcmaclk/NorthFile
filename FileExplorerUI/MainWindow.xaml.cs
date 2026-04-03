@@ -2,6 +2,7 @@ using FileExplorerUI.Controls;
 using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
 using System;
 using System.ComponentModel;
 
@@ -14,6 +15,10 @@ namespace FileExplorerUI
         public MainWindow(string? initialPath = null)
         {
             InitializeComponent();
+            ExtendsContentIntoTitleBar = true;
+            SetTitleBar(WindowTabDragRegion);
+            WindowTabDragRegion.MinWidth = 188;
+            SettingsTitleBarDragRegion.MinWidth = 188;
             _initialPath = string.IsNullOrWhiteSpace(initialPath)
                 ? ShellMyComputerPath
                 : initialPath.Trim();
@@ -57,6 +62,28 @@ namespace FileExplorerUI
             WireRootAndViewportEvents();
             InitializeViewHostsAndSettings();
             WireShellCommandsAndStartup();
+        }
+
+        private void ToolbarChromeBorder_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (ToolbarThemeShadow is null || ToolbarShadowReceiverGrid is null)
+            {
+                return;
+            }
+
+            ToolbarThemeShadow.Receivers.Clear();
+            ToolbarThemeShadow.Receivers.Add(ToolbarShadowReceiverGrid);
+        }
+
+        private void ExplorerBodyBorder_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (ExplorerBodyThemeShadow is null || ExplorerBodyShadowReceiverGrid is null)
+            {
+                return;
+            }
+
+            ExplorerBodyThemeShadow.Receivers.Clear();
+            ExplorerBodyThemeShadow.Receivers.Add(ExplorerBodyShadowReceiverGrid);
         }
 
     }

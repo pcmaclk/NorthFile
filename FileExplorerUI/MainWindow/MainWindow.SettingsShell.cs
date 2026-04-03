@@ -10,6 +10,7 @@ namespace FileExplorerUI
         private void EnterSettingsShell(SettingsSection section = SettingsSection.General)
         {
             _shellMode = ShellMode.Settings;
+            SetTitleBar(SettingsTitleBarDragRegion);
             ApplyWindowMinimumWidthForShellMode();
             SetCurrentSettingsSection(section, updateSelection: true);
             RaisePropertyChanged(
@@ -21,6 +22,7 @@ namespace FileExplorerUI
         private void ExitSettingsShell()
         {
             _shellMode = ShellMode.Explorer;
+            SetTitleBar(WindowTabDragRegion);
             ApplyWindowMinimumWidthForShellMode();
             RaisePropertyChanged(
                 nameof(ExplorerChromeVisibility),

@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.Win32;
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -302,11 +303,13 @@ namespace FileExplorerUI
         {
             if (_isSidebarCompact == compact)
             {
+                StyledSidebarView.Margin = compact ? new Thickness(0, 0, 8, 0) : new Thickness(0);
                 StyledSidebarView.SetCompact(compact);
                 return;
             }
 
             _isSidebarCompact = compact;
+            StyledSidebarView.Margin = compact ? new Thickness(0, 0, 8, 0) : new Thickness(0);
             StyledSidebarView.SetCompact(compact);
             if (SidebarNavView is not null)
             {
@@ -353,8 +356,10 @@ namespace FileExplorerUI
             TryResetSystemCursorToArrow();
             if (widthChanged)
             {
-                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
-                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
+                RaisePropertyChanged(
+                    nameof(EntriesHorizontalScrollBarVisibility),
+                    nameof(EntriesHorizontalScrollMode),
+                    nameof(ToolbarSearchWidth));
             }
         }
 
@@ -384,6 +389,11 @@ namespace FileExplorerUI
         {
             ApplyTitleBarTheme();
             SyncSidebarTreeRenameOverlayTheme();
+            foreach (EntryViewModel entry in _entries)
+            {
+                entry.RefreshThemeDependentBrushes();
+            }
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ThemeToggleGlyph)));
         }
 
         private static void AppendWindowSizeLog(string message)

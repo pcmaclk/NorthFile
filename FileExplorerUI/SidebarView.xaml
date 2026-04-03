@@ -24,7 +24,7 @@
                     Margin="14,0,0,0"
                     VerticalAlignment="Top"
                     HorizontalAlignment="Stretch"
-                    Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                    Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                     CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                     Visibility="{x:Bind DragInsertBeforeVisibility, Mode=OneWay}" />
                 <Border
@@ -32,7 +32,7 @@
                     Margin="14,0,0,0"
                     VerticalAlignment="Bottom"
                     HorizontalAlignment="Stretch"
-                    Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                    Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                     CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                     Visibility="{x:Bind DragInsertAfterVisibility, Mode=OneWay}" />
                 <controls:EntryItemHost
@@ -40,7 +40,7 @@
                     MinHeight="32"
                     Padding="0,3,0,3"
                     Background="Transparent"
-                    IndicatorBrush="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                    IndicatorBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                     IsSelected="{x:Bind IsSelected, Mode=OneWay}"
                     HorizontalAlignment="Stretch"
                     Loaded="PinnedItemHost_Loaded"
@@ -51,7 +51,7 @@
                     PointerCaptureLost="PinnedItemHost_PointerCaptureLost"
                     Tapped="PinnedItemHost_Tapped"
                     ContextRequested="PinnedItemHost_ContextRequested">
-                    <Grid Margin="6,0,0,0" Height="26" ColumnDefinitions="32,12,*,26" ColumnSpacing="0">
+                    <Grid Margin="10,0,0,0" Height="26" ColumnDefinitions="32,12,*,26" ColumnSpacing="0">
                         <FontIcon
                             Grid.Column="1"
                             Width="12"
@@ -74,7 +74,7 @@
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Opacity="0.72"
                             Glyph="&#xE718;" />
                     </Grid>
@@ -88,11 +88,11 @@
                     MinHeight="32"
                     Padding="0,3,0,3"
                     Background="Transparent"
-                    IndicatorBrush="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                    IndicatorBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                     IsSelected="{x:Bind IsSelected, Mode=OneWay}"
                     HorizontalAlignment="Stretch"
                     IsHitTestVisible="False">
-                    <Grid Margin="6,0,0,0" Height="26" ColumnDefinitions="32,12,*" ColumnSpacing="0">
+                    <Grid Margin="10,0,0,0" Height="26" ColumnDefinitions="32,12,*" ColumnSpacing="0">
                         <FontIcon
                             Grid.Column="1"
                             Width="12"
@@ -115,7 +115,7 @@
     </UserControl.Resources>
 
     <Grid x:Name="RootGrid" RowDefinitions="*,Auto">
-        <ScrollViewer x:Name="SidebarScrollViewer" Padding="0,0,12,0" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="SidebarScrollViewer" Padding="0,0,12,8" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="RootStackPanel" Margin="0,4,0,0" Spacing="0">
                 <StackPanel x:Name="CompactButtonsPanel" Spacing="6" Visibility="Collapsed" />
 
@@ -123,19 +123,19 @@
                 <Border
                     x:Name="PinnedGroupBorder"
                     Margin="0,2"
-                    Padding="0,4"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="PinnedGroup_Click"
                     >
-                    <Grid x:Name="PinnedGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                    <Grid x:Name="PinnedGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0"
+                          Padding="4, 0, 0, 0">
                         <Border
                             x:Name="PinnedGroupSelectionIndicator"
                             Width="3"
                             Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
@@ -144,7 +144,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Glyph="&#xE734;" />
                         <TextBlock
                             x:Name="PinnedGroupTextBlock"
@@ -160,7 +160,7 @@
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Glyph="&#xE70E;" />
                     </Grid>
                 </Border>
@@ -176,7 +176,7 @@
                 <Border
                     x:Name="TreeCompactBorder"
                     Margin="0,2"
-                    Padding="0,4"
+                    Padding="4,4"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="TreeCompactBorder_PointerPressed"
@@ -188,7 +188,7 @@
                             Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
@@ -214,18 +214,19 @@
                 <Border
                     x:Name="CloudGroupBorder"
                     Margin="0,2"
-                    Padding="0,4"
+                    Padding="4,4"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="CloudGroup_Click">
-                    <Grid x:Name="CloudGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                    <Grid x:Name="CloudGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0"
+                          Padding="4, 0, 0, 0">
                         <Border
                             x:Name="CloudGroupSelectionIndicator"
                             Width="3"
                             Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
@@ -234,7 +235,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Glyph="&#xE753;" />
                         <TextBlock
                             x:Name="CloudHeaderTextBlock"
@@ -250,7 +251,7 @@
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Glyph="&#xE70E;" />
                     </Grid>
                 </Border>
@@ -265,18 +266,19 @@
                 <Border
                     x:Name="NetworkGroupBorder"
                     Margin="0,2"
-                    Padding="0,4"
+                    Padding="4,4"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="NetworkGroup_Click">
-                    <Grid x:Name="NetworkGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                    <Grid x:Name="NetworkGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0"
+                          Padding="4, 0, 0, 0">
                         <Border
                             x:Name="NetworkGroupSelectionIndicator"
                             Width="3"
                             Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
@@ -285,7 +287,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Glyph="&#xE774;" />
                         <TextBlock
                             x:Name="NetworkHeaderTextBlock"
@@ -301,7 +303,7 @@
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Glyph="&#xE70E;" />
                     </Grid>
                 </Border>
@@ -317,18 +319,19 @@
                 <Border
                     x:Name="TagsGroupBorder"
                     Margin="0,2"
-                    Padding="0,4"
+                    Padding="4,4"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="TagsGroup_Click">
-                    <Grid x:Name="TagsGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0">
+                    <Grid x:Name="TagsGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0"
+                          Padding="4, 0, 0, 0">
                         <Border
                             x:Name="TagsGroupSelectionIndicator"
                             Width="3"
                             Margin="0,2"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
-                            Background="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                            Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                             CornerRadius="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}"
                             Visibility="Collapsed" />
                         <FontIcon
@@ -337,7 +340,7 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Glyph="&#xE8EC;" />
                         <TextBlock
                             x:Name="TagsHeaderTextBlock"
@@ -353,7 +356,7 @@
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="10"
+                            FontSize="12"
                             Glyph="&#xE70E;" />
                     </Grid>
                 </Border>
@@ -366,7 +369,7 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Grid x:Name="SettingsFooterHost" Grid.Row="1" Height="32" Margin="0,0,12,2">
+        <Grid x:Name="SettingsFooterHost" Grid.Row="1" Height="32" Margin="0,0,12,2" Visibility="Collapsed">
             <Button
                 x:Name="SidebarSettingsButton"
                 Width="Auto"

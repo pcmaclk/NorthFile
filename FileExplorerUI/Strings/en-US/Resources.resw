@@ -405,8 +405,8 @@
   <data name="ToolTipPaste" xml:space="preserve">
     <value>Paste</value>
   </data>
-  <data name="ToolTipSwitchLanguage" xml:space="preserve">
-    <value>Switch language</value>
+  <data name="ToolTipToggleTheme" xml:space="preserve">
+    <value>Toggle theme</value>
   </data>
   <data name="ToolTipShowHiddenPathSegments" xml:space="preserve">
     <value>Show hidden path segments</value>

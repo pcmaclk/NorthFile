@@ -576,9 +576,14 @@ namespace FileExplorerUI
 
         public Visibility RowSelectionIndicatorVisibility => _isExplicitlySelected ? Visibility.Visible : Visibility.Collapsed;
 
+        public void RefreshThemeDependentBrushes()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectionIndicatorBrush)));
+        }
+
         private static Brush ResolveSelectionIndicatorBrush(bool isActive)
         {
-            string resourceKey = isActive ? "ListViewItemSelectionIndicatorBrush" : "TextFillColorDisabledBrush";
+            string resourceKey = isActive ? "TreeViewItemSelectionIndicatorForeground" : "TextFillColorDisabledBrush";
             if (Application.Current.Resources.TryGetValue(resourceKey, out object? value) && value is Brush brush)
             {
                 return brush;

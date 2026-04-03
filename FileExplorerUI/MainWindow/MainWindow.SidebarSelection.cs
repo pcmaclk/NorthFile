@@ -82,6 +82,11 @@ namespace FileExplorerUI
             EnterSettingsShell();
         }
 
+        private void TitleBarSettingsButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+        {
+            EnterSettingsShell();
+        }
+
         private void ApplySidebarSelectionImmediate(string target)
         {
             if (SidebarNavView is null)

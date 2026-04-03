@@ -396,7 +396,7 @@ namespace FileExplorerUI
             }
 
             _pasteConflictDialog = new Controls.ModalActionDialog();
-            Grid.SetRowSpan(_pasteConflictDialog, 2);
+            Grid.SetRowSpan(_pasteConflictDialog, 3);
             Canvas.SetZIndex(_pasteConflictDialog, 200);
             rootGrid.Children.Add(_pasteConflictDialog);
         }

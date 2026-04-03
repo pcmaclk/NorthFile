@@ -405,8 +405,8 @@
   <data name="ToolTipPaste" xml:space="preserve">
     <value>粘贴</value>
   </data>
-  <data name="ToolTipSwitchLanguage" xml:space="preserve">
-    <value>切换语言</value>
+  <data name="ToolTipToggleTheme" xml:space="preserve">
+    <value>切换主题</value>
   </data>
   <data name="ToolTipShowHiddenPathSegments" xml:space="preserve">
     <value>显示隐藏的路径层级</value>

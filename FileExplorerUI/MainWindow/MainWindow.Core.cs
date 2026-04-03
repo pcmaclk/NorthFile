@@ -1,10 +1,23 @@
 using FileExplorerUI.Workspace;
+using System;
 using System.ComponentModel;
 
 namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
+        public double ToolbarSearchWidth
+        {
+            get
+            {
+                double width = !double.IsNaN(_lastWindowWidth) && _lastWindowWidth > 0
+                    ? _lastWindowWidth
+                    : 1200;
+
+                return Math.Min(width * 0.22, ToolbarSearchMaxWidth);
+            }
+        }
+
         private void InitializeWorkspaceShellState()
         {
             _workspaceLayoutHost.LayoutMode = WorkspaceLayoutMode.Single;

@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Refined the WinUI shell chrome and sidebar presentation:
+  - reworked the title bar, toolbar, compact sidebar spacing, and settings entry placement so the left-edge icon/button alignment is consistent
+  - updated the single-tab shell and settings shell behavior so settings hides tab content without losing the custom drag region
+  - tuned sidebar group item indentation and unified custom selection indicators with the WinUI `TreeView` indicator resources, fixing dark-theme mismatches
 - Refined selection-focus semantics across the WinUI shell so sidebar and entries no longer behave like unrelated focus islands:
   - right-side blank-click now separates explicit selection from keyboard anchor, matching Explorer-style "clear highlight but keep navigation anchor" behavior
   - the entries anchor outline is now independent from explicit selection and uses the shared selection-indicator color path

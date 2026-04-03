@@ -80,11 +80,11 @@ namespace FileExplorerUI
             _groupChevrons.AddRange(new[] { PinnedChevron, CloudChevron, NetworkChevron, TagsChevron });
             _groupHeaderLayouts.AddRange(new[]
             {
-                new GroupHeaderLayoutParts(PinnedGroupBorder, PinnedGroupGrid, PinnedGroupSelectionIndicator, PinnedGroupIcon),
-                new GroupHeaderLayoutParts(TreeCompactBorder, TreeCompactGrid, TreeCompactSelectionIndicator, TreeCompactIcon),
-                new GroupHeaderLayoutParts(CloudGroupBorder, CloudGroupGrid, CloudGroupSelectionIndicator, CloudGroupIcon),
-                new GroupHeaderLayoutParts(NetworkGroupBorder, NetworkGroupGrid, NetworkGroupSelectionIndicator, NetworkGroupIcon),
-                new GroupHeaderLayoutParts(TagsGroupBorder, TagsGroupGrid, TagsGroupSelectionIndicator, TagsGroupIcon)
+                new GroupHeaderLayoutParts(PinnedGroupBorder, PinnedGroupGrid, PinnedGroupSelectionIndicator, PinnedGroupIcon, PinnedGroupGrid.Padding),
+                new GroupHeaderLayoutParts(TreeCompactBorder, TreeCompactGrid, TreeCompactSelectionIndicator, TreeCompactIcon, TreeCompactGrid.Padding),
+                new GroupHeaderLayoutParts(CloudGroupBorder, CloudGroupGrid, CloudGroupSelectionIndicator, CloudGroupIcon, CloudGroupGrid.Padding),
+                new GroupHeaderLayoutParts(NetworkGroupBorder, NetworkGroupGrid, NetworkGroupSelectionIndicator, NetworkGroupIcon, NetworkGroupGrid.Padding),
+                new GroupHeaderLayoutParts(TagsGroupBorder, TagsGroupGrid, TagsGroupSelectionIndicator, TagsGroupIcon, TagsGroupGrid.Padding)
             });
             RefreshAuxiliaryItems();
 
@@ -270,7 +270,7 @@ namespace FileExplorerUI
 
         private void ApplyCompactVisibility(bool compact)
         {
-            SidebarScrollViewer.Padding = compact ? new Thickness(0) : new Thickness(0, 0, 12, 0);
+            SidebarScrollViewer.Padding = compact ? new Thickness(0, 0, 0, 8) : new Thickness(0, 0, 12, 8);
             UpdateSettingsButtonLayout(compact);
             CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             SetVisibility(_fullOnlySections, compact ? Visibility.Collapsed : Visibility.Visible);
@@ -293,7 +293,7 @@ namespace FileExplorerUI
             SettingsFooterHost.Margin = compact ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 12, 2);
             SidebarSettingsButton.Width = compact ? 32 : double.NaN;
             SidebarSettingsButton.Padding = compact ? new Thickness(0) : new Thickness(9, 0, 0, 0);
-            SidebarSettingsButton.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+            SidebarSettingsButton.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             SidebarSettingsButton.HorizontalContentAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
         }
 
@@ -301,7 +301,7 @@ namespace FileExplorerUI
         {
             foreach (GroupHeaderLayoutParts layout in _groupHeaderLayouts)
             {
-                ApplyGroupHeaderLayout(layout.Border, layout.Grid, layout.Indicator, layout.Icon, compact);
+                ApplyGroupHeaderLayout(layout.Border, layout.Grid, layout.Indicator, layout.Icon, layout.ExpandedGridPadding, compact);
             }
         }
 
@@ -788,6 +788,7 @@ namespace FileExplorerUI
         private void SidebarView_ActualThemeChanged(FrameworkElement sender, object args)
         {
             UpdatePinnedDragPreviewTheme();
+            RefreshSelectionIndicatorTheme();
         }
 
         private void UpdatePinnedDragPreviewTheme()
@@ -1192,7 +1193,7 @@ namespace FileExplorerUI
 
         private Brush SelectionIndicatorBrush()
         {
-            string resourceKey = _isSelectionActive ? "ListViewItemSelectionIndicatorBrush" : "TextFillColorDisabledBrush";
+            string resourceKey = _isSelectionActive ? "TreeViewItemSelectionIndicatorForeground" : "TextFillColorDisabledBrush";
             if (Application.Current.Resources.TryGetValue(resourceKey, out object? value) && value is Brush brush)
             {
                 return brush;
@@ -1201,6 +1202,21 @@ namespace FileExplorerUI
             return new SolidColorBrush(_isSelectionActive
                 ? ColorHelper.FromArgb(0xFF, 0x00, 0x78, 0xD4)
                 : ColorHelper.FromArgb(0xFF, 0xC8, 0xC8, 0xC8));
+        }
+
+        private void RefreshSelectionIndicatorTheme()
+        {
+            Brush indicatorBrush = SelectionIndicatorBrush();
+            PinnedGroupSelectionIndicator.Background = indicatorBrush;
+            TreeCompactSelectionIndicator.Background = indicatorBrush;
+            CloudGroupSelectionIndicator.Background = indicatorBrush;
+            NetworkGroupSelectionIndicator.Background = indicatorBrush;
+            TagsGroupSelectionIndicator.Background = indicatorBrush;
+
+            foreach (SidebarVisualItem item in _visualItems)
+            {
+                item.Indicator.Background = indicatorBrush;
+            }
         }
 
         private static Brush HoverBackgroundBrush()
@@ -1312,16 +1328,18 @@ namespace FileExplorerUI
             NavigateRequested?.Invoke(this, new SidebarNavigateRequestedEventArgs(path));
         }
 
-        private static void ApplyGroupHeaderLayout(Border border, Grid grid, Border indicator, FontIcon icon, bool compact)
+        private static void ApplyGroupHeaderLayout(Border border, Grid grid, Border indicator, FontIcon icon, Thickness expandedGridPadding, bool compact)
         {
             border.Width = compact ? 32 : double.NaN;
             border.Height = 32;
             border.Padding = new Thickness(0, 4, 0, 4);
             border.Margin = compact ? new Thickness(0, 2, 0, 2) : new Thickness(0, 2, 0, 2);
-            border.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+            border.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+            grid.Padding = compact ? new Thickness(0) : expandedGridPadding;
 
             indicator.Visibility = compact ? Visibility.Collapsed : indicator.Visibility;
             icon.FontSize = 12;
+            icon.Margin = new Thickness(0);
 
             grid.ColumnDefinitions[0].Width = compact ? new GridLength(0) : new GridLength(10);
             grid.ColumnDefinitions[1].Width = compact ? new GridLength(32) : new GridLength(12);
@@ -1331,7 +1349,7 @@ namespace FileExplorerUI
 
         private sealed record SidebarVisualItem(string Key, string? Path, Border Border, Border Indicator, TextBlock Label, SidebarSection Section, bool Selectable);
         private sealed record CompactFlyoutItem(string Label, string Glyph, string? Path, bool Selectable);
-        private sealed record GroupHeaderLayoutParts(Border Border, Grid Grid, Border Indicator, FontIcon Icon);
+        private sealed record GroupHeaderLayoutParts(Border Border, Grid Grid, Border Indicator, FontIcon Icon, Thickness ExpandedGridPadding);
 
         private enum SidebarSection
         {

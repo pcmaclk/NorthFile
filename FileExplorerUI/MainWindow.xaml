@@ -16,14 +16,126 @@
     </Window.SystemBackdrop>
 
     <Grid
-        RowDefinitions="Auto,*"
-        RowSpacing="8"
-        Padding="8,8,8,0">
+        x:Name="WindowRootGrid"
+        RowDefinitions="Auto,Auto,*"
+        RowSpacing="0"
+        Padding="8,0">
+        <TabView
+            x:Name="SingleTabTitleBarView"
+            Height="40"
+            Margin="0,0,0,0"
+            HorizontalAlignment="Stretch"
+            Background="Transparent"
+            BorderThickness="0"
+            CanDragTabs="False"
+            IsAddTabButtonVisible="False"
+            IsTabStop="False"
+            TabWidthMode="Equal">
+            <TabView.Resources>
+                <ResourceDictionary>
+                    <SolidColorBrush x:Key="TabViewBorderBrush" Color="Transparent" />
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Light">
+                            <StaticResource x:Key="TabViewItemHeaderBackgroundSelected" ResourceKey="SolidBackgroundFillColorTertiaryBrush" />
+                            <StaticResource x:Key="TabViewItemHeaderDragBackground" ResourceKey="SolidBackgroundFillColorTertiaryBrush" />
+                            <StaticResource x:Key="TabViewItemHeaderForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
+                            <StaticResource x:Key="TabViewItemIconForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
+                            <LinearGradientBrush x:Key="TabViewSelectedItemBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
+                                <GradientStop Color="#08000000" Offset="0" />
+                                <GradientStop Color="#08000000" Offset="1" />
+                            </LinearGradientBrush>
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Dark">
+                            <StaticResource x:Key="TabViewItemHeaderBackgroundSelected" ResourceKey="LayerFillColorDefaultBrush" />
+                            <StaticResource x:Key="TabViewItemHeaderDragBackground" ResourceKey="LayerFillColorDefaultBrush" />
+                            <StaticResource x:Key="TabViewItemHeaderForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
+                            <StaticResource x:Key="TabViewItemIconForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
+                            <LinearGradientBrush x:Key="TabViewSelectedItemBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
+                                <GradientStop Color="#10FFFFFF" Offset="0" />
+                                <GradientStop Color="#10FFFFFF" Offset="1" />
+                            </LinearGradientBrush>
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+            </TabView.Resources>
+            <TabView.TabStripHeader>
+                <Grid
+                    x:Name="WindowTabStripLeftInset"
+                    Width="42"
+                    Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}"
+                    Background="Transparent">
+                    <Button
+                        x:Name="TitleBarSettingsButton"
+                        Width="32"
+                        Height="32"
+                        Margin="4,0,0,0"
+                        Padding="0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Click="TitleBarSettingsButton_Click">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{Binding Source={StaticResource Strings}, Path=[SidebarSettingsButtonToolTip.Content]}" />
+                        </ToolTipService.ToolTip>
+                        <FontIcon
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="12"
+                            Glyph="&#xE713;" />
+                    </Button>
+                </Grid>
+            </TabView.TabStripHeader>
+            <TabView.TabStripFooter>
+                <Grid x:Name="WindowTabDragRegion" Background="Transparent" />
+            </TabView.TabStripFooter>
+            <TabViewItem
+                IsClosable="False"
+                Background="Transparent"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}"
+                IsSelected="True">
+                <TabViewItem.Header>
+                    <TextBlock
+                        Text="{x:Bind CurrentTabTitleText, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis" />
+                </TabViewItem.Header>
+                <TabViewItem.IconSource>
+                    <FontIconSource
+                        FontFamily="Segoe Fluent Icons"
+                        Glyph="{x:Bind TitleBarTabGlyph, Mode=OneWay}" />
+                </TabViewItem.IconSource>
+            </TabViewItem>
+        </TabView>
+
         <Grid
-            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,2*,*"
-            Height="36"
-            ColumnSpacing="8"
+            x:Name="SettingsTitleBarDragRegion"
+            Height="40"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Top"
+            Background="Transparent"
+            Visibility="{x:Bind SettingsShellVisibility, Mode=OneWay}" />
+
+        <Grid
+            Grid.Row="1"
+            Margin="0,0,0,12"
             Visibility="{x:Bind ExplorerChromeVisibility, Mode=OneWay}">
+            <Grid x:Name="ToolbarShadowReceiverGrid" />
+            <Border
+                x:Name="ToolbarChromeBorder"
+                Padding="4,4,8,4"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="0"
+                CornerRadius="{StaticResource ControlCornerRadius}"
+                Loaded="ToolbarChromeBorder_Loaded"
+                Translation="0,0,6">
+                <Border.Shadow>
+                    <ThemeShadow x:Name="ToolbarThemeShadow" />
+                </Border.Shadow>
+                <Grid
+                    ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto"
+                    Height="32"
+                    ColumnSpacing="8">
             <Button
                 x:Name="BackButton"
                 Width="32"
@@ -92,113 +204,32 @@
             </Button>
 
             <Button
-                x:Name="NewFileButton"
+                x:Name="LanguageToggleButton"
                 Grid.Column="4"
                 Width="32"
                 Height="32"
                 Padding="0"
                 Style="{ThemeResource SubtleButtonStyle}"
-                Click="NewFileButton_Click">
-                <ToolTipService.ToolTip>
-                    <ToolTip x:Uid="NewFileButtonToolTip" />
-                </ToolTipService.ToolTip>
-                <FontIcon
-                    FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
-                    Glyph="&#xE7C3;" />
-            </Button>
-
-            <Button
-                x:Name="NewFolderButton"
-                Grid.Column="5"
-                Width="32"
-                Height="32"
-                Padding="0"
-                Style="{ThemeResource SubtleButtonStyle}"
-                Click="NewFolderButton_Click">
-                <ToolTipService.ToolTip>
-                    <ToolTip x:Uid="NewFolderButtonToolTip" />
-                </ToolTipService.ToolTip>
-                <FontIcon
-                    FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
-                    Glyph="&#xE8B7;" />
-            </Button>
-
-            <Button
-                x:Name="CopyButton"
-                Grid.Column="6"
-                Width="32"
-                Height="32"
-                Padding="0"
-                Style="{ThemeResource SubtleButtonStyle}"
-                Click="CopyButton_Click">
-                <ToolTipService.ToolTip>
-                    <ToolTip x:Uid="CopyButtonToolTip" />
-                </ToolTipService.ToolTip>
-                <FontIcon
-                    FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
-                    Glyph="&#xE8C8;" />
-            </Button>
-
-            <Button
-                x:Name="CutButton"
-                Grid.Column="7"
-                Width="32"
-                Height="32"
-                Padding="0"
-                Style="{ThemeResource SubtleButtonStyle}"
-                Click="CutButton_Click">
-                <ToolTipService.ToolTip>
-                    <ToolTip x:Uid="CutButtonToolTip" />
-                </ToolTipService.ToolTip>
-                <FontIcon
-                    FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
-                    Glyph="&#xE8C6;" />
-            </Button>
-
-            <Button
-                x:Name="PasteButton"
-                Grid.Column="8"
-                Width="32"
-                Height="32"
-                Padding="0"
-                Style="{ThemeResource SubtleButtonStyle}"
-                Click="PasteButton_Click">
-                <ToolTipService.ToolTip>
-                    <ToolTip x:Uid="PasteButtonToolTip" />
-                </ToolTipService.ToolTip>
-                <FontIcon
-                    FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
-                    Glyph="&#xE77F;" />
-            </Button>
-
-            <Button
-                x:Name="LanguageToggleButton"
-                Grid.Column="9"
-                Width="32"
-                Height="32"
-                Padding="0"
-                Style="{ThemeResource SubtleButtonStyle}"
                 Click="LanguageToggleButton_Click"
-                Content="{Binding Source={StaticResource Strings}, Path=DebugLanguageButtonText}">
+                UseSystemFocusVisuals="False">
                 <ToolTipService.ToolTip>
                     <ToolTip x:Uid="LanguageToggleButtonToolTip" />
                 </ToolTipService.ToolTip>
+                <FontIcon
+                    FontFamily="Segoe Fluent Icons"
+                    FontSize="12"
+                    Glyph="{x:Bind ThemeToggleGlyph, Mode=OneWay}" />
             </Button>
 
-            <Grid Grid.Column="10">
+            <Grid Grid.Column="5">
                 <Border
                     x:Name="AddressBreadcrumbBorder"
                     Height="32"
                     Padding="6,0,72,0"
                     Background="{ThemeResource TextControlBackground}"
-                    BorderBrush="{ThemeResource TextControlBorderBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                     BorderThickness="1"
-                    CornerRadius="8"
+                    CornerRadius="{StaticResource ControlCornerRadius}"
                     SizeChanged="AddressBreadcrumbBorder_SizeChanged"
                     Tapped="AddressBreadcrumbBorder_Tapped">
                     <Grid
@@ -315,7 +346,8 @@
                 <TextBox
                     x:Name="PathTextBox"
                     x:Uid="PathTextBox"
-                    Padding="12,7,36,8"
+                    Padding="12,7,36,6"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                     TextChanging="PathTextBox_TextChanging"
                     Text="C:\"
                     Visibility="Collapsed"
@@ -333,15 +365,36 @@
             <TextBox
                 x:Name="SearchTextBox"
                 x:Uid="SearchTextBox"
-                Grid.Column="11"
+                Grid.Column="6"
                 Height="32"
-                MinWidth="120"
-                MaxWidth="280"
-                HorizontalAlignment="Stretch"
+                Width="{x:Bind ToolbarSearchWidth, Mode=OneWay}"
+                HorizontalAlignment="Right"
+                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                 KeyDown="SearchTextBox_KeyDown" />
+                </Grid>
+
+            </Border>
         </Grid>
 
-        <Grid Grid.Row="1">
+        <StackPanel Grid.RowSpan="3" Visibility="Collapsed">
+            <Button
+                x:Name="NewFileButton"
+                Click="NewFileButton_Click" />
+            <Button
+                x:Name="NewFolderButton"
+                Click="NewFolderButton_Click" />
+            <Button
+                x:Name="CopyButton"
+                Click="CopyButton_Click" />
+            <Button
+                x:Name="CutButton"
+                Click="CutButton_Click" />
+            <Button
+                x:Name="PasteButton"
+                Click="PasteButton_Click" />
+        </StackPanel>
+
+        <Grid Grid.Row="2">
             <Grid
                 x:Name="ExplorerShellGrid"
                 ColumnSpacing="0"
@@ -379,12 +432,19 @@
                     x:Name="ExplorerBodyGrid"
                     Grid.Row="0"
                     Padding="0">
+                <Grid x:Name="ExplorerBodyShadowReceiverGrid" />
                 <Border
+                    x:Name="ExplorerBodyBorder"
                     Padding="0"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="12">
+                    BorderThickness="0"
+                    CornerRadius="{ThemeResource OverlayCornerRadius}"
+                    Loaded="ExplorerBodyBorder_Loaded"
+                    Translation="0,0,8">
+                    <Border.Shadow>
+                        <ThemeShadow x:Name="ExplorerBodyThemeShadow" />
+                    </Border.Shadow>
                     <Grid RowDefinitions="Auto,*">
                         <Border
                             x:Name="DetailsHeaderBorder"
@@ -541,10 +601,10 @@
                                                 MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
                                                 Padding="0,3,0,3"
                                                 Background="Transparent"
-                                                IndicatorBrush="{Binding SelectionIndicatorBrush, Mode=OneWay}"
+                                                IndicatorBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                                                 IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
                                                 IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
-                                                AnchorBorderBrush="{Binding SelectionIndicatorBrush, Mode=OneWay}"
+                                                AnchorBorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                                                 HorizontalAlignment="Left"
                                                 PointerPressed="EntryRow_PointerPressed"
                                                 SelectedBackground="{Binding RowBackground}"
@@ -619,10 +679,10 @@
                                                 MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
                                                 Padding="0,3,0,3"
                                                 Background="Transparent"
-                                                IndicatorBrush="{Binding SelectionIndicatorBrush, Mode=OneWay}"
+                                                IndicatorBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                                                 IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
                                                 IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
-                                                AnchorBorderBrush="{Binding SelectionIndicatorBrush, Mode=OneWay}"
+                                                AnchorBorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                                                 HorizontalAlignment="Stretch"
                                                 PointerPressed="EntryRow_PointerPressed"
                                                 SelectedBackground="{Binding RowBackground}"
@@ -753,7 +813,7 @@
                                 Width="160"
                                 Height="24"
                                 Background="{ThemeResource TextControlBackgroundFocused}"
-                                BorderBrush="{ThemeResource ListViewItemSelectionIndicatorBrush}"
+                                BorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                                 BorderThickness="1"
                                 Padding="1,0,8,1"
                                 CornerRadius="0"

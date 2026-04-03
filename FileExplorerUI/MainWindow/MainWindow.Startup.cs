@@ -60,9 +60,6 @@ namespace FileExplorerUI
             ApplyAppSettingsToPresentationDefaults();
             LocalizedStrings.Instance.PropertyChanged += LocalizedStrings_PropertyChanged;
             InitializeWorkspaceShellState();
-#if !DEBUG
-            LanguageToggleButton.Visibility = Visibility.Collapsed;
-#endif
         }
 
         private void WireShellCommandsAndStartup()

@@ -19,10 +19,10 @@
                 <Setter Property="SelectedBackground" Value="{ThemeResource ListViewItemBackgroundSelected}" />
                 <Setter Property="SelectedPointerOverBackground" Value="{ThemeResource ListViewItemBackgroundSelectedPointerOver}" />
                 <Setter Property="SelectedPressedBackground" Value="{ThemeResource ListViewItemBackgroundSelectedPressed}" />
-                <Setter Property="IndicatorBrush" Value="{ThemeResource ListViewItemSelectionIndicatorBrush}" />
+                <Setter Property="IndicatorBrush" Value="{ThemeResource TreeViewItemSelectionIndicatorForeground}" />
                 <Setter Property="IndicatorCornerRadius" Value="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}" />
                 <Setter Property="IndicatorWidth" Value="3" />
-                <Setter Property="AnchorBorderBrush" Value="{ThemeResource ListViewItemSelectionIndicatorBrush}" />
+                <Setter Property="AnchorBorderBrush" Value="{ThemeResource TreeViewItemSelectionIndicatorForeground}" />
                 <Setter Property="AnchorBorderThickness" Value="1" />
                 <Setter Property="Template">
                     <Setter.Value>

@@ -78,7 +78,7 @@ namespace FileExplorerUI
 
         private const double SidebarExpandedDefaultWidth = 220;
         private const double SidebarExpandedMinWidth = 32;
-        private const double SidebarCompactWidth = 40;
+        private const double SidebarCompactWidth = 48;
         private const double SidebarCompactThreshold = SidebarCompactWidth;
         private const double SidebarCompactExitThreshold = SidebarCompactWidth + 24;
         private const double SidebarSplitterWidth = 0;
@@ -92,6 +92,7 @@ namespace FileExplorerUI
         private const double SidebarTreeRenameWidthPadding = 12;
         private const double SidebarTreeRenameRightMargin = 8;
         private const double GroupedListColumnSpacing = 12;
+        private const double ToolbarSearchMaxWidth = 280;
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
 
         public event PropertyChangedEventHandler? PropertyChanged;
