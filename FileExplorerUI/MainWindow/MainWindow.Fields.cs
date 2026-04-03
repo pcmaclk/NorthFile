@@ -93,6 +93,15 @@ namespace FileExplorerUI
         private const double SidebarTreeRenameRightMargin = 8;
         private const double GroupedListColumnSpacing = 12;
         private const double ToolbarSearchMaxWidth = 280;
+        private const double ShellWindowHorizontalPadding = 8;
+        private const double ShellTitleBarHeightValue = 40;
+        private const double ShellControlSizeValue = 32;
+        private const double ShellGlyphSizeValue = 12;
+        private const double ShellTitleBarLeftInsetWidthValue = 42;
+        private const double ShellToolbarBottomSpacing = 12;
+        private const double ShellStatusBarHeightValue = 32;
+        private const double ShellSplitterWidthValue = 8;
+        private const double SettingsNavigationCompactPaneLengthValue = 40;
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
 
         public event PropertyChangedEventHandler? PropertyChanged;

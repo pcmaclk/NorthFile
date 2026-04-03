@@ -18,6 +18,13 @@ namespace FileExplorerUI
     {
         private const int CompactTreeChildLimit = 200;
         private const double PinnedDragStartThreshold = 6;
+        private const double SidebarItemHeight = 32;
+        private const double SidebarItemGlyphSize = 12;
+        private const double SidebarItemContentInsetLeft = 10;
+        private const double SidebarExpandedScrollRightPadding = 12;
+        private const double SidebarBottomPadding = 8;
+        private const double SidebarFooterBottomMargin = 2;
+        private const double SidebarCompactButtonSize = 32;
         private const double PinnedDragOverlayWidth = 44;
         private const double PinnedDragOverlayHeight = 44;
         private const double PinnedDragOverlayPointerInsetY = 4;
@@ -130,7 +137,7 @@ namespace FileExplorerUI
             }
 
             treeView.Margin = new Thickness(0);
-            treeView.Padding = new Thickness(0, 0, 8, 0);
+            treeView.Padding = new Thickness(0, 0, SidebarBottomPadding, 0);
             treeView.HorizontalAlignment = HorizontalAlignment.Stretch;
             treeView.SetValue(ScrollViewer.VerticalScrollModeProperty, ScrollMode.Disabled);
             treeView.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
@@ -270,7 +277,9 @@ namespace FileExplorerUI
 
         private void ApplyCompactVisibility(bool compact)
         {
-            SidebarScrollViewer.Padding = compact ? new Thickness(0, 0, 0, 8) : new Thickness(0, 0, 12, 8);
+            SidebarScrollViewer.Padding = compact
+                ? new Thickness(0, 0, 0, SidebarBottomPadding)
+                : new Thickness(0, 0, SidebarExpandedScrollRightPadding, SidebarBottomPadding);
             UpdateSettingsButtonLayout(compact);
             CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             SetVisibility(_fullOnlySections, compact ? Visibility.Collapsed : Visibility.Visible);
@@ -290,8 +299,10 @@ namespace FileExplorerUI
 
         private void UpdateSettingsButtonLayout(bool compact)
         {
-            SettingsFooterHost.Margin = compact ? new Thickness(0, 0, 0, 2) : new Thickness(0, 0, 12, 2);
-            SidebarSettingsButton.Width = compact ? 32 : double.NaN;
+            SettingsFooterHost.Margin = compact
+                ? new Thickness(0, 0, 0, SidebarFooterBottomMargin)
+                : new Thickness(0, 0, SidebarExpandedScrollRightPadding, SidebarFooterBottomMargin);
+            SidebarSettingsButton.Width = compact ? SidebarCompactButtonSize : double.NaN;
             SidebarSettingsButton.Padding = compact ? new Thickness(0) : new Thickness(9, 0, 0, 0);
             SidebarSettingsButton.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             SidebarSettingsButton.HorizontalContentAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
@@ -458,10 +469,11 @@ namespace FileExplorerUI
         {
             var grid = new Grid
             {
-                ColumnSpacing = 0
+                ColumnSpacing = 0,
+                Margin = new Thickness(SidebarItemContentInsetLeft, 0, 0, 0)
             };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SidebarItemGlyphSize) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             indicator = new Border
@@ -477,12 +489,12 @@ namespace FileExplorerUI
 
             var icon = new FontIcon
             {
-                Width = 12,
-                Height = 12,
+                Width = SidebarItemGlyphSize,
+                Height = SidebarItemGlyphSize,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 FontFamily = new FontFamily("Segoe Fluent Icons"),
-                FontSize = 12,
+                FontSize = SidebarItemGlyphSize,
                 Glyph = item.Glyph
             };
             Grid.SetColumn(icon, 1);
@@ -502,7 +514,7 @@ namespace FileExplorerUI
 
             var border = new Border
             {
-                Height = 32,
+                Height = SidebarItemHeight,
                 Margin = new Thickness(0, 2, 0, 2),
                 Padding = new Thickness(0, 4, 0, 4),
                 Background = new SolidColorBrush(Colors.Transparent),
@@ -1330,19 +1342,19 @@ namespace FileExplorerUI
 
         private static void ApplyGroupHeaderLayout(Border border, Grid grid, Border indicator, FontIcon icon, Thickness expandedGridPadding, bool compact)
         {
-            border.Width = compact ? 32 : double.NaN;
-            border.Height = 32;
+            border.Width = compact ? SidebarCompactButtonSize : double.NaN;
+            border.Height = SidebarItemHeight;
             border.Padding = new Thickness(0, 4, 0, 4);
             border.Margin = compact ? new Thickness(0, 2, 0, 2) : new Thickness(0, 2, 0, 2);
             border.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             grid.Padding = compact ? new Thickness(0) : expandedGridPadding;
 
             indicator.Visibility = compact ? Visibility.Collapsed : indicator.Visibility;
-            icon.FontSize = 12;
+            icon.FontSize = SidebarItemGlyphSize;
             icon.Margin = new Thickness(0);
 
             grid.ColumnDefinitions[0].Width = compact ? new GridLength(0) : new GridLength(10);
-            grid.ColumnDefinitions[1].Width = compact ? new GridLength(32) : new GridLength(12);
+            grid.ColumnDefinitions[1].Width = compact ? new GridLength(SidebarCompactButtonSize) : new GridLength(SidebarItemGlyphSize);
             grid.ColumnDefinitions[2].Width = compact ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
             grid.ColumnDefinitions[3].Width = compact ? new GridLength(0) : new GridLength(26);
         }

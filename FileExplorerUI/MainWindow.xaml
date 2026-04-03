@@ -19,10 +19,10 @@
         x:Name="WindowRootGrid"
         RowDefinitions="Auto,Auto,*"
         RowSpacing="0"
-        Padding="8,0">
+        Padding="{x:Bind ShellWindowPadding, Mode=OneWay}">
         <TabView
             x:Name="SingleTabTitleBarView"
-            Height="40"
+            Height="{x:Bind ShellTitleBarHeight, Mode=OneWay}"
             Margin="0,0,0,0"
             HorizontalAlignment="Stretch"
             Background="Transparent"
@@ -61,14 +61,14 @@
             <TabView.TabStripHeader>
                 <Grid
                     x:Name="WindowTabStripLeftInset"
-                    Width="42"
+                    Width="{x:Bind ShellTitleBarLeftInsetWidth, Mode=OneWay}"
                     Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}"
                     Background="Transparent">
                     <Button
                         x:Name="TitleBarSettingsButton"
-                        Width="32"
-                        Height="32"
-                        Margin="4,0,0,0"
+                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Margin="{x:Bind ShellTitleBarLeftInsetButtonMargin, Mode=OneWay}"
                         Padding="0"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Bottom"
@@ -79,7 +79,7 @@
                         </ToolTipService.ToolTip>
                         <FontIcon
                             FontFamily="Segoe Fluent Icons"
-                            FontSize="12"
+                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
                             Glyph="&#xE713;" />
                     </Button>
                 </Grid>
@@ -109,7 +109,7 @@
 
         <Grid
             x:Name="SettingsTitleBarDragRegion"
-            Height="40"
+            Height="{x:Bind ShellTitleBarHeight, Mode=OneWay}"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Top"
             Background="Transparent"
@@ -117,12 +117,12 @@
 
         <Grid
             Grid.Row="1"
-            Margin="0,0,0,12"
+            Margin="{x:Bind ShellToolbarMargin, Mode=OneWay}"
             Visibility="{x:Bind ExplorerChromeVisibility, Mode=OneWay}">
             <Grid x:Name="ToolbarShadowReceiverGrid" />
             <Border
                 x:Name="ToolbarChromeBorder"
-                Padding="4,4,8,4"
+                Padding="{x:Bind ShellToolbarPadding, Mode=OneWay}"
                 Background="{ThemeResource LayerFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="0"
@@ -134,12 +134,12 @@
                 </Border.Shadow>
                 <Grid
                     ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto"
-                    Height="32"
+                    Height="{x:Bind ShellControlSize, Mode=OneWay}"
                     ColumnSpacing="8">
             <Button
                 x:Name="BackButton"
-                Width="32"
-                Height="32"
+                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                Height="{x:Bind ShellControlSize, Mode=OneWay}"
                 Padding="0"
                 Style="{ThemeResource SubtleButtonStyle}"
                 Click="BackButton_Click">
@@ -148,15 +148,15 @@
                 </ToolTipService.ToolTip>
                 <FontIcon
                     FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
+                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
                     Glyph="&#xE72B;" />
             </Button>
 
             <Button
                 x:Name="ForwardButton"
                 Grid.Column="1"
-                Width="32"
-                Height="32"
+                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                Height="{x:Bind ShellControlSize, Mode=OneWay}"
                 Padding="0"
                 Style="{ThemeResource SubtleButtonStyle}"
                 Click="ForwardButton_Click">
@@ -165,15 +165,15 @@
                 </ToolTipService.ToolTip>
                 <FontIcon
                     FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
+                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
                     Glyph="&#xE72A;" />
             </Button>
 
             <Button
                 x:Name="UpButton"
                 Grid.Column="2"
-                Width="32"
-                Height="32"
+                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                Height="{x:Bind ShellControlSize, Mode=OneWay}"
                 Padding="0"
                 Style="{ThemeResource SubtleButtonStyle}"
                 Click="UpButton_Click">
@@ -182,15 +182,15 @@
                 </ToolTipService.ToolTip>
                 <FontIcon
                     FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
+                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
                     Glyph="&#xE74A;" />
             </Button>
 
             <Button
                 x:Name="LoadButton"
                 Grid.Column="3"
-                Width="32"
-                Height="32"
+                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                Height="{x:Bind ShellControlSize, Mode=OneWay}"
                 Padding="0"
                 Style="{ThemeResource SubtleButtonStyle}"
                 Click="LoadButton_Click">
@@ -199,15 +199,15 @@
                 </ToolTipService.ToolTip>
                 <FontIcon
                     FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
+                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
                     Glyph="&#xE72C;" />
             </Button>
 
             <Button
                 x:Name="LanguageToggleButton"
                 Grid.Column="4"
-                Width="32"
-                Height="32"
+                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                Height="{x:Bind ShellControlSize, Mode=OneWay}"
                 Padding="0"
                 Style="{ThemeResource SubtleButtonStyle}"
                 Click="LanguageToggleButton_Click"
@@ -217,14 +217,14 @@
                 </ToolTipService.ToolTip>
                 <FontIcon
                     FontFamily="Segoe Fluent Icons"
-                    FontSize="12"
+                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
                     Glyph="{x:Bind ThemeToggleGlyph, Mode=OneWay}" />
             </Button>
 
             <Grid Grid.Column="5">
                 <Border
                     x:Name="AddressBreadcrumbBorder"
-                    Height="32"
+                    Height="{x:Bind ShellControlSize, Mode=OneWay}"
                     Padding="6,0,72,0"
                     Background="{ThemeResource TextControlBackground}"
                     BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
@@ -366,7 +366,7 @@
                 x:Name="SearchTextBox"
                 x:Uid="SearchTextBox"
                 Grid.Column="6"
-                Height="32"
+                Height="{x:Bind ShellControlSize, Mode=OneWay}"
                 Width="{x:Bind ToolbarSearchWidth, Mode=OneWay}"
                 HorizontalAlignment="Right"
                 BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
@@ -945,11 +945,11 @@
                     Visibility="Collapsed" />
                 </Grid>
 
-                <Grid Grid.Row="1" Height="32">
+                <Grid Grid.Row="1" Height="{x:Bind ShellStatusBarHeight, Mode=OneWay}">
                     <TextBlock
                         x:Name="StatusTextBlock"
                         x:Uid="StatusTextBlock"
-                        Margin="22,0,18,0"
+                        Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
                         VerticalAlignment="Center"
                         FontSize="11"
                         Foreground="{ThemeResource TextFillColorPrimaryBrush}"
@@ -964,7 +964,7 @@
                 <local:ColumnSplitter
                     x:Name="SidebarSplitter"
                     Grid.Column="1"
-                    Width="8"
+                    Width="{x:Bind ShellSplitterWidth, Mode=OneWay}"
                     Margin="-4,0,0,0"
                     HorizontalAlignment="Left"
                     ShowGuide="False"
@@ -979,8 +979,8 @@
                 IsPaneToggleButtonVisible="False"
                 IsSettingsVisible="False"
                 AlwaysShowHeader="False"
-                CompactPaneLength="40"
-                OpenPaneLength="220"
+                CompactPaneLength="{x:Bind SettingsNavigationCompactPaneLength, Mode=OneWay}"
+                OpenPaneLength="{x:Bind SettingsNavigationOpenPaneLength, Mode=OneWay}"
                 PaneDisplayMode="Left"
                 SelectionChanged="SettingsNavigationView_SelectionChanged"
                 Visibility="{x:Bind SettingsShellVisibility, Mode=OneWay}">

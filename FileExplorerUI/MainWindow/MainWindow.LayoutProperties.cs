@@ -127,6 +127,32 @@ namespace FileExplorerUI
             ? Visibility.Visible
             : Visibility.Collapsed;
 
+        public Thickness ShellWindowPadding => new(ShellWindowHorizontalPadding, 0, ShellWindowHorizontalPadding, 0);
+
+        public double ShellTitleBarHeight => ShellTitleBarHeightValue;
+
+        public double ShellControlSize => ShellControlSizeValue;
+
+        public double ShellGlyphSize => ShellGlyphSizeValue;
+
+        public double ShellTitleBarLeftInsetWidth => ShellTitleBarLeftInsetWidthValue;
+
+        public Thickness ShellTitleBarLeftInsetButtonMargin => new(4, 0, 0, 0);
+
+        public Thickness ShellToolbarMargin => new(0, 0, 0, ShellToolbarBottomSpacing);
+
+        public Thickness ShellToolbarPadding => new(4, 4, 8, 4);
+
+        public double ShellStatusBarHeight => ShellStatusBarHeightValue;
+
+        public Thickness ShellStatusTextMargin => new(22, 0, 18, 0);
+
+        public double ShellSplitterWidth => ShellSplitterWidthValue;
+
+        public double SettingsNavigationCompactPaneLength => SettingsNavigationCompactPaneLengthValue;
+
+        public double SettingsNavigationOpenPaneLength => SidebarExpandedDefaultWidth;
+
         public GridLength NameColumnWidth
         {
             get => _nameColumnWidth;
