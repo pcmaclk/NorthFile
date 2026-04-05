@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Refined right-side entries-list interaction polish:
+  - details-column headers now support direct click-to-sort with inline ascending/descending indicators instead of relying only on the background context menu
+  - header hover visuals now align with the list-row hover treatment, with the active sort column keeping its stronger text treatment and right-aligned sort glyph
+  - default sort no longer shows a redundant arrow, while non-default sort states remain visible
+  - right-click on an unselected row now activates the entries surface, selects that row first, and then opens the correct item context menu
+  - right-click on empty list background now clears the current entries selection before opening the background context menu
 - Refined the WinUI shell chrome and sidebar presentation:
   - reworked the title bar, toolbar, compact sidebar spacing, and settings entry placement so the left-edge icon/button alignment is consistent
   - updated the single-tab shell and settings shell behavior so settings hides tab content without losing the custom drag region

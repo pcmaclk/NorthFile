@@ -41,6 +41,7 @@ namespace FileExplorerUI
 
         private void HandleEntriesViewRightTapped(RightTappedRoutedEventArgs e)
         {
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
             EntriesViewHitResult? hit = GetActiveEntriesViewHost()?.ResolveRightTappedHit(e);
             if (hit is null)
             {
@@ -57,12 +58,24 @@ namespace FileExplorerUI
                 hit = new EntriesViewHitResult(root, e.GetPosition(root), null, false);
             }
 
-            _lastEntriesContextItem = hit.Entry;
-            if (hit.Entry is not null && !IsEntryAlreadySelected(hit.Entry))
+            if (hit.Entry is not null)
             {
-                SelectEntryInList(hit.Entry, ensureVisible: false);
+                _lastEntriesContextItem = hit.Entry;
+                if (!IsEntryAlreadySelected(hit.Entry))
+                {
+                    SelectEntryInList(hit.Entry, ensureVisible: false);
+                }
+            }
+            else
+            {
+                _lastEntriesContextItem = null;
+                if (!string.IsNullOrWhiteSpace(_selectedEntryPath) || !string.IsNullOrWhiteSpace(_focusedEntryPath))
+                {
+                    ClearListSelectionAndAnchor();
+                }
             }
 
+            FocusEntriesList();
             ShowEntriesContextFlyout(new EntriesContextRequest(
                 hit.Anchor,
                 hit.Position,

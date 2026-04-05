@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using FileExplorerUI.Controls;
 using FileExplorerUI.Workspace;
 using System;
@@ -133,6 +135,8 @@ namespace FileExplorerUI
                 GroupByTypeMenuItem.IsChecked = _currentGroupField == EntryGroupField.Type;
                 GroupByModifiedDateMenuItem.IsChecked = _currentGroupField == EntryGroupField.ModifiedDate;
             }
+
+            UpdateDetailsHeaders();
         }
 
         private async Task SetViewModeAsync(EntryViewMode mode)
@@ -536,7 +540,18 @@ namespace FileExplorerUI
 
         private void UpdateDetailsHeaders()
         {
-            if (NameHeaderTextBlock is null || TypeHeaderTextBlock is null || SizeHeaderTextBlock is null || ModifiedHeaderTextBlock is null)
+            if (NameHeaderTextBlock is null ||
+                TypeHeaderTextBlock is null ||
+                SizeHeaderTextBlock is null ||
+                ModifiedHeaderTextBlock is null ||
+                NameHeaderBorder is null ||
+                TypeHeaderBorder is null ||
+                SizeHeaderBorder is null ||
+                ModifiedHeaderBorder is null ||
+                NameHeaderSortGlyphTextBlock is null ||
+                TypeHeaderSortGlyphTextBlock is null ||
+                SizeHeaderSortGlyphTextBlock is null ||
+                ModifiedHeaderSortGlyphTextBlock is null)
             {
                 return;
             }
@@ -547,11 +562,131 @@ namespace FileExplorerUI
             {
                 SizeHeaderTextBlock.Text = S("ColumnTotalSizeHeader");
                 ModifiedHeaderTextBlock.Text = S("ColumnFreeSpaceHeader");
+            }
+            else
+            {
+                SizeHeaderTextBlock.Text = S("ColumnSizeHeader");
+                ModifiedHeaderTextBlock.Text = S("ColumnModifiedHeader");
+            }
+
+            UpdateDetailsHeaderVisual(NameHeaderBorder, NameHeaderTextBlock, NameHeaderSortGlyphTextBlock, EntrySortField.Name);
+            UpdateDetailsHeaderVisual(TypeHeaderBorder, TypeHeaderTextBlock, TypeHeaderSortGlyphTextBlock, EntrySortField.Type);
+            UpdateDetailsHeaderVisual(SizeHeaderBorder, SizeHeaderTextBlock, SizeHeaderSortGlyphTextBlock, EntrySortField.Size);
+            UpdateDetailsHeaderVisual(ModifiedHeaderBorder, ModifiedHeaderTextBlock, ModifiedHeaderSortGlyphTextBlock, EntrySortField.ModifiedDate);
+        }
+
+        private void UpdateDetailsHeaderVisual(Border border, TextBlock label, TextBlock sortGlyph, EntrySortField field)
+        {
+            bool isActive = _currentSortField == field;
+            bool showSortGlyph = isActive && !IsCurrentSortAtDefault();
+            label.Foreground = isActive ? GetDetailsHeaderPrimaryBrush() : GetDetailsHeaderSecondaryBrush();
+            label.Opacity = isActive ? 1.0 : 0.88;
+            sortGlyph.Text = isActive && _currentSortDirection == SortDirection.Descending ? "↓" : "↑";
+            sortGlyph.Foreground = isActive ? GetDetailsHeaderPrimaryBrush() : GetDetailsHeaderSecondaryBrush();
+            sortGlyph.Visibility = showSortGlyph ? Visibility.Visible : Visibility.Collapsed;
+            sortGlyph.Opacity = showSortGlyph ? 0.92 : 0.72;
+            border.Background = GetDetailsHeaderRestBrush();
+        }
+
+        private async void DetailsHeader_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element ||
+                !TryGetDetailsHeaderField(element.Tag as string, out EntrySortField field))
+            {
                 return;
             }
 
-            SizeHeaderTextBlock.Text = S("ColumnSizeHeader");
-            ModifiedHeaderTextBlock.Text = S("ColumnModifiedHeader");
+            SortDirection? explicitDirection = _currentSortField == field
+                ? (_currentSortDirection == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending)
+                : null;
+
+            await SetSortAsync(field, explicitDirection);
+            e.Handled = true;
+        }
+
+        private void DetailsHeader_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border border)
+            {
+                border.Background = GetDetailsHeaderHoverBrush();
+            }
+        }
+
+        private void DetailsHeader_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border border)
+            {
+                border.Background = GetDetailsHeaderRestBrush();
+            }
+        }
+
+        private bool IsCurrentSortAtDefault()
+        {
+            EntrySortField defaultField = _appSettings.DefaultSortField;
+            SortDirection defaultDirection = GetDefaultSortDirection(defaultField);
+            return _currentSortField == defaultField && _currentSortDirection == defaultDirection;
+        }
+
+        private static bool TryGetDetailsHeaderField(string? fieldName, out EntrySortField field)
+        {
+            field = fieldName switch
+            {
+                nameof(EntrySortField.Name) => EntrySortField.Name,
+                nameof(EntrySortField.Type) => EntrySortField.Type,
+                nameof(EntrySortField.Size) => EntrySortField.Size,
+                nameof(EntrySortField.ModifiedDate) => EntrySortField.ModifiedDate,
+                _ => EntrySortField.Name
+            };
+
+            return fieldName is nameof(EntrySortField.Name) or
+                nameof(EntrySortField.Type) or
+                nameof(EntrySortField.Size) or
+                nameof(EntrySortField.ModifiedDate);
+        }
+
+        private static Brush? GetDetailsHeaderHoverBrush()
+        {
+            if (Application.Current.Resources.TryGetValue("ListViewItemBackgroundPointerOver", out object? value) && value is Brush brush)
+            {
+                return brush;
+            }
+
+            if (Application.Current.Resources.TryGetValue("SubtleFillColorSecondaryBrush", out value) && value is Brush fallbackBrush)
+            {
+                return fallbackBrush;
+            }
+
+            return null;
+        }
+
+        private static Brush? GetDetailsHeaderRestBrush()
+        {
+            if (Application.Current.Resources.TryGetValue("SubtleFillColorTransparentBrush", out object? value) && value is Brush brush)
+            {
+                return brush;
+            }
+
+            return null;
+        }
+
+        private static Brush? GetDetailsHeaderPrimaryBrush()
+        {
+            if (Application.Current.Resources.TryGetValue("TextFillColorPrimaryBrush", out object? value) && value is Brush brush)
+            {
+                return brush;
+            }
+
+            return null;
+        }
+
+        private static Brush? GetDetailsHeaderSecondaryBrush()
+        {
+            if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out object? value) && value is Brush brush)
+            {
+                return brush;
+            }
+
+            return GetDetailsHeaderPrimaryBrush();
         }
 
     }

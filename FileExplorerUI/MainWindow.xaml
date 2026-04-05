@@ -470,45 +470,126 @@
                                     <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock
-                                    x:Name="NameHeaderTextBlock"
-                                    x:Uid="NameHeaderTextBlock"
-                                    Margin="{Binding ElementName=RootWindow, Path=NameHeaderMargin}"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Center"
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                    Opacity="0.72" />
-                                <TextBlock
-                                    x:Name="TypeHeaderTextBlock"
-                                    x:Uid="TypeHeaderTextBlock"
+                                <Border
+                                    x:Name="NameHeaderBorder"
+                                    Background="Transparent"
+                                    CornerRadius="4"
+                                    Padding="0,0,10,0"
+                                    PointerEntered="DetailsHeader_PointerEntered"
+                                    PointerExited="DetailsHeader_PointerExited"
+                                    PointerPressed="DetailsHeader_PointerPressed"
+                                    Tag="Name">
+                                    <Grid Margin="{Binding ElementName=RootWindow, Path=NameHeaderMargin}" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="NameHeaderTextBlock"
+                                            x:Uid="NameHeaderTextBlock"
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                            Opacity="0.72" />
+                                        <TextBlock
+                                            x:Name="NameHeaderSortGlyphTextBlock"
+                                            Grid.Column="2"
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
+                                <Border
+                                    x:Name="TypeHeaderBorder"
                                     Grid.Column="2"
-                                    Margin="14,0,0,0"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Center"
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                    Opacity="0.72" />
-                                <TextBlock
-                                    x:Name="SizeHeaderTextBlock"
-                                    x:Uid="SizeHeaderTextBlock"
+                                    Background="Transparent"
+                                    CornerRadius="4"
+                                    Padding="0,0,10,0"
+                                    PointerEntered="DetailsHeader_PointerEntered"
+                                    PointerExited="DetailsHeader_PointerExited"
+                                    PointerPressed="DetailsHeader_PointerPressed"
+                                    Tag="Type">
+                                    <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="TypeHeaderTextBlock"
+                                            x:Uid="TypeHeaderTextBlock"
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                            Opacity="0.72" />
+                                        <TextBlock
+                                            x:Name="TypeHeaderSortGlyphTextBlock"
+                                            Grid.Column="2"
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
+                                <Border
+                                    x:Name="SizeHeaderBorder"
                                     Grid.Column="4"
-                                    Margin="14,0,0,0"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Center"
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                    Opacity="0.72" />
-                                <TextBlock
-                                    x:Name="ModifiedHeaderTextBlock"
-                                    x:Uid="ModifiedHeaderTextBlock"
+                                    Background="Transparent"
+                                    CornerRadius="4"
+                                    Padding="0,0,10,0"
+                                    PointerEntered="DetailsHeader_PointerEntered"
+                                    PointerExited="DetailsHeader_PointerExited"
+                                    PointerPressed="DetailsHeader_PointerPressed"
+                                    Tag="Size">
+                                    <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="SizeHeaderTextBlock"
+                                            x:Uid="SizeHeaderTextBlock"
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                            Opacity="0.72" />
+                                        <TextBlock
+                                            x:Name="SizeHeaderSortGlyphTextBlock"
+                                            Grid.Column="2"
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
+                                <Border
+                                    x:Name="ModifiedHeaderBorder"
                                     Grid.Column="6"
-                                    Margin="14,0,0,0"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Center"
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                    Opacity="0.72" />
+                                    Margin="0,0,6,0"
+                                    Background="Transparent"
+                                    CornerRadius="4"
+                                    Padding="0,0,10,0"
+                                    PointerEntered="DetailsHeader_PointerEntered"
+                                    PointerExited="DetailsHeader_PointerExited"
+                                    PointerPressed="DetailsHeader_PointerPressed"
+                                    Tag="ModifiedDate">
+                                    <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="ModifiedHeaderTextBlock"
+                                            x:Uid="ModifiedHeaderTextBlock"
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                            Opacity="0.72" />
+                                        <TextBlock
+                                            x:Name="ModifiedHeaderSortGlyphTextBlock"
+                                            Grid.Column="2"
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
 
                                 <local:ColumnSplitter
                                     x:Name="HeaderSplitter1"
