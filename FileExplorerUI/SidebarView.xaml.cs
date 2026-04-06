@@ -20,10 +20,10 @@ namespace FileExplorerUI
         private const double PinnedDragStartThreshold = 6;
         private const double SidebarItemHeight = 32;
         private const double SidebarItemGlyphSize = 12;
-        private const double SidebarItemContentInsetLeft = 10;
+        private const double SidebarItemContentInsetLeft = 8;
         private const double SidebarExpandedScrollRightPadding = 12;
         private const double SidebarBottomPadding = 8;
-        private const double SidebarFooterBottomMargin = 2;
+        private const double SidebarFooterBottomMargin = 0;
         private const double SidebarCompactButtonSize = 32;
         private const double PinnedDragOverlayWidth = 44;
         private const double PinnedDragOverlayHeight = 44;
@@ -85,14 +85,11 @@ namespace FileExplorerUI
             _fullGroupPanels.AddRange(new Panel[] { PinnedSectionPanel, TreeSectionPanel, CloudSectionPanel, NetworkSectionPanel, TagsSectionPanel });
             _fullOnlySections.AddRange(new FrameworkElement[] { PinnedSectionPanel, TreeSectionPanel, CloudSectionPanel, NetworkSectionPanel, TagsSectionPanel, TreeHostBorder });
             _groupChevrons.AddRange(new[] { PinnedChevron, CloudChevron, NetworkChevron, TagsChevron });
-            _groupHeaderLayouts.AddRange(new[]
-            {
-                new GroupHeaderLayoutParts(PinnedGroupBorder, PinnedGroupGrid, PinnedGroupSelectionIndicator, PinnedGroupIcon, PinnedGroupGrid.Padding),
-                new GroupHeaderLayoutParts(TreeCompactBorder, TreeCompactGrid, TreeCompactSelectionIndicator, TreeCompactIcon, TreeCompactGrid.Padding),
-                new GroupHeaderLayoutParts(CloudGroupBorder, CloudGroupGrid, CloudGroupSelectionIndicator, CloudGroupIcon, CloudGroupGrid.Padding),
-                new GroupHeaderLayoutParts(NetworkGroupBorder, NetworkGroupGrid, NetworkGroupSelectionIndicator, NetworkGroupIcon, NetworkGroupGrid.Padding),
-                new GroupHeaderLayoutParts(TagsGroupBorder, TagsGroupGrid, TagsGroupSelectionIndicator, TagsGroupIcon, TagsGroupGrid.Padding)
-            });
+            TryRegisterGroupHeaderLayout(PinnedGroupBorder, PinnedGroupGrid, PinnedGroupSelectionIndicator, PinnedGroupIcon);
+            TryRegisterGroupHeaderLayout(TreeCompactBorder, TreeCompactGrid, TreeCompactSelectionIndicator, TreeCompactIcon);
+            TryRegisterGroupHeaderLayout(CloudGroupBorder, CloudGroupGrid, CloudGroupSelectionIndicator, CloudGroupIcon);
+            TryRegisterGroupHeaderLayout(NetworkGroupBorder, NetworkGroupGrid, NetworkGroupSelectionIndicator, NetworkGroupIcon);
+            TryRegisterGroupHeaderLayout(TagsGroupBorder, TagsGroupGrid, TagsGroupSelectionIndicator, TagsGroupIcon);
             RefreshAuxiliaryItems();
 
             RegisterGroupHover(PinnedGroupBorder);
@@ -299,9 +296,7 @@ namespace FileExplorerUI
 
         private void UpdateSettingsButtonLayout(bool compact)
         {
-            SettingsFooterHost.Margin = compact
-                ? new Thickness(0, 0, 0, SidebarFooterBottomMargin)
-                : new Thickness(0, 0, SidebarExpandedScrollRightPadding, SidebarFooterBottomMargin);
+            SettingsFooterHost.Margin = new Thickness(0);
             SidebarSettingsButton.Width = compact ? SidebarCompactButtonSize : double.NaN;
             SidebarSettingsButton.Padding = compact ? new Thickness(0) : new Thickness(9, 0, 0, 0);
             SidebarSettingsButton.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
@@ -479,7 +474,7 @@ namespace FileExplorerUI
             indicator = new Border
             {
                 Width = 3,
-                Margin = new Thickness(0, 2, 0, 2),
+                Margin = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 CornerRadius = (CornerRadius)Application.Current.Resources["ListViewItemSelectionIndicatorCornerRadius"],
@@ -515,7 +510,7 @@ namespace FileExplorerUI
             var border = new Border
             {
                 Height = SidebarItemHeight,
-                Margin = new Thickness(0, 2, 0, 2),
+                Margin = new Thickness(0),
                 Padding = new Thickness(0, 4, 0, 4),
                 Background = new SolidColorBrush(Colors.Transparent),
                 CornerRadius = (CornerRadius)Application.Current.Resources["ListViewItemCornerRadius"],
@@ -1246,6 +1241,20 @@ namespace FileExplorerUI
             return new SolidColorBrush(Colors.Transparent);
         }
 
+        private void TryRegisterGroupHeaderLayout(
+            Border? border,
+            Grid? grid,
+            Border? indicator,
+            FontIcon? icon)
+        {
+            if (border is null || grid is null || indicator is null || icon is null)
+            {
+                return;
+            }
+
+            _groupHeaderLayouts.Add(new GroupHeaderLayoutParts(border, grid, indicator, icon, grid.Padding));
+        }
+
         private void ShowPinnedCompactFlyout(FrameworkElement target)
         {
             _compactMenuController.Show(target, BuildPinnedCompactItems());
@@ -1345,7 +1354,7 @@ namespace FileExplorerUI
             border.Width = compact ? SidebarCompactButtonSize : double.NaN;
             border.Height = SidebarItemHeight;
             border.Padding = new Thickness(0, 4, 0, 4);
-            border.Margin = compact ? new Thickness(0, 2, 0, 2) : new Thickness(0, 2, 0, 2);
+            border.Margin = new Thickness(0);
             border.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             grid.Padding = compact ? new Thickness(0) : expandedGridPadding;
 

@@ -259,12 +259,12 @@ namespace FileExplorerUI
 
         private void ApplySidebarWidthLayout(double? requestedWidth = null, bool fromUserDrag = false)
         {
-            if (ExplorerShellGrid is null)
+            if (WindowRootGrid is null)
             {
                 return;
             }
 
-            double bodyWidth = ExplorerShellGrid.ActualWidth;
+            double bodyWidth = WindowRootGrid.ActualWidth - WindowRootGrid.Padding.Left - WindowRootGrid.Padding.Right;
             if (bodyWidth <= 0)
             {
                 SidebarColumnWidth = new GridLength((_sidebarPinnedCompact || _isSidebarCompact) ? SidebarCompactWidth : _sidebarPreferredExpandedWidth);
@@ -311,13 +311,12 @@ namespace FileExplorerUI
             _isSidebarCompact = compact;
             StyledSidebarView.Margin = compact ? new Thickness(0, 0, 8, 0) : new Thickness(0);
             StyledSidebarView.SetCompact(compact);
-            if (SidebarNavView is not null)
-            {
-                SidebarNavView.PaneDisplayMode = compact ? NavigationViewPaneDisplayMode.LeftCompact : NavigationViewPaneDisplayMode.Left;
-                SidebarNavView.IsPaneOpen = !compact;
-                SidebarNavView.CompactPaneLength = SidebarCompactWidth;
-                SidebarNavView.OpenPaneLength = compact ? SidebarCompactWidth : SidebarColumnWidth.Value;
-            }
+            RaisePropertyChanged(
+                nameof(ShellTitleBarLeftInsetWidth),
+                nameof(SidebarTopChromeMargin),
+                nameof(SidebarTopSettingsVisibility),
+                nameof(TitleBarSidebarSettingsVisibility),
+                nameof(SidebarCollapseButtonToolTipText));
         }
 
         private void MainWindow_SizeChanged(object sender, WindowSizeChangedEventArgs args)
@@ -357,6 +356,8 @@ namespace FileExplorerUI
             if (widthChanged)
             {
                 RaisePropertyChanged(
+                    nameof(PrimaryPaneSearchBoxWidth),
+                    nameof(PrimaryPaneSearchVisibility),
                     nameof(EntriesHorizontalScrollBarVisibility),
                     nameof(EntriesHorizontalScrollMode),
                     nameof(ToolbarSearchWidth));
@@ -393,6 +394,15 @@ namespace FileExplorerUI
             {
                 entry.RefreshThemeDependentBrushes();
             }
+            RaisePropertyChanged(
+                nameof(PrimaryPaneToolbarBackground),
+                nameof(PrimaryPaneBodyBackground),
+                nameof(PrimaryPaneInputBackground),
+                nameof(PrimaryPaneBorderBrush),
+                nameof(SecondaryPaneToolbarBackground),
+                nameof(SecondaryPaneBodyBackground),
+                nameof(SecondaryPaneInputBackground),
+                nameof(SecondaryPaneBorderBrush));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ThemeToggleGlyph)));
         }
 

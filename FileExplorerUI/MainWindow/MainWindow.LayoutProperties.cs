@@ -1,4 +1,5 @@
 using FileExplorerUI.Controls;
+using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -135,19 +136,81 @@ namespace FileExplorerUI
 
         public double ShellGlyphSize => ShellGlyphSizeValue;
 
-        public double ShellTitleBarLeftInsetWidth => ShellTitleBarLeftInsetWidthValue;
+        public double ShellTitleBarLeftInsetWidth => _shellMode == ShellMode.Explorer && _isSidebarCompact
+            ? ShellTitleBarLeftInsetWidthValue
+            : 0;
+
+        public Thickness ShellTitleBarMargin => _shellMode == ShellMode.Explorer && !_isSidebarCompact
+            ? new Thickness(-8, 0, 0, 0)
+            : new Thickness(0);
+
+        public Visibility ShellTitleBarLeftInsetVisibility => _shellMode == ShellMode.Explorer && _isSidebarCompact
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         public Thickness ShellTitleBarLeftInsetButtonMargin => new(4, 0, 0, 0);
 
-        public Thickness ShellToolbarMargin => new(0, 0, 0, ShellToolbarBottomSpacing);
+        public Thickness SidebarTopChromeMargin => new(0);
 
-        public Thickness ShellToolbarPadding => new(4, 4, 8, 4);
+        public Visibility SidebarTopChromeVisibility => _shellMode == ShellMode.Explorer
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public Visibility SidebarTopSettingsVisibility => _shellMode == ShellMode.Explorer && !_isSidebarCompact
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public Visibility TitleBarSidebarSettingsVisibility => _shellMode == ShellMode.Explorer && _isSidebarCompact
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public string SidebarCollapseButtonToolTipText => _isSidebarCompact
+            ? LocalizedStrings.Instance.Get("CommonExpand")
+            : LocalizedStrings.Instance.Get("CommonCollapse");
+
+        public Thickness ShellToolbarMargin => new(0, 8, 0, ShellToolbarBottomSpacing);
+
+        public Thickness ShellToolbarPadding => new(8, 4, 8, 4);
+
+        public Thickness ExplorerPanelHostMargin => new(0, 8, 0, 0);
+
+        public double ExplorerPanelHostSpacing => ShellToolbarBottomSpacing;
 
         public double ShellStatusBarHeight => ShellStatusBarHeightValue;
 
         public Thickness ShellStatusTextMargin => new(22, 0, 18, 0);
 
         public double ShellSplitterWidth => ShellSplitterWidthValue;
+
+        public GridLength ExplorerPanePrimaryColumnWidth => new(1, GridUnitType.Star);
+
+        public GridLength ExplorerPaneToolbarActionRailColumnWidth => new(ExplorerPaneActionRailWidthValue);
+
+        public GridLength ExplorerPaneActionRailColumnWidth => _isDualPaneEnabled
+            ? new GridLength(ExplorerPaneActionRailWidthValue)
+            : new GridLength(0);
+
+        public GridLength ExplorerPaneSecondaryColumnWidth => _isDualPaneEnabled
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(0);
+
+        public Visibility ExplorerPaneToolbarActionRailVisibility => Visibility.Visible;
+
+        public Visibility ExplorerPaneActionRailVisibility => _isDualPaneEnabled
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public Visibility ExplorerSecondaryPaneVisibility => _isDualPaneEnabled
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        public string ExplorerPaneToggleGlyph => _isDualPaneEnabled
+            ? "\uE71A"
+            : "\uE8A9";
+
+        public string ExplorerPaneToggleToolTipText => _isDualPaneEnabled
+            ? "关闭双面板"
+            : "打开双面板";
 
         public double SettingsNavigationCompactPaneLength => SettingsNavigationCompactPaneLengthValue;
 

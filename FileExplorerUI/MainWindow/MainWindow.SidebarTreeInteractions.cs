@@ -21,57 +21,6 @@ namespace FileExplorerUI
     {
         private void BuildSidebarItems()
         {
-            if (SidebarNavView is null)
-            {
-                return;
-            }
-
-            SidebarNavView.MenuItems.Clear();
-            _sidebarPathButtons.Clear();
-            _sidebarQuickAccessPaths.Clear();
-            _sidebarDrivePaths.Clear();
-
-            NavigationViewItem CreateLeaf(string label, string path, Symbol icon, bool inQuickAccess, bool inDrives)
-            {
-                var item = new NavigationViewItem
-                {
-                    Content = label,
-                    Tag = path,
-                    Icon = new SymbolIcon(icon)
-                };
-                _sidebarPathButtons[path] = item;
-                if (inQuickAccess)
-                {
-                    _sidebarQuickAccessPaths.Add(path);
-                }
-                if (inDrives)
-                {
-                    _sidebarDrivePaths.Add(path);
-                }
-                return item;
-            }
-
-            var quickAccess = new NavigationViewItem
-            {
-                Content = S("SidebarPinned"),
-                Icon = new SymbolIcon(Symbol.Favorite),
-                SelectsOnInvoked = false
-            };
-            foreach (SidebarNavItemModel favorite in BuildSidebarFavoriteModels())
-            {
-                if (string.IsNullOrWhiteSpace(favorite.Path))
-                {
-                    continue;
-                }
-
-                quickAccess.MenuItems.Add(CreateLeaf(favorite.Label, favorite.Path, Symbol.Folder, true, false));
-            }
-            SidebarNavView.MenuItems.Add(quickAccess);
-
-            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarCloud"), Icon = new SymbolIcon(Symbol.World), SelectsOnInvoked = false });
-            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarNetwork"), Icon = new SymbolIcon(Symbol.Globe), SelectsOnInvoked = false });
-            SidebarNavView.MenuItems.Add(new NavigationViewItem { Content = S("SidebarTags"), Icon = new SymbolIcon(Symbol.Tag), SelectsOnInvoked = false });
-
             StyledSidebarView.SetPinnedItems(BuildSidebarFavoriteModels());
             StyledSidebarView.SetExtraItems(new[]
             {

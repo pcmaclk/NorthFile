@@ -54,6 +54,12 @@ namespace FileExplorerUI
 
         private void AddressBreadcrumbBorder_Tapped(object sender, TappedRoutedEventArgs e)
         {
+            if (e.OriginalSource is DependencyObject source &&
+                (source is Button || IsDescendantOf(source, OverflowBreadcrumbButton) || IsDescendantOf(source, BreadcrumbItemsControl)))
+            {
+                return;
+            }
+
             EnterAddressEditMode(selectAll: true);
         }
 

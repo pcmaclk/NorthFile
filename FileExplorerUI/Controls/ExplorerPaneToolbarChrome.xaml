@@ -1,0 +1,25 @@
+<UserControl
+    x:Class="FileExplorerUI.Controls.ExplorerPaneToolbarChrome"
+    x:Name="RootControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid>
+        <Grid x:Name="ShadowReceiverGrid" />
+        <Border
+            x:Name="ChromeBorder"
+            Padding="{x:Bind ChromePadding, Mode=OneWay}"
+            Background="{x:Bind ChromeBackground, Mode=OneWay}"
+            BorderBrush="{x:Bind ChromeBorderBrush, Mode=OneWay}"
+            BorderThickness="{x:Bind ChromeBorderThickness, Mode=OneWay}"
+            CornerRadius="{ThemeResource OverlayCornerRadius}"
+            Loaded="ChromeBorder_Loaded"
+            Opacity="{x:Bind ChromeOpacity, Mode=OneWay}"
+            Translation="0,0,6">
+            <Border.Shadow>
+                <ThemeShadow x:Name="ChromeShadow" />
+            </Border.Shadow>
+            <ContentPresenter Content="{x:Bind ToolbarContent, Mode=OneWay}" />
+        </Border>
+    </Grid>
+</UserControl>

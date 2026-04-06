@@ -32,6 +32,7 @@ namespace FileExplorerUI
             activePanel.GroupField = _currentGroupField;
             activePanel.QueryText = _currentQuery;
             activePanel.CurrentPath = _currentPath;
+            activePanel.AddressText = GetDisplayPathText(_currentPath);
             activePanel.SelectedEntryPath = _selectedEntryPath;
         }
 

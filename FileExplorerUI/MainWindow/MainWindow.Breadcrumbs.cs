@@ -202,15 +202,12 @@ namespace FileExplorerUI
 
         private void UpdateBreadcrumbs(string path)
         {
+            RaisePropertyChanged(nameof(DisplayAddressText), nameof(AddressTextFallbackVisibility));
             Breadcrumbs.Clear();
             _breadcrumbWidthsReady = false;
             _breadcrumbVisibleStartIndex = -1;
             _hiddenBreadcrumbItems.Clear();
             VisibleBreadcrumbs.Clear();
-            if (BreadcrumbItemsControl is not null)
-            {
-                BreadcrumbItemsControl.Opacity = 0;
-            }
             if (OverflowBreadcrumbButton is not null)
             {
                 OverflowBreadcrumbButton.Visibility = Visibility.Collapsed;
@@ -228,6 +225,7 @@ namespace FileExplorerUI
                     IsLast = true,
                     MeasuredWidth = 0
                 });
+                ResetVisibleBreadcrumbs(Breadcrumbs);
                 return;
             }
 
@@ -281,6 +279,8 @@ namespace FileExplorerUI
                     : Visibility.Collapsed;
                 item.MeasuredWidth = 0;
             }
+
+            ResetVisibleBreadcrumbs(Breadcrumbs);
         }
 
         private void AddressBreadcrumbBorder_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -294,6 +294,7 @@ namespace FileExplorerUI
             {
                 _hiddenBreadcrumbItems.Clear();
                 VisibleBreadcrumbs.Clear();
+                RaisePropertyChanged(nameof(AddressTextFallbackVisibility));
                 if (OverflowBreadcrumbButton is not null)
                 {
                     OverflowBreadcrumbButton.Visibility = Visibility.Collapsed;
@@ -309,6 +310,11 @@ namespace FileExplorerUI
             int visibleStartIndex = CalculateVisibleBreadcrumbStartIndex();
             if (visibleStartIndex == _breadcrumbVisibleStartIndex)
             {
+                RaisePropertyChanged(nameof(AddressTextFallbackVisibility));
+                if (OverflowBreadcrumbButton is not null)
+                {
+                    OverflowBreadcrumbButton.Visibility = visibleStartIndex > 0 ? Visibility.Visible : Visibility.Collapsed;
+                }
                 return;
             }
 
@@ -327,14 +333,11 @@ namespace FileExplorerUI
 
             ResetVisibleBreadcrumbs(visibleItems);
 
-            if (BreadcrumbItemsControl is not null)
-            {
-                BreadcrumbItemsControl.Opacity = 1;
-            }
             if (OverflowBreadcrumbButton is not null)
             {
                 OverflowBreadcrumbButton.Visibility = visibleStartIndex > 0 ? Visibility.Visible : Visibility.Collapsed;
             }
+            RaisePropertyChanged(nameof(AddressTextFallbackVisibility));
         }
 
         private int CalculateVisibleBreadcrumbStartIndex()
@@ -389,6 +392,7 @@ namespace FileExplorerUI
             {
                 VisibleBreadcrumbs.Add(item);
             }
+            RaisePropertyChanged(nameof(AddressTextFallbackVisibility));
         }
 
         private void MeasureBreadcrumbItem_Loaded(object sender, RoutedEventArgs e)

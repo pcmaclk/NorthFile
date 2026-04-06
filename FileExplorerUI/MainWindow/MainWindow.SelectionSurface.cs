@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using FileExplorerUI.Workspace;
 
 namespace FileExplorerUI
 {
@@ -44,16 +46,25 @@ namespace FileExplorerUI
         private void FocusSidebarSurface()
         {
             SetActiveSelectionSurface(SelectionSurfaceId.Sidebar);
-            if (!StyledSidebarView.Focus(FocusState.Pointer))
-            {
-                SidebarNavView?.Focus(FocusState.Pointer);
-            }
+            StyledSidebarView.Focus(FocusState.Pointer);
         }
 
         private void SetActiveSelectionSurface(SelectionSurfaceId surface)
         {
+            SyncActivePanelPresentationState();
+
+            if (surface == SelectionSurfaceId.PrimaryPane)
+            {
+                _workspaceLayoutHost.ActivatePanel(WorkspacePanelId.Primary);
+            }
+            else if (surface == SelectionSurfaceId.SecondaryPane && _isDualPaneEnabled)
+            {
+                _workspaceLayoutHost.ActivatePanel(WorkspacePanelId.Secondary);
+            }
+
             _selectionSurfaceCoordinator.SetActiveSurface(surface);
             UpdateSelectionActivityState();
+            NotifyWorkspacePanelVisualStateChanged();
         }
 
         private void UpdateSelectionActivityState()
@@ -75,6 +86,38 @@ namespace FileExplorerUI
 
             _isEntriesSelectionActive = entriesSelectionActive;
             UpdateEntrySelectionVisuals();
+        }
+
+        private void NotifyWorkspacePanelVisualStateChanged()
+        {
+            RaisePropertyChanged(
+                nameof(IsPrimaryWorkspacePanelActive),
+                nameof(IsSecondaryWorkspacePanelActive),
+                nameof(PrimaryPaneToolbarBackground),
+                nameof(PrimaryPaneBodyBackground),
+                nameof(PrimaryPaneInputBackground),
+                nameof(PrimaryPaneBorderBrush),
+                nameof(PrimaryPaneBodyTranslation),
+                nameof(SecondaryPaneToolbarBackground),
+                nameof(SecondaryPaneBodyBackground),
+                nameof(SecondaryPaneInputBackground),
+                nameof(SecondaryPaneBorderBrush),
+                nameof(SecondaryPaneBodyTranslation));
+        }
+
+        private void PrimaryPaneSurface_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+        }
+
+        private void SecondaryPaneSurface_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (!_isDualPaneEnabled)
+            {
+                return;
+            }
+
+            SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
         }
 
         private void RefreshSidebarTreeSelectionVisuals()

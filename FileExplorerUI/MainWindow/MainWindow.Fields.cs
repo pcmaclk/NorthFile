@@ -43,7 +43,6 @@ namespace FileExplorerUI
         private bool _suppressSidebarTreeSelection;
         private int _sidebarTreeScrollRequestVersion;
         private readonly Dictionary<string, string> _sidebarTreeSelectionMemory = new(StringComparer.OrdinalIgnoreCase);
-        private bool _suppressSidebarNavSelection;
         private EntryViewModel? _pendingContextRenameEntry;
         private EntriesContextRequest? _entriesContextRequest;
         private EntryViewModel? _lastEntriesContextItem;
@@ -73,6 +72,7 @@ namespace FileExplorerUI
         private bool _isCommittingSidebarTreeRename;
         private bool _isSidebarSelectionActive;
         private bool _isEntriesSelectionActive = true;
+        private bool _isDualPaneEnabled = false;
         private readonly SelectionSurfaceCoordinator _selectionSurfaceCoordinator =
             new(SelectionSurfaceId.Sidebar);
 
@@ -97,10 +97,11 @@ namespace FileExplorerUI
         private const double ShellTitleBarHeightValue = 40;
         private const double ShellControlSizeValue = 32;
         private const double ShellGlyphSizeValue = 12;
-        private const double ShellTitleBarLeftInsetWidthValue = 42;
+        private const double ShellTitleBarLeftInsetWidthValue = 38;
         private const double ShellToolbarBottomSpacing = 12;
         private const double ShellStatusBarHeightValue = 32;
         private const double ShellSplitterWidthValue = 8;
+        private const double ExplorerPaneActionRailWidthValue = 48;
         private const double SettingsNavigationCompactPaneLengthValue = 40;
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
 
@@ -211,9 +212,6 @@ namespace FileExplorerUI
         private double _lastWindowHeight = double.NaN;
         private double _lastGroupedViewportHeight = double.NaN;
         private long _lastGroupedColumnsLiveResizeRefreshTick;
-        private readonly Dictionary<string, NavigationViewItem> _sidebarPathButtons = new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<string> _sidebarQuickAccessPaths = new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<string> _sidebarDrivePaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, bool> _groupExpansionStates = new(StringComparer.Ordinal);
         private readonly WorkspaceShellState _workspaceShellState = new();
         private readonly WorkspaceLayoutHost _workspaceLayoutHost;

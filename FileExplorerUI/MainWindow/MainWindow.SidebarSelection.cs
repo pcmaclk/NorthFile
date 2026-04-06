@@ -1,49 +1,11 @@
-using FileExplorerUI.Controls;
-using FileExplorerUI.Services;
-using Microsoft.UI.Xaml.Controls;
 using System;
 using System.IO;
+using FileExplorerUI.Services;
 
 namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
-        private async void SidebarNavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
-        {
-            if (_suppressSidebarNavSelection || args.IsSettingsSelected)
-            {
-                return;
-            }
-
-            if (args.SelectedItemContainer is not NavigationViewItem item || item.Tag is not string target || string.IsNullOrWhiteSpace(target))
-            {
-                return;
-            }
-
-            if (_isLoading)
-            {
-                UpdateStatusKey("StatusSidebarNavIgnoredLoading");
-                return;
-            }
-
-            FocusSidebarSurface();
-            ClearListSelectionAndAnchor();
-
-            if (IsCurrentPath(target))
-            {
-                return;
-            }
-
-            try
-            {
-                await NavigateToPathAsync(target, pushHistory: true, focusEntriesAfterNavigation: false);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatusKey("StatusSidebarNavFailed", FileOperationErrors.ToUserMessage(ex));
-            }
-        }
-
         private async void StyledSidebarView_NavigateRequested(object? sender, SidebarNavigateRequestedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(e.Path))
@@ -87,66 +49,19 @@ namespace FileExplorerUI
             EnterSettingsShell();
         }
 
-        private void ApplySidebarSelectionImmediate(string target)
+        private void SidebarCollapseButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
         {
-            if (SidebarNavView is null)
+            _sidebarPinnedCompact = !_sidebarPinnedCompact;
+            if (!_sidebarPinnedCompact)
             {
-                return;
+                _sidebarPreferredExpandedWidth = Math.Max(_sidebarPreferredExpandedWidth, SidebarExpandedDefaultWidth);
             }
 
-            NavigationViewItem? selected = null;
-            int bestLen = -1;
-            string selectedPath = Path.GetFullPath(target).TrimEnd('\\');
-            foreach ((string path, NavigationViewItem item) in _sidebarPathButtons)
-            {
-                string currentPath = Path.GetFullPath(path).TrimEnd('\\');
-                bool matched = string.Equals(currentPath, selectedPath, StringComparison.OrdinalIgnoreCase)
-                    || selectedPath.StartsWith(currentPath + "\\", StringComparison.OrdinalIgnoreCase);
-                if (!matched)
-                {
-                    continue;
-                }
-
-                if (path.Length > bestLen)
-                {
-                    bestLen = path.Length;
-                    selected = item;
-                }
-            }
-
-            _suppressSidebarNavSelection = true;
-            SidebarNavView.SelectedItem = selected;
-            _suppressSidebarNavSelection = false;
-
-            StyledSidebarView.SetSelectedPath(target);
-            _ = SelectSidebarTreePathAsync(target);
+            ApplySidebarWidthLayout();
         }
 
         private void UpdateSidebarSelectionOnly()
         {
-            NavigationViewItem? selected = null;
-            int bestLen = -1;
-            foreach ((string path, NavigationViewItem item) in _sidebarPathButtons)
-            {
-                if (!IsCurrentPath(path))
-                {
-                    continue;
-                }
-
-                if (path.Length > bestLen)
-                {
-                    bestLen = path.Length;
-                    selected = item;
-                }
-            }
-
-            if (SidebarNavView is not null)
-            {
-                _suppressSidebarNavSelection = true;
-                SidebarNavView.SelectedItem = selected;
-                _suppressSidebarNavSelection = false;
-            }
-
             StyledSidebarView.SetSelectedPath(_currentPath);
             _ = SelectSidebarTreePathAsync(_currentPath);
         }

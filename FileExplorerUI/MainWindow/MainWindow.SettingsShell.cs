@@ -16,7 +16,12 @@ namespace FileExplorerUI
             RaisePropertyChanged(
                 nameof(ExplorerChromeVisibility),
                 nameof(ExplorerShellVisibility),
-                nameof(SettingsShellVisibility));
+                nameof(SettingsShellVisibility),
+                nameof(ShellTitleBarLeftInsetWidth),
+                nameof(SidebarTopChromeMargin),
+                nameof(SidebarTopChromeVisibility),
+                nameof(SidebarTopSettingsVisibility),
+                nameof(TitleBarSidebarSettingsVisibility));
         }
 
         private void ExitSettingsShell()
@@ -27,7 +32,12 @@ namespace FileExplorerUI
             RaisePropertyChanged(
                 nameof(ExplorerChromeVisibility),
                 nameof(ExplorerShellVisibility),
-                nameof(SettingsShellVisibility));
+                nameof(SettingsShellVisibility),
+                nameof(ShellTitleBarLeftInsetWidth),
+                nameof(SidebarTopChromeMargin),
+                nameof(SidebarTopChromeVisibility),
+                nameof(SidebarTopSettingsVisibility),
+                nameof(TitleBarSidebarSettingsVisibility));
         }
 
         private void SetCurrentSettingsSection(SettingsSection section, bool updateSelection)

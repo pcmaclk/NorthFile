@@ -11,6 +11,22 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
                 <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="AddressSearchChromeBorderBrush" Color="#10000000" />
+                    <LinearGradientBrush x:Key="ExplorerShellPanelBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
+                        <GradientStop Color="#08000000" Offset="0" />
+                        <GradientStop Color="#08000000" Offset="1" />
+                    </LinearGradientBrush>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="AddressSearchChromeBorderBrush" Color="#10FFFFFF" />
+                    <LinearGradientBrush x:Key="ExplorerShellPanelBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
+                        <GradientStop Color="#10FFFFFF" Offset="0" />
+                        <GradientStop Color="#10FFFFFF" Offset="1" />
+                    </LinearGradientBrush>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
             <local:LocalizedStrings x:Key="Strings" />
             <Style TargetType="controls:EntryItemHost">
                 <Setter Property="Background" Value="Transparent" />

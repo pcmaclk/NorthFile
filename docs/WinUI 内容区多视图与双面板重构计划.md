@@ -1,5 +1,27 @@
 # WinUI 内容区多视图与双面板重构计划
 
+## 当前进度（2026-04-06）
+
+- 壳层 UI 重构阶段已收口：
+  - `MainWindow` 已切到明确的 `LeftShellColumn / RightShellColumn` 骨架。
+  - sidebar 顶部按钮区、标题栏 tab strip、toolbar、workspace、status bar 都已回到稳定的列内结构。
+  - 旧的隐藏 `NavigationView` sidebar 兼容层已移除，不再保留“看不见但还在驱动状态”的旧壳。
+- 双面板 UI 骨架已具备最小可用形态：
+  - workspace 当前支持 `Single / SplitVertical` 两种壳层布局。
+  - 主 pane 与次 pane 都已有独立 toolbar 区和内容区边界。
+  - 中间 action rail 已预留，将来可继续放 pane 级命令或拖拽操作。
+- 双面板当前已落地的最小 pane-local 状态：
+  - `Secondary` panel 已有独立 `CurrentPath / AddressText / QueryText / Sort / Group / ViewMode / SelectedEntryPath` 状态字段。
+  - 次 pane 的地址栏与搜索栏当前已接入自己的状态写回，不再是完全写死的占位文本。
+  - pane 激活状态当前会驱动边框、背景和内容区阴影。
+- 双面板当前仍然刻意没有做的部分：
+  - 次 pane 还没有接第二套真实 entries surface。
+  - pane-local 返回/前进/上级/刷新/搜索命令路由还没有真正切到 `ActivePanel`。
+  - 主 pane 的真实数据与视图宿主还没有进一步抽成独立 `PanelHost + entries host` 组合。
+- 当前阶段结论：
+  - UI 壳层重构已经可以视为完成，可以停止继续打磨骨架样式。
+  - 下一阶段应切到新分支，开始做 pane-local 命令路由和第二面板真实功能，而不是继续扩散 UI 结构改动。
+
 ## 当前进度（2026-03-28）
 
 - 列表模式已从多层 `ItemsControl` 分列实现迁移到 `ItemsRepeater + 自定义 VirtualizingLayout`：

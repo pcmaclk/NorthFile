@@ -62,17 +62,7 @@ namespace FileExplorerUI
             WireRootAndViewportEvents();
             InitializeViewHostsAndSettings();
             WireShellCommandsAndStartup();
-        }
-
-        private void ToolbarChromeBorder_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (ToolbarThemeShadow is null || ToolbarShadowReceiverGrid is null)
-            {
-                return;
-            }
-
-            ToolbarThemeShadow.Receivers.Clear();
-            ToolbarThemeShadow.Receivers.Add(ToolbarShadowReceiverGrid);
+            ApplyExplorerPaneLayout();
         }
 
         private void ExplorerBodyBorder_Loaded(object sender, RoutedEventArgs e)
@@ -84,6 +74,17 @@ namespace FileExplorerUI
 
             ExplorerBodyThemeShadow.Receivers.Clear();
             ExplorerBodyThemeShadow.Receivers.Add(ExplorerBodyShadowReceiverGrid);
+        }
+
+        private void SecondaryPaneBodyBorder_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (SecondaryPaneBodyThemeShadow is null || SecondaryPaneShadowReceiverGrid is null)
+            {
+                return;
+            }
+
+            SecondaryPaneBodyThemeShadow.Receivers.Clear();
+            SecondaryPaneBodyThemeShadow.Receivers.Add(SecondaryPaneShadowReceiverGrid);
         }
 
     }

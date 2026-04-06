@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- Completed the WinUI shell and dual-pane UI refactor baseline:
+  - `MainWindow` now uses a real left/right shell layout with the sidebar chrome living in the left column and the title/tab/toolbar/content shell aligned to the right content column
+  - the previous hidden `NavigationView` compatibility layer has been removed from the sidebar host, so the visible custom sidebar is now the only sidebar shell
+  - the explorer workspace now has a pane-aware shell with a split toggle, center action rail, independent pane chrome, and a minimal secondary-pane state model
+  - active vs inactive pane visuals are now intentionally constrained to background, border, and content-shadow differences instead of mixed marker-line and opacity rules
+  - toolbar chrome and toolbar layout were extracted into reusable controls to prepare for future pane-local command routing without duplicating shell structure
+  - each pane toolbar now includes its own close action, and closing the primary pane promotes the secondary pane state back into the primary single-pane shell
+  - the secondary pane now owns independent address/search text state and placeholder state even before a second real entries surface is connected
 - Refined right-side entries-list interaction polish:
   - details-column headers now support direct click-to-sort with inline ascending/descending indicators instead of relying only on the background context menu
   - header hover visuals now align with the list-row hover treatment, with the active sort column keeping its stronger text treatment and right-aligned sort glyph

@@ -244,7 +244,6 @@ namespace FileExplorerUI
             _isLoading = true;
             LoadButton.IsEnabled = false;
             NextButton.IsEnabled = false;
-            SidebarNavView.IsEnabled = false;
             StyledSidebarView.IsEnabled = false;
 
             try
@@ -420,7 +419,6 @@ namespace FileExplorerUI
                 _isLoading = false;
                 LoadButton.IsEnabled = true;
                 NextButton.IsEnabled = _hasMore;
-                SidebarNavView.IsEnabled = true;
                 StyledSidebarView.IsEnabled = true;
                 perf?.Mark("load-page.exit");
             }
@@ -445,7 +443,6 @@ namespace FileExplorerUI
             _isLoading = true;
             LoadButton.IsEnabled = false;
             NextButton.IsEnabled = false;
-            SidebarNavView.IsEnabled = false;
             StyledSidebarView.IsEnabled = false;
 
             try
@@ -544,7 +541,6 @@ namespace FileExplorerUI
                 _isLoading = false;
                 LoadButton.IsEnabled = true;
                 NextButton.IsEnabled = false;
-                SidebarNavView.IsEnabled = true;
                 StyledSidebarView.IsEnabled = true;
                 UpdateFileCommandStates();
                 perf?.Mark("load-all.exit");
