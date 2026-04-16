@@ -1,5 +1,7 @@
 using FileExplorerUI.Settings;
+using FileExplorerUI.Workspace;
 using System;
+using System.Collections.Generic;
 
 namespace FileExplorerUI
 {
@@ -7,9 +9,35 @@ namespace FileExplorerUI
     {
         private void InitializeStartupPathFromSettings()
         {
-            string startupPath = ResolveStartupPath();
-            _currentPath = startupPath;
-            PathTextBox.Text = GetDisplayPathText(startupPath);
+            if (!_hasExplicitInitialPath &&
+                _appSettings.StartupLocationPreference == StartupLocationPreference.LastLocation &&
+                TryRestoreLastWorkspaceSession())
+            {
+                return;
+            }
+
+            string startupPath = _hasExplicitInitialPath && IsValidStartupPath(_initialPath)
+                ? _initialPath
+                : ResolveStartupPath();
+            SetPrimaryPanelNavigationState(startupPath, syncEditors: true);
+        }
+
+        private bool TryRestoreLastWorkspaceSession()
+        {
+            if (!WorkspaceSessionSnapshot.TryRestore(
+                    _appSettings.LastWorkspaceSessionJson,
+                    ShellMyComputerPath,
+                    out List<WorkspaceTabState> tabs,
+                    out int activeTabIndex))
+            {
+                return false;
+            }
+
+            _workspaceSession.RestoreTabs(tabs, activeTabIndex);
+            _workspaceLayoutHost.SetShellState(_workspaceSession.CurrentShellState);
+            _startupWorkspaceSessionRestored = true;
+            _ = _workspaceUiApplier.ApplyAsync(_workspaceSession.CurrentShellState);
+            return true;
         }
 
         private string ResolveStartupPath()
@@ -61,13 +89,26 @@ namespace FileExplorerUI
 
         private void PersistLastOpenedPathIfNeeded()
         {
-            if (!IsValidStartupPath(_currentPath) ||
-                string.Equals(_appSettings.LastOpenedPath, _currentPath, StringComparison.OrdinalIgnoreCase))
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            if (!IsValidStartupPath(currentPath) ||
+                string.Equals(_appSettings.LastOpenedPath, currentPath, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
-            _appSettings.LastOpenedPath = _currentPath;
+            _appSettings.LastOpenedPath = currentPath;
+            _appSettingsService.Save(_appSettings);
+        }
+
+        private void PersistLastWorkspaceSession()
+        {
+            _appSettings.LastWorkspaceSessionJson = WorkspaceSessionSnapshot.Serialize(_workspaceSession);
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            if (IsValidStartupPath(currentPath))
+            {
+                _appSettings.LastOpenedPath = currentPath;
+            }
+
             _appSettingsService.Save(_appSettings);
         }
     }

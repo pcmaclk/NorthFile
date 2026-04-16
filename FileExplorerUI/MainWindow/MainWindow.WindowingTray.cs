@@ -244,6 +244,7 @@ namespace FileExplorerUI
 
         private void MainWindow_Closed(object sender, WindowEventArgs args)
         {
+            PersistLastWorkspaceSession();
             PersistCurrentWindowSize();
             RemoveTrayIcon();
             DisposeFavoriteWatchers();

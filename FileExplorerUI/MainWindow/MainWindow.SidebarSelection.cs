@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using FileExplorerUI.Services;
+using FileExplorerUI.Workspace;
 
 namespace FileExplorerUI
 {
@@ -13,7 +14,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (_isLoading)
+            if (GetPanelIsLoading(WorkspacePanelId.Primary))
             {
                 UpdateStatusKey("StatusSidebarNavIgnoredLoading");
                 return;
@@ -24,18 +25,22 @@ namespace FileExplorerUI
 
             if (IsCurrentPath(e.Path))
             {
-                StyledSidebarView.SetSelectedPath(_currentPath);
+                StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(WorkspacePanelId.Primary));
                 return;
             }
 
             try
             {
-                await NavigateToPathAsync(e.Path, pushHistory: true, focusEntriesAfterNavigation: false);
+            await NavigatePanelToPathAsync(
+                WorkspacePanelId.Primary,
+                e.Path,
+                pushHistory: true,
+                focusEntriesAfterNavigation: false);
             }
             catch (Exception ex)
             {
                 UpdateStatusKey("StatusSidebarNavFailed", FileOperationErrors.ToUserMessage(ex));
-                StyledSidebarView.SetSelectedPath(_currentPath);
+                StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(WorkspacePanelId.Primary));
             }
         }
 
@@ -62,8 +67,9 @@ namespace FileExplorerUI
 
         private void UpdateSidebarSelectionOnly()
         {
-            StyledSidebarView.SetSelectedPath(_currentPath);
-            _ = SelectSidebarTreePathAsync(_currentPath);
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            StyledSidebarView.SetSelectedPath(currentPath);
+            _ = SelectSidebarTreePathAsync(currentPath);
         }
 
         private bool IsCurrentPath(string candidate)
@@ -72,18 +78,19 @@ namespace FileExplorerUI
             {
                 return false;
             }
-            if (string.IsNullOrWhiteSpace(_currentPath))
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            if (string.IsNullOrWhiteSpace(currentPath))
             {
                 return false;
             }
 
             if (string.Equals(candidate, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+                string.Equals(currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                return string.Equals(candidate, _currentPath, StringComparison.OrdinalIgnoreCase);
+                return string.Equals(candidate, currentPath, StringComparison.OrdinalIgnoreCase);
             }
 
-            string curr = Path.GetFullPath(_currentPath).TrimEnd('\\');
+            string curr = Path.GetFullPath(currentPath).TrimEnd('\\');
             string cand = Path.GetFullPath(candidate).TrimEnd('\\');
             if (string.Equals(curr, cand, StringComparison.OrdinalIgnoreCase))
             {
@@ -95,14 +102,15 @@ namespace FileExplorerUI
 
         private bool IsExactCurrentPath(string candidate)
         {
-            if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(_currentPath))
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(currentPath))
             {
                 return false;
             }
 
             try
             {
-                string curr = Path.GetFullPath(_currentPath).TrimEnd('\\');
+                string curr = Path.GetFullPath(currentPath).TrimEnd('\\');
                 string cand = Path.GetFullPath(candidate).TrimEnd('\\');
                 return string.Equals(curr, cand, StringComparison.OrdinalIgnoreCase);
             }

@@ -120,5 +120,19 @@ namespace FileExplorerUI
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MeasuredWidth)));
             }
         }
+
+        public BreadcrumbItemViewModel Clone()
+        {
+            return new BreadcrumbItemViewModel
+            {
+                Label = Label,
+                FullPath = FullPath,
+                IconGlyph = IconGlyph,
+                HasChildren = HasChildren,
+                IsLast = IsLast,
+                ChevronVisibility = ChevronVisibility,
+                MeasuredWidth = MeasuredWidth
+            };
+        }
     }
 }

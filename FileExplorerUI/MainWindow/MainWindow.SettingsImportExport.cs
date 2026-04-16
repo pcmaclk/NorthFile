@@ -91,7 +91,7 @@ namespace FileExplorerUI
 
             if (settingsDiff.FilteringChanged)
             {
-                await LoadFirstPageAsync();
+                await LoadPanelDataAsync(WorkspacePanelId.Primary);
                 return;
             }
 

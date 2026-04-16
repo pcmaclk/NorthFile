@@ -2,7 +2,7 @@ namespace FileExplorerUI.Workspace;
 
 public sealed class WorkspaceLayoutHost
 {
-    private readonly WorkspaceShellState _shellState;
+    private WorkspaceShellState _shellState;
 
     public WorkspaceLayoutHost(WorkspaceShellState shellState)
     {
@@ -10,6 +10,11 @@ public sealed class WorkspaceLayoutHost
     }
 
     public WorkspaceShellState ShellState => _shellState;
+
+    public void SetShellState(WorkspaceShellState shellState)
+    {
+        _shellState = shellState;
+    }
 
     public WorkspaceLayoutMode LayoutMode
     {

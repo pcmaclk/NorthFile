@@ -1,4 +1,5 @@
 using FileExplorerUI.Services;
+using FileExplorerUI.Workspace;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -123,7 +124,7 @@ namespace FileExplorerUI
 
         private void ScheduleIncrementalRefreshFromWatcher(string reason)
         {
-            string snapPath = _currentPath;
+            string snapPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
             _watcherDebounceCts?.Cancel();
             _watcherDebounceCts = new CancellationTokenSource();
             CancellationToken token = _watcherDebounceCts.Token;
@@ -141,16 +142,17 @@ namespace FileExplorerUI
                     _ = DispatcherQueue.TryEnqueue(() =>
                     {
                         long now = Environment.TickCount64;
+                        string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
                         WatcherController.RefreshDecision refreshDecision = _watcherController.EvaluateRefresh(
                             snapPath,
-                            _currentPath,
-                            _isLoading,
+                            currentPath,
+                            GetPanelIsLoading(WorkspacePanelId.Primary),
                             now,
                             _lastWatcherRefreshTick,
-                            ConsumeSuppressedWatcherRefresh(_currentPath));
+                            ConsumeSuppressedWatcherRefresh(currentPath));
                         if (refreshDecision.WasSuppressed)
                         {
-                            Debug.WriteLine($"[Watcher] Suppressed self-refresh for {_currentPath}");
+                            Debug.WriteLine($"[Watcher] Suppressed self-refresh for {currentPath}");
                             return;
                         }
                         if (!refreshDecision.ShouldRefresh)
@@ -161,14 +163,14 @@ namespace FileExplorerUI
 
                         try
                         {
-                            _explorerService.MarkPathChanged(_currentPath);
+                            _explorerService.MarkPathChanged(currentPath);
                         }
                         catch
                         {
                             // Ignore mark failures; background refresh will still attempt to recover.
                         }
 
-                        EnsurePersistentRefreshFallbackInvalidation(_currentPath, $"watcher_{reason}");
+                        EnsurePersistentRefreshFallbackInvalidation(currentPath, $"watcher_{reason}");
                         RefreshSidebarFavorites(refreshSelection: false);
                         _ = RefreshCurrentDirectoryInBackgroundAsync();
                     });

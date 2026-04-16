@@ -20,10 +20,7 @@ namespace FileExplorerUI
                 DefaultButton = ContentDialogButton.Close
             };
 
-            if (this.Content is FrameworkElement root)
-            {
-                dialog.XamlRoot = root.XamlRoot;
-            }
+            PrepareWindowDialog(dialog);
 
             ContentDialogResult result = await dialog.ShowAsync();
             return result == ContentDialogResult.Primary;

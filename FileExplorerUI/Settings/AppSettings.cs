@@ -52,6 +52,8 @@ public sealed class AppSettings
 
     public string LastOpenedPath { get; set; } = "shell:mycomputer";
 
+    public string LastWorkspaceSessionJson { get; set; } = string.Empty;
+
     public EntrySortField DefaultSortField { get; set; } = EntrySortField.Name;
 
     public EntryGroupField DefaultGroupField { get; set; } = EntryGroupField.None;

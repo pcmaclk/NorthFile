@@ -59,12 +59,18 @@ public sealed partial class ModalActionDialog : UserControl
         set => SetValue(SecondaryTextProperty, value);
     }
 
+    public Visibility SecondaryButtonVisibility =>
+        string.IsNullOrWhiteSpace(SecondaryText)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
     public async Task<ModalActionDialogResult> ShowAsync(string title, string message, string primaryText, string secondaryText)
     {
         Title = title;
         Message = message;
         PrimaryText = primaryText;
         SecondaryText = secondaryText;
+        Bindings?.Update();
         Visibility = Visibility.Visible;
         UpdateLayout();
         PrimaryButton.Focus(FocusState.Programmatic);

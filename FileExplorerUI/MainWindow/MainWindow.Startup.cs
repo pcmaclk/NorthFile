@@ -3,6 +3,7 @@ using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
+using System.ComponentModel;
 
 namespace FileExplorerUI
 {
@@ -31,13 +32,19 @@ namespace FileExplorerUI
             RegisterColumnSplitterHandlers(HeaderSplitter2);
             RegisterColumnSplitterHandlers(HeaderSplitter3);
             RegisterColumnSplitterHandlers(HeaderSplitter4);
+            RegisterColumnSplitterHandlers(SecondaryHeaderSplitter1);
+            RegisterColumnSplitterHandlers(SecondaryHeaderSplitter2);
+            RegisterColumnSplitterHandlers(SecondaryHeaderSplitter3);
+            RegisterColumnSplitterHandlers(SecondaryHeaderSplitter4);
             RegisterSidebarSplitterHandlers(SidebarSplitter);
             DetailsEntriesRepeater.Layout = _detailsVirtualizingLayout;
             GroupedEntriesRepeater.Layout = _groupedVirtualizingLayout;
             RegisterEntriesKeyHandlers(DetailsEntriesScrollViewer);
             RegisterEntriesKeyHandlers(GroupedEntriesScrollViewer);
+            RegisterEntriesKeyHandlers(SecondaryEntriesScrollViewer);
             DetailsEntriesScrollViewer.ViewChanged += DetailsEntriesScrollViewer_ViewChanged;
             GroupedEntriesScrollViewer.ViewChanged += GroupedEntriesScrollViewer_ViewChanged;
+            SecondaryEntriesScrollViewer.ViewChanged += SecondaryEntriesScrollViewer_ViewChanged;
         }
 
         private void InitializeViewHostsAndSettings()
@@ -46,12 +53,11 @@ namespace FileExplorerUI
                 DetailsEntriesScrollViewer,
                 DetailsEntriesRepeater,
                 _detailsRepeaterLayoutProfile);
-            _detailsEntriesViewHost.SetItems(_entries);
             _groupedEntriesViewHost = new GroupedRepeaterEntriesViewHost(
                 GroupedEntriesScrollViewer,
                 GroupedEntriesRepeater,
                 _groupedVirtualizingLayout);
-            _groupedEntriesViewHost.SetItems(_entries);
+            RebindPrimaryPaneDataSession();
             UpdateEntriesContextOverlayTargets();
             SizeChanged += MainWindow_SizeChanged;
             Activated += MainWindow_Activated;
@@ -95,7 +101,65 @@ namespace FileExplorerUI
             InitializeStartupPathFromSettings();
             _sidebarInitialized = true;
             ApplyCommandDockLayout();
-            _ = LoadFirstPageAsync();
+            if (!_startupWorkspaceSessionRestored)
+            {
+                _ = LoadPanelDataAsync(WorkspacePanelId.Primary);
+            }
+        }
+
+        private void RebindPrimaryPaneDataSession()
+        {
+            bool detailsSourceChanged = false;
+            if (DetailsEntriesRepeater is not null)
+            {
+                if (!ReferenceEquals(DetailsEntriesRepeater.ItemsSource, PrimaryEntries))
+                {
+                    ResetEntriesViewport();
+                    DetailsEntriesRepeater.ItemsSource = null;
+                    DetailsEntriesRepeater.UpdateLayout();
+                    DetailsEntriesRepeater.ItemsSource = PrimaryEntries;
+                    detailsSourceChanged = true;
+                }
+            }
+
+            bool groupedSourceChanged = false;
+            if (GroupedEntriesRepeater is not null)
+            {
+                if (!ReferenceEquals(GroupedEntriesRepeater.ItemsSource, PrimaryEntries))
+                {
+                    GroupedEntriesScrollViewer.ChangeView(0, null, null, disableAnimation: true);
+                    GroupedEntriesRepeater.ItemsSource = null;
+                    GroupedEntriesRepeater.UpdateLayout();
+                    GroupedEntriesRepeater.ItemsSource = PrimaryEntries;
+                    groupedSourceChanged = true;
+                }
+            }
+
+            _detailsEntriesViewHost?.SetItems(PrimaryEntries);
+            _groupedEntriesViewHost?.SetItems(PrimaryEntries);
+            if (detailsSourceChanged)
+            {
+                DetailsEntriesRepeater?.InvalidateMeasure();
+                DetailsEntriesScrollViewer?.UpdateLayout();
+            }
+
+            if (groupedSourceChanged)
+            {
+                GroupedEntriesRepeater?.InvalidateMeasure();
+                GroupedEntriesScrollViewer?.UpdateLayout();
+            }
+
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("PrimaryEntries"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GroupedEntryColumns)));
+        }
+
+        private void RebindSecondaryPaneDataSession()
+        {
+            if (SecondaryEntriesRepeater is not null &&
+                !ReferenceEquals(SecondaryEntriesRepeater.ItemsSource, SecondaryPaneEntries))
+            {
+                SecondaryEntriesRepeater.ItemsSource = SecondaryPaneEntries;
+            }
         }
     }
 }

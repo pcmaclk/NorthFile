@@ -1,8 +1,10 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using FileExplorerUI.Workspace;
 
 namespace FileExplorerUI
 {
@@ -10,12 +12,12 @@ namespace FileExplorerUI
     {
         private async void SearchTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
         {
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+
             if (e.Key == Windows.System.VirtualKey.Escape)
             {
                 e.Handled = true;
-                _currentQuery = string.Empty;
-                SearchTextBox.Text = string.Empty;
-                await ReloadCurrentPresentationAsync();
+                await ClearPanelSearchAsync(WorkspacePanelId.Primary);
                 return;
             }
 
@@ -25,13 +27,18 @@ namespace FileExplorerUI
             }
 
             e.Handled = true;
-            _currentQuery = SearchTextBox.Text?.Trim() ?? string.Empty;
-            await ReloadCurrentPresentationAsync();
+            await CommitPanelSearchAsync(WorkspacePanelId.Primary, SearchTextBox.Text ?? string.Empty);
+        }
+
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            SetPanelQueryText(WorkspacePanelId.Primary, SearchTextBox.Text);
         }
 
         private async void LoadButton_Click(object sender, RoutedEventArgs e)
         {
-            await NavigateToPathAsync(NormalizeAddressInputPath(PathTextBox.Text), pushHistory: true);
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+            await NavigatePanelToPathAsync(WorkspacePanelId.Primary, NormalizeAddressInputPath(PathTextBox.Text), pushHistory: true);
         }
 
         private async void NextButton_Click(object sender, RoutedEventArgs e)
@@ -41,51 +48,20 @@ namespace FileExplorerUI
 
         private async void UpButton_Click(object sender, RoutedEventArgs e)
         {
-            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
-            {
-                UpdateStatusKey("StatusAlreadyAtRoot");
-                return;
-            }
-
-            if (IsDriveRoot(_currentPath))
-            {
-                await NavigateToPathAsync(ShellMyComputerPath, pushHistory: true);
-                return;
-            }
-
-            string? parent = _explorerService.GetParentPath(_currentPath);
-            if (string.IsNullOrEmpty(parent))
-            {
-                await NavigateToPathAsync(ShellMyComputerPath, pushHistory: true);
-                return;
-            }
-
-            _pendingParentReturnAnchorPath = _currentPath;
-            await NavigateToPathAsync(parent, pushHistory: true);
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+            await TryNavigatePanelUpAsync(WorkspacePanelId.Primary);
         }
 
         private async void BackButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!_directorySessionController.TryGoBack(_backStack, _forwardStack, _currentPath, out string prev))
-            {
-                UpdateNavButtonsState();
-                return;
-            }
-
-            UpdateNavButtonsState();
-            await NavigateToPathAsync(prev, pushHistory: false);
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+            await TryNavigatePanelBackAsync(WorkspacePanelId.Primary);
         }
 
         private async void ForwardButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!_directorySessionController.TryGoForward(_backStack, _forwardStack, _currentPath, out string next))
-            {
-                UpdateNavButtonsState();
-                return;
-            }
-
-            UpdateNavButtonsState();
-            await NavigateToPathAsync(next, pushHistory: false);
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+            await TryNavigatePanelForwardAsync(WorkspacePanelId.Primary);
         }
     }
 }

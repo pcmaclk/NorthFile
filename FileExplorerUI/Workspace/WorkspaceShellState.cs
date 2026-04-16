@@ -12,6 +12,28 @@ public sealed class WorkspaceShellState
 
     public bool IsSplit => LayoutMode != WorkspaceLayoutMode.Single;
 
+    public PanelViewState GetPanelState(WorkspacePanelId panelId)
+    {
+        return panelId == WorkspacePanelId.Secondary
+            ? Secondary
+            : Primary;
+    }
+
+    public void CopyNonDataStateFrom(WorkspaceShellState source)
+    {
+        LayoutMode = source.LayoutMode;
+        ActivePanel = source.ActivePanel;
+        Primary.CopyNonDataStateFrom(source.Primary);
+        Secondary.CopyNonDataStateFrom(source.Secondary);
+    }
+
+    public WorkspaceShellState Clone()
+    {
+        var clone = new WorkspaceShellState();
+        clone.CopyNonDataStateFrom(this);
+        return clone;
+    }
+
     public string BuildTabSummary()
     {
         if (!IsSplit)

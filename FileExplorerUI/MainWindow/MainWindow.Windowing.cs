@@ -42,6 +42,17 @@ namespace FileExplorerUI
                 return;
             }
 
+            if (!_inlineEditCoordinator.ShouldCommitActiveSessionOnExternalClick())
+            {
+                _inlineEditCoordinator.CancelActiveSession();
+                return;
+            }
+
+            if (!e.GetCurrentPoint(Content as UIElement).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
             await _inlineEditCoordinator.CommitActiveSessionAsync();
         }
 
@@ -70,15 +81,25 @@ namespace FileExplorerUI
                 return;
             }
 
+            if (!e.GetCurrentPoint(splitter).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            WorkspacePanelId panelId = GetColumnSplitterPanelId(splitter);
+            CancelRenameOverlayForPanelSwitch(panelId);
+            ActivateWorkspacePanel(panelId);
+
             _activeSplitterElement = splitter;
             _activeSplitterDragMode = SplitterDragMode.Column;
             _activeColumnSplitterKind = kind;
+            _activeColumnSplitterPanelId = panelId;
             _activeColumnResizeState = new ColumnResizeState(
-                NameColumnWidth.Value,
-                TypeColumnWidth.Value,
-                SizeColumnWidth.Value,
-                ModifiedColumnWidth.Value,
-                DetailsContentWidth);
+                GetColumnWidthValue(_activeColumnSplitterPanelId, ColumnSplitterKind.Name),
+                GetColumnWidthValue(_activeColumnSplitterPanelId, ColumnSplitterKind.Type),
+                GetColumnWidthValue(_activeColumnSplitterPanelId, ColumnSplitterKind.Size),
+                GetColumnWidthValue(_activeColumnSplitterPanelId, ColumnSplitterKind.Modified),
+                GetDetailsContentWidth(_activeColumnSplitterPanelId));
             _splitterDragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
             splitter.CapturePointer(e.Pointer);
             e.Handled = true;
@@ -159,11 +180,7 @@ namespace FileExplorerUI
                     break;
             }
 
-            NameColumnWidth = new GridLength(name);
-            TypeColumnWidth = new GridLength(type);
-            SizeColumnWidth = new GridLength(size);
-            ModifiedColumnWidth = new GridLength(modified);
-            DetailsContentWidth = content;
+            SetPanelColumnWidths(_activeColumnSplitterPanelId, name, type, size, modified, content);
             e.Handled = true;
         }
 
@@ -177,8 +194,15 @@ namespace FileExplorerUI
         {
             kind = default;
             if (splitter is not FrameworkElement element
-                || element.Tag is not string tagText
-                || !int.TryParse(tagText, out int tagValue)
+                || element.Tag is not string tagText)
+            {
+                return false;
+            }
+
+            string normalizedTag = tagText.StartsWith("S", StringComparison.OrdinalIgnoreCase)
+                ? tagText[1..]
+                : tagText;
+            if (!int.TryParse(normalizedTag, out int tagValue)
                 || !Enum.IsDefined(typeof(ColumnSplitterKind), tagValue))
             {
                 return false;
@@ -188,12 +212,69 @@ namespace FileExplorerUI
             return true;
         }
 
+        private static WorkspacePanelId GetColumnSplitterPanelId(UIElement splitter)
+        {
+            return splitter is FrameworkElement element &&
+                element.Tag is string tagText &&
+                tagText.StartsWith("S", StringComparison.OrdinalIgnoreCase)
+                    ? WorkspacePanelId.Secondary
+                    : WorkspacePanelId.Primary;
+        }
+
+        private double GetColumnWidthValue(WorkspacePanelId panelId, ColumnSplitterKind kind)
+        {
+            return (panelId, kind) switch
+            {
+                (WorkspacePanelId.Secondary, ColumnSplitterKind.Name) => SecondaryNameColumnWidth.Value,
+                (WorkspacePanelId.Secondary, ColumnSplitterKind.Type) => SecondaryTypeColumnWidth.Value,
+                (WorkspacePanelId.Secondary, ColumnSplitterKind.Size) => SecondarySizeColumnWidth.Value,
+                (WorkspacePanelId.Secondary, ColumnSplitterKind.Modified) => SecondaryModifiedColumnWidth.Value,
+                (_, ColumnSplitterKind.Name) => NameColumnWidth.Value,
+                (_, ColumnSplitterKind.Type) => TypeColumnWidth.Value,
+                (_, ColumnSplitterKind.Size) => SizeColumnWidth.Value,
+                _ => ModifiedColumnWidth.Value
+            };
+        }
+
+        private double GetDetailsContentWidth(WorkspacePanelId panelId)
+        {
+            return panelId == WorkspacePanelId.Secondary
+                ? SecondaryDetailsContentWidth
+                : DetailsContentWidth;
+        }
+
+        private void SetPanelColumnWidths(
+            WorkspacePanelId panelId,
+            double name,
+            double type,
+            double size,
+            double modified,
+            double content)
+        {
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                SecondaryNameColumnWidth = new GridLength(name);
+                SecondaryTypeColumnWidth = new GridLength(type);
+                SecondarySizeColumnWidth = new GridLength(size);
+                SecondaryModifiedColumnWidth = new GridLength(modified);
+                SecondaryDetailsContentWidth = content;
+                return;
+            }
+
+            NameColumnWidth = new GridLength(name);
+            TypeColumnWidth = new GridLength(type);
+            SizeColumnWidth = new GridLength(size);
+            ModifiedColumnWidth = new GridLength(modified);
+            DetailsContentWidth = content;
+        }
+
         private void EndActiveSplitterDrag(UIElement? splitter)
         {
             splitter?.ReleasePointerCaptures();
             _activeSplitterElement = null;
             _activeSplitterDragMode = SplitterDragMode.None;
             _activeColumnSplitterKind = null;
+            _activeColumnSplitterPanelId = WorkspacePanelId.Primary;
             _activeColumnResizeState = null;
             _sidebarDragStartWidth = null;
             _splitterDragStartX = 0;
@@ -205,6 +286,7 @@ namespace FileExplorerUI
             _activeSplitterElement = null;
             _activeSplitterDragMode = SplitterDragMode.None;
             _activeColumnSplitterKind = null;
+            _activeColumnSplitterPanelId = WorkspacePanelId.Primary;
             _activeColumnResizeState = null;
             _sidebarDragStartWidth = null;
         }
@@ -330,7 +412,7 @@ namespace FileExplorerUI
                 ApplySidebarWidthLayout();
             }
 
-            if (_currentViewMode == EntryViewMode.Details)
+            if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details)
             {
                 UpdateEstimatedItemHeight();
                 RequestViewportWork();
@@ -339,9 +421,9 @@ namespace FileExplorerUI
             {
                 long now = Environment.TickCount64;
                 const int liveRefreshIntervalMs = 240;
-                if (now - _lastGroupedColumnsLiveResizeRefreshTick >= liveRefreshIntervalMs)
+                if (now - GetPanelLastGroupedColumnsLiveResizeRefreshTick(WorkspacePanelId.Primary) >= liveRefreshIntervalMs)
                 {
-                    _lastGroupedColumnsLiveResizeRefreshTick = now;
+                    SetPanelLastGroupedColumnsLiveResizeRefreshTick(WorkspacePanelId.Primary, now);
                     RequestGroupedColumnsRefresh(force: false);
                 }
 
@@ -349,7 +431,11 @@ namespace FileExplorerUI
             }
             if (widthChanged)
             {
-                UpdateVisibleBreadcrumbs();
+                UpdateVisibleBreadcrumbs(WorkspacePanelId.Primary);
+                if (_isDualPaneEnabled)
+                {
+                    UpdateVisibleBreadcrumbs(WorkspacePanelId.Secondary);
+                }
             }
             UpdateRenameOverlayPosition();
             TryResetSystemCursorToArrow();
@@ -390,19 +476,14 @@ namespace FileExplorerUI
         {
             ApplyTitleBarTheme();
             SyncSidebarTreeRenameOverlayTheme();
-            foreach (EntryViewModel entry in _entries)
+            _workspaceChromeCoordinator.RefreshTabVisuals();
+            foreach (EntryViewModel entry in PrimaryEntries)
             {
                 entry.RefreshThemeDependentBrushes();
             }
-            RaisePropertyChanged(
-                nameof(PrimaryPaneToolbarBackground),
-                nameof(PrimaryPaneBodyBackground),
-                nameof(PrimaryPaneInputBackground),
-                nameof(PrimaryPaneBorderBrush),
-                nameof(SecondaryPaneToolbarBackground),
-                nameof(SecondaryPaneBodyBackground),
-                nameof(SecondaryPaneInputBackground),
-                nameof(SecondaryPaneBorderBrush));
+            RaiseWorkspacePanelShellPropertiesChanged();
+            UpdateDetailsHeaders();
+            UpdatePanelDetailsHeaders(WorkspacePanelId.Secondary);
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ThemeToggleGlyph)));
         }
 

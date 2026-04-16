@@ -1,5 +1,6 @@
 using FileExplorerUI.Interop;
 using FileExplorerUI.Services;
+using FileExplorerUI.Collections;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -15,11 +16,24 @@ namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
+        private BatchObservableCollection<EntryViewModel> GetViewportEntries(WorkspacePanelId panelId)
+        {
+            return GetPanelEntries(panelId);
+        }
+
         private ScrollViewer GetCurrentViewportScrollViewer()
         {
-            return _currentViewMode == EntryViewMode.Details
+            return GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details
                 ? DetailsEntriesScrollViewer
                 : GroupedEntriesScrollViewer;
+        }
+
+        private ScrollViewer GetPanelViewportScrollViewer(WorkspacePanelId panelId)
+        {
+            EntryViewMode viewMode = panelId == WorkspacePanelId.Secondary
+                ? EntryViewMode.Details
+                : _workspaceLayoutHost.GetPanelState(panelId).ViewMode;
+            return GetPanelActiveScrollViewer(panelId, viewMode);
         }
 
         private static uint ClampPageSize(uint suggested, uint fallback)
@@ -48,7 +62,14 @@ namespace FileExplorerUI
 
         private int GetLogicalEntryCount()
         {
-            return Math.Max(_entries.Count, checked((int)Math.Min(int.MaxValue, _totalEntries)));
+            return Math.Max(PrimaryEntries.Count, checked((int)Math.Min(int.MaxValue, GetPanelTotalEntries(WorkspacePanelId.Primary))));
+        }
+
+        private int GetLogicalEntryCount(WorkspacePanelId panelId)
+        {
+            BatchObservableCollection<EntryViewModel> entries = GetViewportEntries(panelId);
+            PanelViewState panel = GetPanelState(panelId);
+            return Math.Max(entries.Count, checked((int)Math.Min(int.MaxValue, panel.DataSession.TotalEntries)));
         }
 
         private void UpdateEstimatedItemHeight()
@@ -58,7 +79,7 @@ namespace FileExplorerUI
 
         private void ReplaceEntriesWithLoadedRows(string basePath, IReadOnlyList<FileRow> rows)
         {
-            _entries.Clear();
+            PrimaryEntries.Clear();
             AppendLoadedRows(basePath, rows);
         }
 
@@ -71,13 +92,13 @@ namespace FileExplorerUI
 
             foreach (FileRow row in rows)
             {
-                _entries.Add(CreateLoadedEntryModel(basePath, row));
+                PrimaryEntries.Add(CreateLoadedEntryModel(basePath, row));
             }
         }
 
         private void EnsurePlaceholderCount(int target)
         {
-            _entries.Resize(target, CreatePlaceholderEntryModel);
+            PrimaryEntries.Resize(target, CreatePlaceholderEntryModel);
         }
 
         private void EnsureLoadedRangeCapacity(int startIndex, int rowCount)
@@ -88,7 +109,7 @@ namespace FileExplorerUI
             }
 
             int target = checked(startIndex + rowCount);
-            if (target > _entries.Count)
+            if (target > PrimaryEntries.Count)
             {
                 EnsurePlaceholderCount(target);
             }
@@ -117,16 +138,18 @@ namespace FileExplorerUI
 
         private void FillPageRows(int startIndex, IReadOnlyList<FileRow> rows, string? basePathOverride = null)
         {
-            if (startIndex < 0 || startIndex >= _entries.Count)
+            if (startIndex < 0 || startIndex >= PrimaryEntries.Count)
             {
                 return;
             }
 
-            string basePath = string.IsNullOrWhiteSpace(basePathOverride) ? _currentPath : basePathOverride;
-            int max = Math.Min(rows.Count, _entries.Count - startIndex);
+            string basePath = string.IsNullOrWhiteSpace(basePathOverride)
+                ? GetPanelCurrentPath(WorkspacePanelId.Primary)
+                : basePathOverride;
+            int max = Math.Min(rows.Count, PrimaryEntries.Count - startIndex);
             for (int i = 0; i < max; i++)
             {
-                ApplyLoadedEntryRow(_entries[startIndex + i], basePath, rows[i]);
+                ApplyLoadedEntryRow(PrimaryEntries[startIndex + i], basePath, rows[i]);
             }
         }
 
@@ -221,7 +244,32 @@ namespace FileExplorerUI
                 return 0;
             }
 
-            if (_currentViewMode == EntryViewMode.List)
+            if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.List)
+            {
+                int rowsPerColumn = Math.Max(1, GetGroupedListRowsPerColumn());
+                double columnStride = Math.Max(1, EntryContainerWidth + GroupedListColumnSpacing);
+                int columnIndex = (int)Math.Floor(viewer.HorizontalOffset / columnStride);
+                return Math.Clamp(columnIndex * rowsPerColumn, 0, logicalCount - 1);
+            }
+
+            double itemExtent = Math.Max(1.0, _estimatedItemHeight);
+            int index = (int)Math.Floor(Math.Max(0.0, viewer.VerticalOffset) / itemExtent);
+            return Math.Clamp(index, 0, logicalCount - 1);
+        }
+
+        private int EstimateViewportIndex(WorkspacePanelId panelId, ScrollViewer viewer)
+        {
+            int logicalCount = GetLogicalEntryCount(panelId);
+            if (logicalCount <= 1)
+            {
+                return 0;
+            }
+
+            EntryViewMode viewMode = panelId == WorkspacePanelId.Secondary
+                ? EntryViewMode.Details
+                : GetPanelViewMode(panelId);
+
+            if (viewMode == EntryViewMode.List)
             {
                 int rowsPerColumn = Math.Max(1, GetGroupedListRowsPerColumn());
                 double columnStride = Math.Max(1, EntryContainerWidth + GroupedListColumnSpacing);
@@ -237,28 +285,120 @@ namespace FileExplorerUI
         private int EstimateViewportBottomIndex(ScrollViewer viewer)
         {
             int topIndex = EstimateViewportIndex(viewer);
-            int visibleCount = _currentViewMode == EntryViewMode.List
+            int visibleCount = GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.List
                 ? Math.Max(1, GetGroupedListRowsPerColumn() * Math.Max(1, (int)Math.Ceiling(viewer.ViewportWidth / Math.Max(1, EntryContainerWidth + GroupedListColumnSpacing))))
                 : Math.Max(1, (int)Math.Ceiling(viewer.ViewportHeight / _estimatedItemHeight));
             int bottom = topIndex + visibleCount;
             return Math.Min(GetLogicalEntryCount() - 1, Math.Max(0, bottom));
         }
 
+        private int EstimateViewportBottomIndex(WorkspacePanelId panelId, ScrollViewer viewer)
+        {
+            int topIndex = EstimateViewportIndex(panelId, viewer);
+            EntryViewMode viewMode = panelId == WorkspacePanelId.Secondary
+                ? EntryViewMode.Details
+                : GetPanelViewMode(panelId);
+            int visibleCount = viewMode == EntryViewMode.List
+                ? Math.Max(1, GetGroupedListRowsPerColumn() * Math.Max(1, (int)Math.Ceiling(viewer.ViewportWidth / Math.Max(1, EntryContainerWidth + GroupedListColumnSpacing))))
+                : Math.Max(1, (int)Math.Ceiling(viewer.ViewportHeight / _estimatedItemHeight));
+            int bottom = topIndex + visibleCount;
+            return Math.Min(GetLogicalEntryCount(panelId) - 1, Math.Max(0, bottom));
+        }
+
         private void ResetEntriesViewport()
         {
-            DetailsEntriesScrollViewer.ChangeView(0, 0, null, disableAnimation: true);
-            GroupedEntriesScrollViewer.ChangeView(0, 0, null, disableAnimation: true);
-            _lastDetailsHorizontalOffset = double.NaN;
-            _lastDetailsVerticalOffset = double.NaN;
-            _lastGroupedHorizontalOffset = double.NaN;
-            _lastGroupedVerticalOffset = double.NaN;
-            _lastDetailsViewportStartIndex = -1;
-            _lastDetailsViewportIndexDelta = 0;
+            ResetPanelViewportState(WorkspacePanelId.Primary);
 
             if (DetailsHeaderTranslateTransform is not null)
             {
                 DetailsHeaderTranslateTransform.X = 0;
             }
+        }
+
+        private double GetCurrentDetailsVerticalOffset()
+        {
+            return double.IsNaN(_lastDetailsVerticalOffset)
+                ? Math.Max(0, DetailsEntriesScrollViewer.VerticalOffset)
+                : Math.Max(0, _lastDetailsVerticalOffset);
+        }
+
+        private double GetCurrentPanelDetailsVerticalOffset(WorkspacePanelId panelId)
+        {
+            double verticalOffset = GetPanelLastDetailsVerticalOffset(panelId);
+            return double.IsNaN(verticalOffset)
+                ? Math.Max(0, GetPanelDetailsScrollViewer(panelId).VerticalOffset)
+                : Math.Max(0, verticalOffset);
+        }
+
+        private double GetCurrentDetailsHorizontalOffset()
+        {
+            return double.IsNaN(_lastDetailsHorizontalOffset)
+                ? Math.Max(0, DetailsEntriesScrollViewer.HorizontalOffset)
+                : Math.Max(0, _lastDetailsHorizontalOffset);
+        }
+
+        private double GetCurrentPanelDetailsHorizontalOffset(WorkspacePanelId panelId)
+        {
+            double horizontalOffset = GetPanelLastDetailsHorizontalOffset(panelId);
+            return double.IsNaN(horizontalOffset)
+                ? Math.Max(0, GetPanelDetailsScrollViewer(panelId).HorizontalOffset)
+                : Math.Max(0, horizontalOffset);
+        }
+
+        private double GetCurrentGroupedHorizontalOffset()
+        {
+            return double.IsNaN(_lastGroupedHorizontalOffset)
+                ? Math.Max(0, GroupedEntriesScrollViewer.HorizontalOffset)
+                : Math.Max(0, _lastGroupedHorizontalOffset);
+        }
+
+        private double GetCurrentPanelGroupedHorizontalOffset(WorkspacePanelId panelId)
+        {
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                return 0;
+            }
+
+            double horizontalOffset = GetPanelLastGroupedHorizontalOffset(panelId);
+            return double.IsNaN(horizontalOffset)
+                ? Math.Max(0, GroupedEntriesScrollViewer.HorizontalOffset)
+                : Math.Max(0, horizontalOffset);
+        }
+
+        private void RestoreCurrentViewportOffsets(
+            double detailsHorizontalOffset,
+            double detailsVerticalOffset,
+            double groupedHorizontalOffset)
+        {
+            double safeDetailsHorizontalOffset = NormalizeViewportOffset(detailsHorizontalOffset);
+            double safeDetailsVerticalOffset = NormalizeViewportOffset(detailsVerticalOffset);
+            double safeGroupedHorizontalOffset = NormalizeViewportOffset(groupedHorizontalOffset);
+
+            if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details)
+            {
+                double maxOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableHeight);
+                double maxHorizontalOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableWidth);
+                DetailsEntriesScrollViewer.ChangeView(
+                    Math.Min(maxHorizontalOffset, safeDetailsHorizontalOffset),
+                    Math.Min(maxOffset, safeDetailsVerticalOffset),
+                    null,
+                    disableAnimation: true);
+                return;
+            }
+
+            double groupedMaxOffset = Math.Max(0, GroupedEntriesScrollViewer.ScrollableWidth);
+            GroupedEntriesScrollViewer.ChangeView(
+                Math.Min(groupedMaxOffset, safeGroupedHorizontalOffset),
+                null,
+                null,
+                disableAnimation: true);
+        }
+
+        private static double NormalizeViewportOffset(double offset)
+        {
+            return double.IsNaN(offset) || double.IsInfinity(offset)
+                ? 0
+                : Math.Max(0, offset);
         }
 
         private void InvalidateEntriesLayouts()
@@ -279,9 +419,9 @@ namespace FileExplorerUI
             int safeEndIndex = Math.Clamp(Math.Max(startIndex, endIndex), safeStartIndex, logicalCount - 1);
             LogDetailsViewportPerf(
                 "ensure-viewport",
-                $"start={safeStartIndex} end={safeEndIndex} entries={_entries.Count} total={_totalEntries} loading={_isLoading}");
+                $"start={safeStartIndex} end={safeEndIndex} entries={PrimaryEntries.Count} total={GetPanelTotalEntries(WorkspacePanelId.Primary)} loading={GetPanelIsLoading(WorkspacePanelId.Primary)}");
 
-            if (_currentViewMode == EntryViewMode.Details && _entries.Count < logicalCount)
+            if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details && PrimaryEntries.Count < logicalCount)
             {
                 EnsurePlaceholderCount(logicalCount);
                 InvalidateEntriesLayouts();
@@ -307,15 +447,15 @@ namespace FileExplorerUI
                 return true;
             }
 
-            if (startIndex >= _entries.Count)
+            if (startIndex >= PrimaryEntries.Count)
             {
                 return false;
             }
 
-            int cappedEnd = Math.Min(endIndex, _entries.Count - 1);
+            int cappedEnd = Math.Min(endIndex, PrimaryEntries.Count - 1);
             for (int index = startIndex; index <= cappedEnd; index++)
             {
-                if (!_entries[index].IsLoaded)
+                if (!PrimaryEntries[index].IsLoaded)
                 {
                     return false;
                 }
@@ -326,7 +466,7 @@ namespace FileExplorerUI
 
         private bool MaybePrefetchDetailsViewportBlock(int startIndex, int endIndex, bool preferMinimalPage)
         {
-            if (_currentViewMode != EntryViewMode.Details)
+            if (GetPanelViewMode(WorkspacePanelId.Primary) != EntryViewMode.Details)
             {
                 return false;
             }
@@ -350,7 +490,7 @@ namespace FileExplorerUI
             int firstUnloadedIndex = -1;
             for (int index = searchStart; index <= searchEnd; index++)
             {
-                if (index >= _entries.Count || !_entries[index].IsLoaded)
+                if (index >= PrimaryEntries.Count || !PrimaryEntries[index].IsLoaded)
                 {
                     firstUnloadedIndex = index;
                     break;
@@ -441,21 +581,21 @@ namespace FileExplorerUI
 
         private bool IsInitialDetailsSparseBootstrap(int targetIndex)
         {
-            if (_currentViewMode != EntryViewMode.Details || targetIndex < 0 || targetIndex >= _entries.Count)
+            if (GetPanelViewMode(WorkspacePanelId.Primary) != EntryViewMode.Details || targetIndex < 0 || targetIndex >= PrimaryEntries.Count)
             {
                 return false;
             }
 
-            if (_entries[targetIndex].IsLoaded)
+            if (PrimaryEntries[targetIndex].IsLoaded)
             {
                 return false;
             }
 
-            int loadedThreshold = Math.Max(192, checked((int)_currentPageSize) * 2);
+            int loadedThreshold = Math.Max(192, checked((int)GetPanelCurrentPageSize(WorkspacePanelId.Primary)) * 2);
             int loadedCount = 0;
-            for (int i = 0; i < _entries.Count; i++)
+            for (int i = 0; i < PrimaryEntries.Count; i++)
             {
-                if (_entries[i].IsLoaded)
+                if (PrimaryEntries[i].IsLoaded)
                 {
                     loadedCount++;
                     if (loadedCount > loadedThreshold)
@@ -470,7 +610,9 @@ namespace FileExplorerUI
 
         private async Task LoadSparseViewportPageAsync(int targetIndex, bool preferMinimalPage)
         {
-            if (_currentViewMode != EntryViewMode.Details || string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            if (GetPanelViewMode(WorkspacePanelId.Primary) != EntryViewMode.Details ||
+                string.Equals(currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
@@ -496,11 +638,11 @@ namespace FileExplorerUI
             ulong cursor = (ulong)startIndex;
             int requestId = Interlocked.Increment(ref s_detailsViewportPerfSequence);
 
-            string path = _currentPath;
-            uint lastFetchMs = _lastFetchMs;
-            long snapshotVersion = _directorySnapshotVersion;
+            string path = currentPath;
+            uint lastFetchMs = GetPanelLastFetchMs(WorkspacePanelId.Primary);
+            long snapshotVersion = GetPanelDirectorySnapshotVersion(WorkspacePanelId.Primary);
             EnsureActiveEntryResultSet(path);
-            IEntryResultSet? resultSet = _activeEntryResultSet;
+            IEntryResultSet? resultSet = GetPanelActiveEntryResultSet(WorkspacePanelId.Primary);
             if (resultSet is null)
             {
                 return;
@@ -509,13 +651,13 @@ namespace FileExplorerUI
             Stopwatch sw = Stopwatch.StartNew();
             LogDetailsViewportPerf(
                 "sparse-fetch.begin",
-                $"req={requestId} target={targetIndex} cursor={cursor} pageSize={pageSize} visible={visibleCount} block={blockSize} minimal={preferMinimalPage} entries={_entries.Count} total={_totalEntries}");
+                $"req={requestId} target={targetIndex} cursor={cursor} pageSize={pageSize} visible={visibleCount} block={blockSize} minimal={preferMinimalPage} entries={PrimaryEntries.Count} total={GetPanelTotalEntries(WorkspacePanelId.Primary)}");
 
             FileBatchPage page;
             bool ok;
             int rustErrorCode;
             string rustErrorMessage;
-            int viewportIndexDelta = _lastDetailsViewportIndexDelta;
+            int viewportIndexDelta = GetPanelLastDetailsViewportIndexDelta(WorkspacePanelId.Primary);
             int viewportBlockDelta = Math.Max(0, (int)Math.Ceiling(viewportIndexDelta / (double)Math.Max(1, blockSize)));
             bool useSynchronousRead = preferMinimalPage &&
                 (viewportBlockDelta <= 1 || IsInitialDetailsSparseBootstrap(targetIndex));
@@ -548,26 +690,28 @@ namespace FileExplorerUI
             sw.Stop();
             LogDetailsViewportPerf(
                 "sparse-fetch.end",
-                $"req={requestId} ok={ok} elapsed={sw.ElapsedMilliseconds}ms cursor={cursor} rows={page.Rows.Count} total={page.TotalEntries} rust={rustErrorCode} sync={useSynchronousRead} delta={_lastDetailsVerticalDelta:F1} indexDelta={viewportIndexDelta} blockDelta={viewportBlockDelta}");
+                $"req={requestId} ok={ok} elapsed={sw.ElapsedMilliseconds}ms cursor={cursor} rows={page.Rows.Count} total={page.TotalEntries} rust={rustErrorCode} sync={useSynchronousRead} delta={GetPanelLastDetailsVerticalDelta(WorkspacePanelId.Primary):F1} indexDelta={viewportIndexDelta} blockDelta={viewportBlockDelta}");
 
-            if (!ok || snapshotVersion != _directorySnapshotVersion || !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+            if (!ok ||
+                snapshotVersion != GetPanelDirectorySnapshotVersion(WorkspacePanelId.Primary) ||
+                !string.Equals(path, GetPanelCurrentPath(WorkspacePanelId.Primary), StringComparison.OrdinalIgnoreCase))
             {
                 LogDetailsViewportPerf(
                     "sparse-fetch.discard",
-                    $"req={requestId} ok={ok} snapshotMatch={snapshotVersion == _directorySnapshotVersion} pathMatch={string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase)}");
+                    $"req={requestId} ok={ok} snapshotMatch={snapshotVersion == GetPanelDirectorySnapshotVersion(WorkspacePanelId.Primary)} pathMatch={string.Equals(path, GetPanelCurrentPath(WorkspacePanelId.Primary), StringComparison.OrdinalIgnoreCase)}");
                 return;
             }
 
             Stopwatch bindSw = Stopwatch.StartNew();
-            _totalEntries = Math.Max(_totalEntries, page.TotalEntries);
-            EnsurePlaceholderCount(checked((int)Math.Min(int.MaxValue, _totalEntries)));
+            SetPanelTotalEntries(WorkspacePanelId.Primary, Math.Max(GetPanelTotalEntries(WorkspacePanelId.Primary), page.TotalEntries));
+            EnsurePlaceholderCount(checked((int)Math.Min(int.MaxValue, GetPanelTotalEntries(WorkspacePanelId.Primary))));
             FillPageRows((int)cursor, page.Rows, path);
             InvalidateEntriesLayouts();
             CancelPendingViewportMetadataWork();
             bindSw.Stop();
             LogDetailsViewportPerf(
                 "sparse-bind.end",
-                $"req={requestId} elapsed={bindSw.ElapsedMilliseconds}ms cursor={cursor} rows={page.Rows.Count} entries={_entries.Count} total={_totalEntries}");
+                $"req={requestId} elapsed={bindSw.ElapsedMilliseconds}ms cursor={cursor} rows={page.Rows.Count} entries={PrimaryEntries.Count} total={GetPanelTotalEntries(WorkspacePanelId.Primary)}");
         }
 
         private static void LogDetailsViewportPerf(string stage, string detail)
@@ -579,10 +723,19 @@ namespace FileExplorerUI
 
         private void BeginDirectorySnapshot()
         {
-            CancelAndDispose(ref _metadataPrefetchCts);
-            CancelAndDispose(ref _directoryLoadCts);
-            _directoryLoadCts = new CancellationTokenSource();
-            _directorySnapshotVersion++;
+            BeginDirectorySnapshot(WorkspacePanelId.Primary);
+        }
+
+        private void BeginDirectorySnapshot(WorkspacePanelId panelId)
+        {
+            CancellationTokenSource? metadataPrefetchCts = GetPanelMetadataPrefetchCts(panelId);
+            CancellationTokenSource? directoryLoadCts = GetPanelDirectoryLoadCts(panelId);
+            CancelAndDispose(ref metadataPrefetchCts);
+            CancelAndDispose(ref directoryLoadCts);
+            SetPanelMetadataPrefetchCts(panelId, null);
+            SetPanelDirectoryLoadCts(panelId, null);
+            SetPanelDirectoryLoadCts(panelId, new CancellationTokenSource());
+            SetPanelDirectorySnapshotVersion(panelId, GetPanelDirectorySnapshotVersion(panelId) + 1);
         }
 
         private static void CancelAndDispose(ref CancellationTokenSource? cts)

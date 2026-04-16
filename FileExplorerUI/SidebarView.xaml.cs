@@ -676,8 +676,6 @@ namespace FileExplorerUI
             if (properties.IsRightButtonPressed)
             {
                 CancelPinnedDrag();
-                RaisePinnedContextRequested(element, item, e.GetCurrentPoint(element).Position);
-                e.Handled = true;
                 return;
             }
 
@@ -835,10 +833,11 @@ namespace FileExplorerUI
                 return;
             }
 
-            KeyValuePair<SidebarNavItemModel, FrameworkElement>? match = _pinnedItemHosts.FirstOrDefault(pair => ReferenceEquals(pair.Value, element));
-            if (match.HasValue)
+            KeyValuePair<SidebarNavItemModel, FrameworkElement> match =
+                _pinnedItemHosts.FirstOrDefault(pair => ReferenceEquals(pair.Value, element));
+            if (match.Key is not null)
             {
-                _pinnedItemHosts.Remove(match.Value.Key);
+                _pinnedItemHosts.Remove(match.Key);
             }
         }
 

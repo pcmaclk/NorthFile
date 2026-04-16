@@ -18,6 +18,16 @@ namespace FileExplorerUI
     {
         private int _groupedColumnsCacheRowsPerColumn = -1;
 
+        private PrimaryPresentationNotificationState CapturePrimaryPresentationNotificationState()
+        {
+            return new PrimaryPresentationNotificationState(
+                GetPanelViewMode(WorkspacePanelId.Primary),
+                GetPanelSortField(WorkspacePanelId.Primary),
+                GetPanelSortDirection(WorkspacePanelId.Primary),
+                GetPanelGroupField(WorkspacePanelId.Primary),
+                _currentEntryViewDensityMode);
+        }
+
         private PanelViewState GetActivePanelState()
         {
             return _workspaceLayoutHost.GetActivePanelState();
@@ -25,25 +35,22 @@ namespace FileExplorerUI
 
         private void SyncActivePanelPresentationState()
         {
-            PanelViewState activePanel = GetActivePanelState();
-            activePanel.ViewMode = _currentViewMode;
-            activePanel.SortField = _currentSortField;
-            activePanel.SortDirection = _currentSortDirection;
-            activePanel.GroupField = _currentGroupField;
-            activePanel.QueryText = _currentQuery;
-            activePanel.CurrentPath = _currentPath;
-            activePanel.AddressText = GetDisplayPathText(_currentPath);
+            PanelViewState activePanel = GetPanelState(WorkspacePanelId.Primary);
+            activePanel.QueryText = GetPanelQueryText(WorkspacePanelId.Primary);
+            activePanel.CurrentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            activePanel.AddressText = GetPanelAddressText(WorkspacePanelId.Primary);
             activePanel.SelectedEntryPath = _selectedEntryPath;
+            activePanel.FocusedEntryPath = _focusedEntryPath;
         }
 
         private bool UsesColumnsListPresentation()
         {
-            return _currentViewMode == EntryViewMode.List;
+            return GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.List;
         }
 
         private FrameworkElement GetVisibleEntriesRoot()
         {
-            return _currentViewMode == EntryViewMode.Details
+            return GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details
                 ? DetailsEntriesScrollViewer
                 : GroupedEntriesScrollViewer;
         }
@@ -58,14 +65,14 @@ namespace FileExplorerUI
 
         private IEntriesViewHost? GetVisibleEntriesViewHost()
         {
-            return _currentViewMode == EntryViewMode.Details
+            return GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details
                 ? _detailsEntriesViewHost
                 : _groupedEntriesViewHost;
         }
 
         private bool NeedsEntriesHorizontalScroll()
         {
-            if (_currentViewMode != EntryViewMode.Details)
+            if (GetPanelViewMode(WorkspacePanelId.Primary) != EntryViewMode.Details)
             {
                 return true;
             }
@@ -81,23 +88,55 @@ namespace FileExplorerUI
             return DetailsRowWidth > viewportWidth - 1;
         }
 
-        public IReadOnlyList<GroupedEntryColumnViewModel> GroupedEntryColumns => _groupedEntryColumns;
+        public IReadOnlyList<GroupedEntryColumnViewModel> GroupedEntryColumns => GetPrimaryGroupedEntryColumns();
 
-        private void NotifyPresentationModeChanged()
+        private void NotifyPresentationModeChanged(PrimaryPresentationNotificationState? previousState = null)
         {
-            _groupedListRowsPerColumn = -1;
-            ApplyEntryItemMetricsPreset();
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntryContainerWidth)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesListVisibility)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GroupedColumnsVisibility)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsItemsVisibility)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsHeaderVisibility)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameHeaderMargin)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsNameCellMargin)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
-            UpdateViewCommandStates();
-            SyncActivePanelPresentationState();
+            PrimaryPresentationNotificationState currentState = CapturePrimaryPresentationNotificationState();
+            bool force = previousState is null;
+            PrimaryPresentationNotificationState previous = previousState ?? currentState;
+            bool viewModeChanged = force || previous.ViewMode != currentState.ViewMode;
+            bool sortChanged = force || previous.SortField != currentState.SortField || previous.SortDirection != currentState.SortDirection;
+            bool groupChanged = force || previous.GroupField != currentState.GroupField;
+            bool densityChanged = force || previous.DensityMode != currentState.DensityMode;
+            bool layoutChanged = viewModeChanged || groupChanged || densityChanged;
+
+            if (viewModeChanged)
+            {
+                SetPrimaryGroupedListRowsPerColumn(-1);
+            }
+
+            if (densityChanged)
+            {
+                ApplyEntryItemMetricsPreset();
+            }
+            else if (layoutChanged)
+            {
+                InvalidateEntriesLayouts();
+            }
+
+            if (layoutChanged)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntryContainerWidth)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesListVisibility)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(GroupedColumnsVisibility)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsItemsVisibility)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsHeaderVisibility)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameHeaderMargin)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsNameCellMargin)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
+            }
+
+            if (viewModeChanged || sortChanged || groupChanged)
+            {
+                UpdateViewCommandStates();
+            }
+
+            if (force || layoutChanged || sortChanged)
+            {
+                SyncActivePanelPresentationState();
+            }
         }
 
         private void ApplyEntryItemMetricsPreset()
@@ -111,30 +150,33 @@ namespace FileExplorerUI
         {
             if (ViewDetailsMenuItem is not null)
             {
-                ViewDetailsMenuItem.IsChecked = _currentViewMode == EntryViewMode.Details;
+                ViewDetailsMenuItem.IsChecked = GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details;
             }
 
             if (ViewListMenuItem is not null)
             {
-                ViewListMenuItem.IsChecked = _currentViewMode == EntryViewMode.List;
+                ViewListMenuItem.IsChecked = GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.List;
             }
 
             if (SortByNameMenuItem is not null)
             {
-                SortByNameMenuItem.IsChecked = _currentSortField == EntrySortField.Name;
-                SortByTypeMenuItem.IsChecked = _currentSortField == EntrySortField.Type;
-                SortBySizeMenuItem.IsChecked = _currentSortField == EntrySortField.Size;
-                SortByModifiedDateMenuItem.IsChecked = _currentSortField == EntrySortField.ModifiedDate;
-                SortAscendingMenuItem.IsChecked = _currentSortDirection == SortDirection.Ascending;
-                SortDescendingMenuItem.IsChecked = _currentSortDirection == SortDirection.Descending;
+                EntrySortField primarySortField = GetPanelSortField(WorkspacePanelId.Primary);
+                SortDirection primarySortDirection = GetPanelSortDirection(WorkspacePanelId.Primary);
+                SortByNameMenuItem.IsChecked = primarySortField == EntrySortField.Name;
+                SortByTypeMenuItem.IsChecked = primarySortField == EntrySortField.Type;
+                SortBySizeMenuItem.IsChecked = primarySortField == EntrySortField.Size;
+                SortByModifiedDateMenuItem.IsChecked = primarySortField == EntrySortField.ModifiedDate;
+                SortAscendingMenuItem.IsChecked = primarySortDirection == SortDirection.Ascending;
+                SortDescendingMenuItem.IsChecked = primarySortDirection == SortDirection.Descending;
             }
 
             if (GroupByNoneMenuItem is not null)
             {
-                GroupByNoneMenuItem.IsChecked = _currentGroupField == EntryGroupField.None;
-                GroupByNameMenuItem.IsChecked = _currentGroupField == EntryGroupField.Name;
-                GroupByTypeMenuItem.IsChecked = _currentGroupField == EntryGroupField.Type;
-                GroupByModifiedDateMenuItem.IsChecked = _currentGroupField == EntryGroupField.ModifiedDate;
+                EntryGroupField primaryGroupField = GetPanelGroupField(WorkspacePanelId.Primary);
+                GroupByNoneMenuItem.IsChecked = primaryGroupField == EntryGroupField.None;
+                GroupByNameMenuItem.IsChecked = primaryGroupField == EntryGroupField.Name;
+                GroupByTypeMenuItem.IsChecked = primaryGroupField == EntryGroupField.Type;
+                GroupByModifiedDateMenuItem.IsChecked = primaryGroupField == EntryGroupField.ModifiedDate;
             }
 
             UpdateDetailsHeaders();
@@ -142,26 +184,31 @@ namespace FileExplorerUI
 
         private async Task SetViewModeAsync(EntryViewMode mode)
         {
-            if (_currentViewMode == mode)
+            if (GetPanelViewMode(WorkspacePanelId.Primary) == mode)
             {
                 UpdateViewCommandStates();
                 _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
                 return;
             }
 
-            _currentViewMode = mode;
+            PrimaryPresentationNotificationState previousState = CapturePrimaryPresentationNotificationState();
+            SetPrimaryPanelPresentationState(
+                mode,
+                GetPanelSortField(WorkspacePanelId.Primary),
+                GetPanelSortDirection(WorkspacePanelId.Primary),
+                GetPanelGroupField(WorkspacePanelId.Primary));
             if (mode == EntryViewMode.List)
             {
-                _groupedListRowsPerColumn = -1;
-                _lastGroupedViewportHeight = double.NaN;
+                SetPrimaryGroupedListRowsPerColumn(-1);
+                SetPanelLastGroupedViewportHeight(WorkspacePanelId.Primary, double.NaN);
             }
-            NotifyPresentationModeChanged();
+            NotifyPresentationModeChanged(previousState);
             await ReloadCurrentPresentationAsync(PresentationReloadReason.ViewModeSwitch);
             _ = DispatcherQueue.TryEnqueue(() =>
             {
                 UpdateEntriesContextOverlayTargets();
                 GetVisibleEntriesRoot().UpdateLayout();
-                if (_currentViewMode == EntryViewMode.List)
+                if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.List)
                 {
                     // Ensure details->list switch gets a correct first layout immediately.
                     RequestGroupedColumnsRefresh(force: true);
@@ -171,34 +218,58 @@ namespace FileExplorerUI
             });
         }
 
-        private async Task SetSortAsync(EntrySortField field, SortDirection? explicitDirection = null)
+        private Task SetSortAsync(EntrySortField field, SortDirection? explicitDirection = null)
         {
-            _currentSortField = field;
-            _currentSortDirection = explicitDirection ?? GetDefaultSortDirection(field);
-            InvalidateProjectionCaches();
-            NotifyPresentationModeChanged();
-            await ReloadCurrentPresentationAsync(PresentationReloadReason.PresentationSettingsChange);
+            return SetPanelSortAsync(WorkspacePanelId.Primary, field, explicitDirection);
+        }
+
+        private async Task SetPanelSortAsync(
+            WorkspacePanelId panelId,
+            EntrySortField field,
+            SortDirection? explicitDirection = null)
+        {
+            SortDirection direction = explicitDirection ?? GetPanelDefaultSortDirection(panelId, field);
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                PrimaryPresentationNotificationState previousState = CapturePrimaryPresentationNotificationState();
+                SetPanelSortState(panelId, field, direction);
+                InvalidateProjectionCaches();
+                NotifyPresentationModeChanged(previousState);
+                await ReloadCurrentPresentationAsync(PresentationReloadReason.PresentationSettingsChange);
+                return;
+            }
+
+            SetPanelSortState(panelId, field, direction);
+            UpdatePanelDetailsHeaders(panelId);
+            await ReloadPanelDataAsync(
+                panelId,
+                preserveViewport: false,
+                ensureSelectionVisible: false,
+                focusEntries: false);
         }
 
         private async Task SetSortDirectionAsync(SortDirection direction)
         {
-            _currentSortDirection = direction;
+            PrimaryPresentationNotificationState previousState = CapturePrimaryPresentationNotificationState();
+            SetPanelSortState(WorkspacePanelId.Primary, GetPanelSortField(WorkspacePanelId.Primary), direction);
             InvalidateProjectionCaches();
-            NotifyPresentationModeChanged();
+            NotifyPresentationModeChanged(previousState);
             await ReloadCurrentPresentationAsync(PresentationReloadReason.PresentationSettingsChange);
         }
 
         private async Task SetGroupAsync(EntryGroupField field)
         {
-            _currentGroupField = field;
+            PrimaryPresentationNotificationState previousState = CapturePrimaryPresentationNotificationState();
+            SetPanelGroupField(WorkspacePanelId.Primary, field);
             InvalidateProjectionCaches();
-            NotifyPresentationModeChanged();
+            NotifyPresentationModeChanged(previousState);
             await ReloadCurrentPresentationAsync(PresentationReloadReason.PresentationSettingsChange);
         }
 
         private async Task ReloadCurrentPresentationAsync(PresentationReloadReason reason = PresentationReloadReason.DataRefresh)
         {
-            if (string.Equals(_currentPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            if (string.Equals(currentPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
             {
                 PopulateMyComputerEntries();
                 ApplyCurrentPresentation();
@@ -212,19 +283,22 @@ namespace FileExplorerUI
 
             if (UsesClientPresentationPipeline())
             {
-                await LoadAllEntriesForPresentationAsync(_currentPath);
+                await LoadAllEntriesForPresentationAsync(currentPath);
                 return;
             }
 
-            await LoadPageAsync(_currentPath, cursor: 0, append: false);
+            await LoadPageAsync(currentPath, cursor: 0, append: false);
         }
 
         private void ApplyCurrentPresentation(NavigationPerfSession? perf = null)
         {
-            perf?.Mark("apply-presentation.enter", $"view={_currentViewMode} group={_currentGroupField} sort={_currentSortField}/{_currentSortDirection}");
-            List<EntryViewModel> sourceEntries = _presentationSourceInitialized
-                ? _presentationSourceEntries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList()
-                : _entries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList();
+            LogPrimaryTabDataState("ApplyCurrentPresentation.enter");
+            perf?.Mark(
+                "apply-presentation.enter",
+                $"view={GetPanelViewMode(WorkspacePanelId.Primary)} group={GetPanelGroupField(WorkspacePanelId.Primary)} sort={GetPanelSortField(WorkspacePanelId.Primary)}/{GetPanelSortDirection(WorkspacePanelId.Primary)}");
+            List<EntryViewModel> sourceEntries = GetPrimaryPresentationSourceInitialized()
+                ? GetPrimaryPresentationSourceEntries().Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList()
+                : PrimaryEntries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList();
 
             sourceEntries.Sort(CompareEntriesForPresentation);
             perf?.Mark("apply-presentation.sorted", $"count={sourceEntries.Count}");
@@ -232,13 +306,13 @@ namespace FileExplorerUI
             if (UsesColumnsListPresentation())
             {
                 List<EntryViewModel> presentedEntries = BuildPresentedEntries(sourceEntries);
-                _groupedListRowsPerColumn = GetGroupedListRowsPerColumn();
+                SetPrimaryGroupedListRowsPerColumn(GetGroupedListRowsPerColumn());
                 if (!MatchesCurrentVisibleEntries(presentedEntries))
                 {
                     ReplaceVisibleEntries(presentedEntries);
                 }
 
-                _groupedEntryColumns.Clear();
+                GetPrimaryGroupedEntryColumns().Clear();
                 RequestGroupedColumnsRefresh();
             }
             else
@@ -250,7 +324,7 @@ namespace FileExplorerUI
                     ReplaceVisibleEntries(presentedEntries);
                 }
 
-                _groupedEntryColumns.Clear();
+                GetPrimaryGroupedEntryColumns().Clear();
             }
 
             if (!string.IsNullOrWhiteSpace(selectedPath))
@@ -260,19 +334,20 @@ namespace FileExplorerUI
 
             UpdateEntrySelectionVisuals();
             UpdateViewCommandStates();
-            perf?.Mark("apply-presentation.exit", $"visible={_entries.Count}");
+            LogPrimaryTabDataState("ApplyCurrentPresentation.exit");
+            perf?.Mark("apply-presentation.exit", $"visible={PrimaryEntries.Count}");
         }
 
         private bool MatchesCurrentVisibleEntries(IReadOnlyList<EntryViewModel> entries)
         {
-            if (_entries.Count != entries.Count)
+            if (PrimaryEntries.Count != entries.Count)
             {
                 return false;
             }
 
             for (int i = 0; i < entries.Count; i++)
             {
-                if (!ReferenceEquals(_entries[i], entries[i]))
+                if (!ReferenceEquals(PrimaryEntries[i], entries[i]))
                 {
                     return false;
                 }
@@ -283,12 +358,12 @@ namespace FileExplorerUI
 
         private void ReplaceVisibleEntries(IReadOnlyList<EntryViewModel> entries)
         {
-            _entries.ReplaceAll(entries);
+            PrimaryEntries.ReplaceAll(entries);
         }
 
         private List<EntryViewModel> BuildPresentedEntries(IReadOnlyList<EntryViewModel> orderedEntries)
         {
-            if (_currentGroupField == EntryGroupField.None)
+            if (GetPanelGroupField(WorkspacePanelId.Primary) == EntryGroupField.None)
             {
                 ApplyEntryViewState(orderedEntries);
                 return orderedEntries.ToList();
@@ -328,7 +403,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            bool isExpanded = !_groupExpansionStates.TryGetValue(descriptor.StateKey, out bool expanded) || expanded;
+            bool isExpanded = !GetPrimaryGroupExpansionStates().TryGetValue(descriptor.StateKey, out bool expanded) || expanded;
             EntryViewModel headerEntry = EntryViewModel.CreateGroupHeader(descriptor.StateKey, descriptor.Label, groupEntries.Count, isExpanded);
             headerEntry.DetailsGroupHeaderMargin = presentedEntries.Count == 0 ? new Thickness(0) : new Thickness(0, 6, 0, 0);
             ApplyEntryLayoutState(headerEntry);
@@ -362,14 +437,16 @@ namespace FileExplorerUI
         private void ApplyEntryLayoutState(EntryViewModel entry)
         {
             entry.HeaderRowVisibility = entry.IsGroupHeader ? Visibility.Visible : Visibility.Collapsed;
-            entry.DetailsRowVisibility = !entry.IsGroupHeader && _currentViewMode == EntryViewMode.Details ? Visibility.Visible : Visibility.Collapsed;
-            entry.ListRowVisibility = !entry.IsGroupHeader && _currentViewMode == EntryViewMode.List ? Visibility.Visible : Visibility.Collapsed;
+            EntryViewMode primaryViewMode = GetPanelViewMode(WorkspacePanelId.Primary);
+            entry.DetailsRowVisibility = !entry.IsGroupHeader && primaryViewMode == EntryViewMode.Details ? Visibility.Visible : Visibility.Collapsed;
+            entry.ListRowVisibility = !entry.IsGroupHeader && primaryViewMode == EntryViewMode.List ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void UpdateEntrySelectionVisuals()
         {
+            bool isActive = IsPrimaryWorkspacePanelActive;
             var seen = new HashSet<EntryViewModel>();
-            IEnumerable<EntryViewModel> allEntries = _presentationSourceEntries.Concat(_entries);
+            IEnumerable<EntryViewModel> allEntries = GetPrimaryPresentationSourceEntries().Concat(PrimaryEntries);
             foreach (EntryViewModel entry in allEntries)
             {
                 if (!seen.Add(entry))
@@ -383,18 +460,31 @@ namespace FileExplorerUI
                 entry.IsKeyboardAnchor = !entry.IsGroupHeader &&
                     !string.IsNullOrWhiteSpace(_focusedEntryPath) &&
                     string.Equals(entry.FullPath, _focusedEntryPath, StringComparison.OrdinalIgnoreCase);
-                entry.IsSelectionActive = _isEntriesSelectionActive;
+                entry.IsSelectionActive = isActive;
             }
         }
 
         private int CompareEntriesForPresentation(EntryViewModel left, EntryViewModel right)
+        {
+            return CompareEntriesForPresentation(
+                left,
+                right,
+                GetPanelSortField(WorkspacePanelId.Primary),
+                GetPanelSortDirection(WorkspacePanelId.Primary));
+        }
+
+        private static int CompareEntriesForPresentation(
+            EntryViewModel left,
+            EntryViewModel right,
+            EntrySortField sortField,
+            SortDirection sortDirection)
         {
             if (left.IsDirectory != right.IsDirectory)
             {
                 return left.IsDirectory ? -1 : 1;
             }
 
-            int result = _currentSortField switch
+            int result = sortField switch
             {
                 EntrySortField.ModifiedDate => Nullable.Compare(left.ModifiedAt, right.ModifiedAt),
                 EntrySortField.Type => StringComparer.CurrentCultureIgnoreCase.Compare(left.Type, right.Type),
@@ -402,12 +492,12 @@ namespace FileExplorerUI
                 _ => StringComparer.CurrentCultureIgnoreCase.Compare(left.Name, right.Name)
             };
 
-            if (result == 0 && _currentSortField != EntrySortField.Name)
+            if (result == 0 && sortField != EntrySortField.Name)
             {
                 result = StringComparer.CurrentCultureIgnoreCase.Compare(left.Name, right.Name);
             }
 
-            if (_currentSortDirection == SortDirection.Descending)
+            if (sortDirection == SortDirection.Descending)
             {
                 result = -result;
             }
@@ -420,9 +510,24 @@ namespace FileExplorerUI
             return result;
         }
 
+        private void ApplySecondaryPanePresentation(PanelViewState panelState)
+        {
+            List<EntryViewModel> sortedEntries = panelState.DataSession.Entries
+                .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
+                .OrderBy(
+                    entry => entry,
+                    Comparer<EntryViewModel>.Create((left, right) =>
+                        CompareEntriesForPresentation(left, right, panelState.SortField, panelState.SortDirection)))
+                .ToList();
+
+            panelState.DataSession.Entries.ReplaceAll(sortedEntries);
+            panelState.DataSession.PresentationSourceEntries.Clear();
+            panelState.DataSession.PresentationSourceEntries.AddRange(sortedEntries);
+        }
+
         private EntryGroupDescriptor GetGroupDescriptor(EntryViewModel entry)
         {
-            return _currentGroupField switch
+            return GetPanelGroupField(WorkspacePanelId.Primary) switch
             {
                 EntryGroupField.Name => GetNameGroupDescriptor(entry),
                 EntryGroupField.Type => GetTypeGroupDescriptor(entry),
@@ -454,51 +559,27 @@ namespace FileExplorerUI
 
         private void PopulateMyComputerEntries()
         {
-            _entries.Clear();
+            PrimaryEntries.Clear();
             _selectedEntryPath = null;
-            var drives = new List<EntryViewModel>();
-            foreach (DriveInfo drive in _explorerService.GetReadyDrives())
-            {
-                string root = drive.RootDirectory.FullName;
-                string label = drive.Name.TrimEnd('\\');
-                string type = string.IsNullOrWhiteSpace(drive.VolumeLabel)
-                    ? S("DriveTypeLocalDisk")
-                    : SF("DriveTypeVolumeFormat", drive.VolumeLabel, drive.DriveFormat);
-
-                drives.Add(new EntryViewModel
-                {
-                    Name = label,
-                    DisplayName = label,
-                    PendingName = label,
-                    FullPath = root,
-                    Type = type,
-                    IconGlyph = "\uE7F8",
-                    IconForeground = FolderIconBrush,
-                    MftRef = 0,
-                    SizeText = FormatBytes(drive.TotalSize),
-                    ModifiedText = FormatBytes(drive.AvailableFreeSpace),
-                    IsDirectory = true,
-                    IsLink = false,
-                    IsLoaded = true,
-                    IsMetadataLoaded = true
-                });
-            }
+            List<EntryViewModel> drives = CreateMyComputerDriveEntries();
 
             foreach (EntryViewModel driveEntry in drives)
             {
-                _entries.Add(driveEntry);
+                PrimaryEntries.Add(driveEntry);
             }
 
             SetPresentationSourceEntries(drives);
 
-            _totalEntries = (uint)_entries.Count;
+            SetPanelTotalEntries(WorkspacePanelId.Primary, (uint)PrimaryEntries.Count);
+            MarkPanelDataLoadedForCurrentNavigation(WorkspacePanelId.Primary);
             InvalidateEntriesLayouts();
-            _nextCursor = 0;
-            _hasMore = false;
+            SetPanelNextCursor(WorkspacePanelId.Primary, 0);
+            SetPanelHasMore(WorkspacePanelId.Primary, false);
             UpdateFileCommandStates();
             _lastTitleWasReadFailed = false;
             UpdateWindowTitle();
-            UpdateStatus(SF("StatusDriveCount", _entries.Count));
+            UpdateStatus(SF("StatusDriveCount", PrimaryEntries.Count));
+            LogPrimaryTabDataState("PopulateMyComputerEntries");
         }
 
         private void UpdateStatus(string message)
@@ -513,24 +594,17 @@ namespace FileExplorerUI
                 await _statusDialogSemaphore.WaitAsync();
                 try
                 {
-                    var dialog = new ContentDialog
+                    EnsureOperationFeedbackOverlay();
+                    if (_operationFeedbackDialog is null)
                     {
-                        Title = S(warning ? "StatusDialogWarningTitle" : "StatusDialogErrorTitle"),
-                        Content = new TextBlock
-                        {
-                            Text = message,
-                            TextWrapping = TextWrapping.Wrap
-                        },
-                        CloseButtonText = S("DialogCancelButton"),
-                        DefaultButton = ContentDialogButton.Close
-                    };
-
-                    if (Content is FrameworkElement root)
-                    {
-                        dialog.XamlRoot = root.XamlRoot;
+                        return;
                     }
 
-                    await dialog.ShowAsync();
+                    await _operationFeedbackDialog.ShowAsync(
+                        S(warning ? "StatusDialogWarningTitle" : "StatusDialogErrorTitle"),
+                        message,
+                        S("DialogCancelButton"),
+                        string.Empty);
                 }
                 finally
                 {
@@ -541,6 +615,17 @@ namespace FileExplorerUI
 
         private void UpdateDetailsHeaders()
         {
+            UpdatePanelDetailsHeaders(WorkspacePanelId.Primary);
+        }
+
+        private void UpdatePanelDetailsHeaders(WorkspacePanelId panelId)
+        {
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                UpdateSecondaryDetailsHeaders();
+                return;
+            }
+
             if (NameHeaderTextBlock is null ||
                 TypeHeaderTextBlock is null ||
                 SizeHeaderTextBlock is null ||
@@ -559,7 +644,7 @@ namespace FileExplorerUI
 
             NameHeaderTextBlock.Text = S("ColumnNameHeader");
             TypeHeaderTextBlock.Text = S("ColumnTypeHeader");
-            if (string.Equals(_currentPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(GetPanelCurrentPath(WorkspacePanelId.Primary), ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
             {
                 SizeHeaderTextBlock.Text = S("ColumnTotalSizeHeader");
                 ModifiedHeaderTextBlock.Text = S("ColumnFreeSpaceHeader");
@@ -576,13 +661,97 @@ namespace FileExplorerUI
             UpdateDetailsHeaderVisual(ModifiedHeaderBorder, ModifiedHeaderTextBlock, ModifiedHeaderSortGlyphTextBlock, EntrySortField.ModifiedDate);
         }
 
+        private void UpdateSecondaryDetailsHeaders()
+        {
+            if (SecondaryNameHeaderTextBlock is null ||
+                SecondaryTypeHeaderTextBlock is null ||
+                SecondarySizeHeaderTextBlock is null ||
+                SecondaryModifiedHeaderTextBlock is null ||
+                SecondaryNameHeaderBorder is null ||
+                SecondaryTypeHeaderBorder is null ||
+                SecondarySizeHeaderBorder is null ||
+                SecondaryModifiedHeaderBorder is null ||
+                SecondaryNameHeaderSortGlyphTextBlock is null ||
+                SecondaryTypeHeaderSortGlyphTextBlock is null ||
+                SecondarySizeHeaderSortGlyphTextBlock is null ||
+                SecondaryModifiedHeaderSortGlyphTextBlock is null)
+            {
+                return;
+            }
+
+            SecondaryNameHeaderTextBlock.Text = S("ColumnNameHeader");
+            SecondaryTypeHeaderTextBlock.Text = S("ColumnTypeHeader");
+            if (string.Equals(GetPanelCurrentPath(WorkspacePanelId.Secondary), ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                SecondarySizeHeaderTextBlock.Text = S("ColumnTotalSizeHeader");
+                SecondaryModifiedHeaderTextBlock.Text = S("ColumnFreeSpaceHeader");
+            }
+            else
+            {
+                SecondarySizeHeaderTextBlock.Text = S("ColumnSizeHeader");
+                SecondaryModifiedHeaderTextBlock.Text = S("ColumnModifiedHeader");
+            }
+
+            UpdateDetailsHeaderVisual(
+                SecondaryNameHeaderBorder,
+                SecondaryNameHeaderTextBlock,
+                SecondaryNameHeaderSortGlyphTextBlock,
+                GetPanelSortField(WorkspacePanelId.Secondary),
+                GetPanelSortDirection(WorkspacePanelId.Secondary),
+                EntrySortField.Name,
+                IsPanelSortAtDefault(WorkspacePanelId.Secondary));
+            UpdateDetailsHeaderVisual(
+                SecondaryTypeHeaderBorder,
+                SecondaryTypeHeaderTextBlock,
+                SecondaryTypeHeaderSortGlyphTextBlock,
+                GetPanelSortField(WorkspacePanelId.Secondary),
+                GetPanelSortDirection(WorkspacePanelId.Secondary),
+                EntrySortField.Type,
+                IsPanelSortAtDefault(WorkspacePanelId.Secondary));
+            UpdateDetailsHeaderVisual(
+                SecondarySizeHeaderBorder,
+                SecondarySizeHeaderTextBlock,
+                SecondarySizeHeaderSortGlyphTextBlock,
+                GetPanelSortField(WorkspacePanelId.Secondary),
+                GetPanelSortDirection(WorkspacePanelId.Secondary),
+                EntrySortField.Size,
+                IsPanelSortAtDefault(WorkspacePanelId.Secondary));
+            UpdateDetailsHeaderVisual(
+                SecondaryModifiedHeaderBorder,
+                SecondaryModifiedHeaderTextBlock,
+                SecondaryModifiedHeaderSortGlyphTextBlock,
+                GetPanelSortField(WorkspacePanelId.Secondary),
+                GetPanelSortDirection(WorkspacePanelId.Secondary),
+                EntrySortField.ModifiedDate,
+                IsPanelSortAtDefault(WorkspacePanelId.Secondary));
+        }
+
         private void UpdateDetailsHeaderVisual(Border border, TextBlock label, TextBlock sortGlyph, EntrySortField field)
         {
-            bool isActive = _currentSortField == field;
-            bool showSortGlyph = isActive && !IsCurrentSortAtDefault();
+            UpdateDetailsHeaderVisual(
+                border,
+                label,
+                sortGlyph,
+                GetPanelSortField(WorkspacePanelId.Primary),
+                GetPanelSortDirection(WorkspacePanelId.Primary),
+                field,
+                IsCurrentSortAtDefault());
+        }
+
+        private void UpdateDetailsHeaderVisual(
+            Border border,
+            TextBlock label,
+            TextBlock sortGlyph,
+            EntrySortField activeSortField,
+            SortDirection activeSortDirection,
+            EntrySortField field,
+            bool isAtDefault)
+        {
+            bool isActive = activeSortField == field;
+            bool showSortGlyph = isActive && !isAtDefault;
             label.Foreground = isActive ? GetDetailsHeaderPrimaryBrush() : GetDetailsHeaderSecondaryBrush();
             label.Opacity = isActive ? 1.0 : 0.88;
-            sortGlyph.Text = isActive && _currentSortDirection == SortDirection.Descending ? "↓" : "↑";
+            sortGlyph.Text = isActive && activeSortDirection == SortDirection.Descending ? "↓" : "↑";
             sortGlyph.Foreground = isActive ? GetDetailsHeaderPrimaryBrush() : GetDetailsHeaderSecondaryBrush();
             sortGlyph.Visibility = showSortGlyph ? Visibility.Visible : Visibility.Collapsed;
             sortGlyph.Opacity = showSortGlyph ? 0.92 : 0.72;
@@ -597,12 +766,32 @@ namespace FileExplorerUI
                 return;
             }
 
-            SortDirection? explicitDirection = _currentSortField == field
-                ? (_currentSortDirection == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending)
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+            e.Handled = true;
+
+            SortDirection? explicitDirection = GetPanelSortField(WorkspacePanelId.Primary) == field
+                ? (GetPanelSortDirection(WorkspacePanelId.Primary) == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending)
                 : null;
 
             await SetSortAsync(field, explicitDirection);
+        }
+
+        private async void SecondaryDetailsHeader_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element ||
+                !TryGetDetailsHeaderField(element.Tag as string, out EntrySortField field))
+            {
+                return;
+            }
+
+            SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
             e.Handled = true;
+
+            SortDirection? explicitDirection = GetPanelSortField(WorkspacePanelId.Secondary) == field
+                ? (GetPanelSortDirection(WorkspacePanelId.Secondary) == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending)
+                : null;
+
+            await SetPanelSortAsync(WorkspacePanelId.Secondary, field, explicitDirection);
         }
 
         private void DetailsHeader_PointerEntered(object sender, PointerRoutedEventArgs e)
@@ -621,11 +810,50 @@ namespace FileExplorerUI
             }
         }
 
+        private void SecondaryDetailsHeader_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border border)
+            {
+                border.Background = GetDetailsHeaderHoverBrush();
+            }
+        }
+
+        private void SecondaryDetailsHeader_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Border border)
+            {
+                border.Background = GetDetailsHeaderRestBrush();
+            }
+        }
+
         private bool IsCurrentSortAtDefault()
         {
             EntrySortField defaultField = _appSettings.DefaultSortField;
             SortDirection defaultDirection = GetDefaultSortDirection(defaultField);
-            return _currentSortField == defaultField && _currentSortDirection == defaultDirection;
+            return GetPanelSortField(WorkspacePanelId.Primary) == defaultField &&
+                GetPanelSortDirection(WorkspacePanelId.Primary) == defaultDirection;
+        }
+
+        private bool IsPanelSortAtDefault(WorkspacePanelId panelId)
+        {
+            EntrySortField defaultField = GetPanelDefaultSortField(panelId);
+            SortDirection defaultDirection = GetPanelDefaultSortDirection(panelId, defaultField);
+            return GetPanelSortField(panelId) == defaultField &&
+                GetPanelSortDirection(panelId) == defaultDirection;
+        }
+
+        private EntrySortField GetPanelDefaultSortField(WorkspacePanelId panelId)
+        {
+            return panelId == WorkspacePanelId.Primary
+                ? _appSettings.DefaultSortField
+                : EntrySortField.Name;
+        }
+
+        private SortDirection GetPanelDefaultSortDirection(WorkspacePanelId panelId, EntrySortField field)
+        {
+            return panelId == WorkspacePanelId.Primary
+                ? GetDefaultSortDirection(field)
+                : SortDirection.Ascending;
         }
 
         private static bool TryGetDetailsHeaderField(string? fieldName, out EntrySortField field)
@@ -645,8 +873,15 @@ namespace FileExplorerUI
                 nameof(EntrySortField.ModifiedDate);
         }
 
-        private static Brush? GetDetailsHeaderHoverBrush()
+        private Brush? GetDetailsHeaderHoverBrush()
         {
+            if (RightShellColumn?.Resources is not null &&
+                RightShellColumn.Resources.TryGetValue("DetailsHeaderHoverBackgroundBrush", out object? localValue) &&
+                localValue is Brush localBrush)
+            {
+                return localBrush;
+            }
+
             if (Application.Current.Resources.TryGetValue("ListViewItemBackgroundPointerOver", out object? value) && value is Brush brush)
             {
                 return brush;
@@ -660,8 +895,15 @@ namespace FileExplorerUI
             return null;
         }
 
-        private static Brush? GetDetailsHeaderRestBrush()
+        private Brush? GetDetailsHeaderRestBrush()
         {
+            if (RightShellColumn?.Resources is not null &&
+                RightShellColumn.Resources.TryGetValue("DetailsHeaderRestBackgroundBrush", out object? localValue) &&
+                localValue is Brush localBrush)
+            {
+                return localBrush;
+            }
+
             if (Application.Current.Resources.TryGetValue("SubtleFillColorTransparentBrush", out object? value) && value is Brush brush)
             {
                 return brush;
@@ -670,8 +912,13 @@ namespace FileExplorerUI
             return null;
         }
 
-        private static Brush? GetDetailsHeaderPrimaryBrush()
+        private Brush? GetDetailsHeaderPrimaryBrush()
         {
+            if (TitleBarPrimaryBrushProbe.Foreground is Brush probeBrush)
+            {
+                return probeBrush;
+            }
+
             if (Application.Current.Resources.TryGetValue("TextFillColorPrimaryBrush", out object? value) && value is Brush brush)
             {
                 return brush;
@@ -680,9 +927,14 @@ namespace FileExplorerUI
             return null;
         }
 
-        private static Brush? GetDetailsHeaderSecondaryBrush()
+        private Brush? GetDetailsHeaderSecondaryBrush()
         {
-            if (Application.Current.Resources.TryGetValue("TextFillColorSecondaryBrush", out object? value) && value is Brush brush)
+            if (DetailsHeaderSecondaryBrushProbe.Foreground is Brush probeBrush)
+            {
+                return probeBrush;
+            }
+
+            if (Application.Current.Resources.TryGetValue("DetailsHeaderSecondaryForegroundBrush", out object? value) && value is Brush brush)
             {
                 return brush;
             }

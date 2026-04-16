@@ -1,4 +1,5 @@
 using FileExplorerUI.Services;
+using FileExplorerUI.Workspace;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -201,6 +202,7 @@ namespace FileExplorerUI
 
             _sidebarTreeRenameOverlayBorder.Background = RenameOverlayBorder.Background;
             _sidebarTreeRenameOverlayBorder.BorderBrush = RenameOverlayBorder.BorderBrush;
+            _sidebarTreeRenameOverlayBorder.CornerRadius = new CornerRadius(0);
             _sidebarTreeRenameOverlayBorder.Padding = RenameOverlayBorder.Padding;
         }
 
@@ -394,17 +396,17 @@ namespace FileExplorerUI
                         await PopulateSidebarTreeChildrenAsync(parentNode, parentPath, CancellationToken.None, expandAfterLoad: true);
                     }
 
-                    if (IsPathWithin(_currentPath, renamed.SourcePath))
+                    string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+                    if (IsPathWithin(currentPath, renamed.SourcePath))
                     {
-                        string suffix = _currentPath.Length > renamed.SourcePath.Length
-                            ? _currentPath[renamed.SourcePath.Length..]
+                        string suffix = currentPath.Length > renamed.SourcePath.Length
+                            ? currentPath[renamed.SourcePath.Length..]
                             : string.Empty;
-                        _currentPath = renamed.TargetPath + suffix;
-                        PathTextBox.Text = GetDisplayPathText(_currentPath);
-                        UpdateBreadcrumbs(_currentPath);
+                        SetPrimaryPanelNavigationState(renamed.TargetPath + suffix, GetPanelQueryText(WorkspacePanelId.Primary), syncEditors: true);
+                        UpdateBreadcrumbs(GetPanelCurrentPath(WorkspacePanelId.Primary));
                         UpdateNavButtonsState();
-                        StyledSidebarView.SetSelectedPath(_currentPath);
-                        await LoadFirstPageAsync();
+                        StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(WorkspacePanelId.Primary));
+                        await LoadPanelDataAsync(WorkspacePanelId.Primary);
                     }
                     else if (wasSelectedInTree)
                     {

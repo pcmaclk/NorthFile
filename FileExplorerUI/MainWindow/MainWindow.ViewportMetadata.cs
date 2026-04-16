@@ -1,4 +1,5 @@
 using FileExplorerUI.Interop;
+using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
@@ -23,14 +24,14 @@ namespace FileExplorerUI
                 return;
             }
 
-            CancellationTokenSource? baseCts = _directoryLoadCts;
+            CancellationTokenSource? baseCts = GetPanelDirectoryLoadCts(WorkspacePanelId.Primary);
             if (baseCts is null)
             {
                 return;
             }
 
-            long snapshotVersion = _directorySnapshotVersion;
-            string path = _currentPath;
+            long snapshotVersion = GetPanelDirectorySnapshotVersion(WorkspacePanelId.Primary);
+            string path = GetPanelCurrentPath(WorkspacePanelId.Primary);
             CancellationToken token = baseCts.Token;
 
             _ = Task.Run(async () =>
@@ -48,15 +49,15 @@ namespace FileExplorerUI
         private List<MetadataWorkItem> CollectMetadataWorkItems(int startIndex, int endIndex)
         {
             var items = new List<MetadataWorkItem>();
-            if (startIndex < 0 || startIndex >= _entries.Count || endIndex < startIndex)
+            if (startIndex < 0 || startIndex >= PrimaryEntries.Count || endIndex < startIndex)
             {
                 return items;
             }
 
-            int cappedEnd = Math.Min(endIndex, _entries.Count - 1);
+            int cappedEnd = Math.Min(endIndex, PrimaryEntries.Count - 1);
             for (int i = startIndex; i <= cappedEnd; i++)
             {
-                EntryViewModel entry = _entries[i];
+                EntryViewModel entry = PrimaryEntries[i];
                 if (!entry.IsLoaded || entry.IsMetadataLoaded)
                 {
                     continue;
@@ -96,7 +97,7 @@ namespace FileExplorerUI
 
             _ = DispatcherQueue.TryEnqueue(() =>
             {
-                if (snapshotVersion != _directorySnapshotVersion)
+                if (snapshotVersion != GetPanelDirectorySnapshotVersion(WorkspacePanelId.Primary))
                 {
                     return;
                 }
@@ -170,19 +171,19 @@ namespace FileExplorerUI
 
         private void ApplyViewportMetadataResults(long snapshotVersion, IReadOnlyList<ViewportMetadataResult> results)
         {
-            if (snapshotVersion != _directorySnapshotVersion || results.Count == 0)
+            if (snapshotVersion != GetPanelDirectorySnapshotVersion(WorkspacePanelId.Primary) || results.Count == 0)
             {
                 return;
             }
 
             foreach (ViewportMetadataResult result in results)
             {
-                if (result.Index < 0 || result.Index >= _entries.Count)
+                if (result.Index < 0 || result.Index >= PrimaryEntries.Count)
                 {
                     continue;
                 }
 
-                EntryViewModel entry = _entries[result.Index];
+                EntryViewModel entry = PrimaryEntries[result.Index];
                 if (!entry.IsLoaded)
                 {
                     continue;
@@ -198,17 +199,17 @@ namespace FileExplorerUI
 
         private void ApplyMetadataPayload(long snapshotVersion, MetadataWorkItem item, MetadataPayload payload)
         {
-            if (snapshotVersion != _directorySnapshotVersion)
+            if (snapshotVersion != GetPanelDirectorySnapshotVersion(WorkspacePanelId.Primary))
             {
                 return;
             }
 
-            if (item.Index < 0 || item.Index >= _entries.Count)
+            if (item.Index < 0 || item.Index >= PrimaryEntries.Count)
             {
                 return;
             }
 
-            EntryViewModel current = _entries[item.Index];
+            EntryViewModel current = PrimaryEntries[item.Index];
             if (!current.IsLoaded)
             {
                 return;

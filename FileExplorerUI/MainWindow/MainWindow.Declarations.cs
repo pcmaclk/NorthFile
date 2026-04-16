@@ -65,6 +65,7 @@ namespace FileExplorerUI
         private enum EntriesContextOrigin
         {
             EntriesList,
+            SecondaryEntriesList,
             SidebarPinned,
             SidebarTree
         }
@@ -246,6 +247,7 @@ namespace FileExplorerUI
             "StatusCreateShortcutFailed" => StatusFeedbackKind.DialogError,
             "StatusOpenFailed" => StatusFeedbackKind.DialogError,
             "StatusLoadFailedWithReason" => StatusFeedbackKind.DialogError,
+            "StatusOpenInNewTabFailed" => StatusFeedbackKind.DialogError,
             "StatusOpenInNewWindowFailed" => StatusFeedbackKind.DialogError,
             "StatusOpenTargetFailed" => StatusFeedbackKind.DialogError,
             "StatusOpenTerminalFailed" => StatusFeedbackKind.DialogError,
@@ -267,6 +269,7 @@ namespace FileExplorerUI
             "StatusDeleteSuccess" => StatusFeedbackKind.Info,
             "StatusExtractZipSuccess" => StatusFeedbackKind.Info,
             "StatusOpened" => StatusFeedbackKind.Info,
+            "StatusOpenedInNewTab" => StatusFeedbackKind.Info,
             "StatusOpenedInNewWindow" => StatusFeedbackKind.Info,
             "StatusOpenTerminalSuccess" => StatusFeedbackKind.Info,
             "StatusOpenWithOpened" => StatusFeedbackKind.Info,

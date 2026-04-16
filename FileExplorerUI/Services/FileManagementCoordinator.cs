@@ -317,6 +317,12 @@ public sealed class FileManagementCoordinator
         {
             string targetPath = Path.Combine(targetDirectoryPath, item.Name);
             bool samePath = string.Equals(item.SourcePath.TrimEnd('\\'), targetPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+            if (samePath && mode == FileTransferMode.Copy)
+            {
+                targetPath = _explorerService.GenerateUniqueCopyTargetPath(targetDirectoryPath, item.SourcePath);
+                samePath = false;
+            }
+
             bool conflict = !samePath && _explorerService.PathExists(targetPath);
 
             if (samePath)

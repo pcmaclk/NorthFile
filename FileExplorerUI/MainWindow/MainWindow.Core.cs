@@ -2,9 +2,12 @@ using FileExplorerUI.Workspace;
 using System;
 using System.ComponentModel;
 using System.Numerics;
+using System.Collections.ObjectModel;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using FileExplorerUI.Collections;
 
 namespace FileExplorerUI
 {
@@ -37,7 +40,13 @@ namespace FileExplorerUI
 
         public Visibility PrimaryPaneSearchVisibility => Visibility.Visible;
 
-        public string DisplayAddressText => GetDisplayPathText(_currentPath);
+        public string DisplayAddressText => GetDisplayPathText(GetPanelCurrentPath(WorkspacePanelId.Primary));
+
+        public ObservableCollection<BreadcrumbItemViewModel> SecondaryPaneBreadcrumbs => SecondaryPanelState.Navigation.Breadcrumbs;
+
+        public ObservableCollection<BreadcrumbItemViewModel> SecondaryPaneVisibleBreadcrumbs => SecondaryPanelState.Navigation.VisibleBreadcrumbs;
+
+        public string SecondaryPaneDisplayAddressText => GetDisplayPathText(SecondaryPanelState.CurrentPath);
 
         public string SecondaryPaneAddressText
         {
@@ -61,14 +70,7 @@ namespace FileExplorerUI
             get => SecondaryPaneAddressText;
             set
             {
-                string normalized = value ?? string.Empty;
-                if (string.Equals(_workspaceLayoutHost.ShellState.Secondary.AddressText, normalized, StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                _workspaceLayoutHost.ShellState.Secondary.AddressText = normalized;
-                RaisePropertyChanged(nameof(SecondaryPaneAddressText), nameof(SecondaryPaneAddressEditorText));
+                SetPanelAddressText(WorkspacePanelId.Secondary, value);
             }
         }
 
@@ -76,95 +78,195 @@ namespace FileExplorerUI
 
         public string SecondaryPaneSearchText
         {
-            get => _workspaceLayoutHost.ShellState.Secondary.QueryText;
-            set
-            {
-                string normalized = value ?? string.Empty;
-                if (string.Equals(_workspaceLayoutHost.ShellState.Secondary.QueryText, normalized, StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                _workspaceLayoutHost.ShellState.Secondary.QueryText = normalized;
-                RaisePropertyChanged(nameof(SecondaryPaneSearchText));
-            }
+            get => GetPanelQueryText(WorkspacePanelId.Secondary);
+            set => SetPanelQueryText(WorkspacePanelId.Secondary, value);
         }
 
         public string SecondaryPanePlaceholderText
         {
             get
             {
+                if (SecondaryPanelState.DataSession.IsLoading &&
+                    SecondaryPaneEntries.Count == 0)
+                {
+                    return S("SecondaryPanePlaceholderLoading");
+                }
+
                 string path = _workspaceLayoutHost.ShellState.Secondary.CurrentPath;
-                return string.IsNullOrWhiteSpace(path)
-                    ? "次面板占位区"
-                    : $"次面板占位区: {GetDisplayPathText(path)}";
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    return S("SecondaryPanePlaceholderIdle");
+                }
+
+                return S("SecondaryPanePlaceholderEmptyFolder");
             }
         }
 
-        public bool IsPrimaryWorkspacePanelActive => !_isDualPaneEnabled || _workspaceLayoutHost.ActivePanel == WorkspacePanelId.Primary;
+        public BatchObservableCollection<EntryViewModel> SecondaryPaneEntries => SecondaryPanelState.DataSession.Entries;
 
-        public bool IsSecondaryWorkspacePanelActive => _isDualPaneEnabled && _workspaceLayoutHost.ActivePanel == WorkspacePanelId.Secondary;
+        public Visibility SecondaryPaneItemsVisibility => SecondaryPaneEntries.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
-        public Brush? PrimaryPaneToolbarBackground => GetPanelBodyBackgroundBrush(IsPrimaryWorkspacePanelActive);
+        public Visibility SecondaryPanePlaceholderVisibility
+        {
+            get
+            {
+                if (SecondaryPanelState.DataSession.IsLoading &&
+                    SecondaryPaneEntries.Count == 0)
+                {
+                    return Visibility.Visible;
+                }
 
-        public Brush? PrimaryPaneBodyBackground => GetPanelBodyBackgroundBrush(IsPrimaryWorkspacePanelActive);
+                string path = _workspaceLayoutHost.ShellState.Secondary.CurrentPath;
+                return string.IsNullOrWhiteSpace(path) || SecondaryPaneEntries.Count == 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+        }
 
-        public Brush? PrimaryPaneInputBackground => GetPanelInputBackgroundBrush(IsPrimaryWorkspacePanelActive);
+        public Visibility SecondaryDetailsHeaderVisibility => SecondaryPaneEntries.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
-        public Brush? SecondaryPaneToolbarBackground => GetPanelBodyBackgroundBrush(IsSecondaryWorkspacePanelActive);
+        public bool SecondaryPaneCanGoBack => _workspaceLayoutHost.ShellState.Secondary.Navigation.BackStack.Count > 0;
 
-        public Brush? SecondaryPaneBodyBackground => GetPanelBodyBackgroundBrush(IsSecondaryWorkspacePanelActive);
+        public bool SecondaryPaneCanGoForward => _workspaceLayoutHost.ShellState.Secondary.Navigation.ForwardStack.Count > 0;
 
-        public Brush? SecondaryPaneInputBackground => GetPanelInputBackgroundBrush(IsSecondaryWorkspacePanelActive);
+        public bool SecondaryPaneCanGoUp
+        {
+            get
+            {
+                string path = _workspaceLayoutHost.ShellState.Secondary.CurrentPath;
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    return false;
+                }
 
-        public Brush? PrimaryPaneBorderBrush => GetPanelBorderBrush(IsPrimaryWorkspacePanelActive);
+                return !string.Equals(path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase);
+            }
+        }
 
-        public Brush? SecondaryPaneBorderBrush => GetPanelBorderBrush(IsSecondaryWorkspacePanelActive);
+        public bool IsPrimaryWorkspacePanelActive => IsWorkspacePanelActive(WorkspacePanelId.Primary);
 
-        public Vector3 PrimaryPaneBodyTranslation => IsPrimaryWorkspacePanelActive
-            ? new Vector3(0, 0, 8)
-            : Vector3.Zero;
+        public bool IsSecondaryWorkspacePanelActive => IsWorkspacePanelActive(WorkspacePanelId.Secondary);
 
-        public Vector3 SecondaryPaneBodyTranslation => IsSecondaryWorkspacePanelActive
-            ? new Vector3(0, 0, 8)
-            : Vector3.Zero;
+        public Brush? PrimaryPaneToolbarBackground => GetPanelToolbarBackgroundBrush(WorkspacePanelId.Primary);
+
+        public Brush? PrimaryPaneBodyBackground => GetPanelBodyBackgroundBrush(WorkspacePanelId.Primary);
+
+        public Brush? SecondaryPaneToolbarBackground => GetPanelToolbarBackgroundBrush(WorkspacePanelId.Secondary);
+
+        public Brush? SecondaryPaneBodyBackground => GetPanelBodyBackgroundBrush(WorkspacePanelId.Secondary);
+
+        public Brush? PrimaryPaneToolbarBorderBrush => GetPanelToolbarBorderBrush(WorkspacePanelId.Primary);
+
+        public Brush? PrimaryPaneBodyBorderBrush => GetPanelBodyBorderBrush(WorkspacePanelId.Primary);
+
+        public Brush? SecondaryPaneToolbarBorderBrush => GetPanelToolbarBorderBrush(WorkspacePanelId.Secondary);
+
+        public Brush? SecondaryPaneBodyBorderBrush => GetPanelBodyBorderBrush(WorkspacePanelId.Secondary);
+
+        public Thickness PrimaryPaneToolbarBorderThickness => GetPanelToolbarBorderThickness(WorkspacePanelId.Primary);
+
+        public Thickness SecondaryPaneToolbarBorderThickness => GetPanelToolbarBorderThickness(WorkspacePanelId.Secondary);
+
+        public Vector3 PrimaryPaneToolbarTranslation => GetPanelToolbarTranslation(WorkspacePanelId.Primary);
+
+        public Vector3 SecondaryPaneToolbarTranslation => GetPanelToolbarTranslation(WorkspacePanelId.Secondary);
+
+        public Thickness PrimaryPaneBodyBorderThickness => GetPanelBodyBorderThickness(WorkspacePanelId.Primary);
+
+        public Thickness SecondaryPaneBodyBorderThickness => GetPanelBodyBorderThickness(WorkspacePanelId.Secondary);
+
+        public Vector3 PrimaryPaneBodyTranslation => GetPanelBodyTranslation(WorkspacePanelId.Primary);
+
+        public Vector3 SecondaryPaneBodyTranslation => GetPanelBodyTranslation(WorkspacePanelId.Secondary);
 
         public Visibility AddressTextFallbackVisibility => VisibleBreadcrumbs.Count == 0
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        private static Brush? GetPanelInputBackgroundBrush(bool isActive)
-        {
-            string key = isActive
-                ? "TextControlBackground"
-                : "LayerOnMicaBaseAltFillColorSecondaryBrush";
+        public Visibility SecondaryPaneAddressTextFallbackVisibility => SecondaryPaneVisibleBreadcrumbs.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
-            return Application.Current.Resources.TryGetValue(key, out object? value) && value is Brush brush
-                ? brush
-                : null;
-        }
-
-        private static Brush? GetPanelBodyBackgroundBrush(bool isActive)
+        private Brush? GetPanelToolbarBackgroundBrush(bool isActive)
         {
-            string key = isActive
+            Border? probe = isActive ? ActivePaneToolbarBrushProbe : InactivePaneToolbarBrushProbe;
+            if (probe?.Background is Brush brush)
+            {
+                return brush;
+            }
+
+            string fallbackKey = isActive
                 ? "LayerFillColorDefaultBrush"
                 : "LayerOnMicaBaseAltFillColorSecondaryBrush";
 
-            return Application.Current.Resources.TryGetValue(key, out object? value) && value is Brush brush
-                ? brush
+            return Application.Current.Resources.TryGetValue(fallbackKey, out object? value) && value is Brush fallbackBrush
+                ? fallbackBrush
                 : null;
         }
 
-        private static Brush? GetPanelBorderBrush(bool isActive)
+        private Brush? GetPanelBodyBackgroundBrush(bool isActive)
         {
-            if (!isActive)
+            Border? probe = isActive ? ActivePaneBodyBrushProbe : InactivePaneBodyBrushProbe;
+            if (probe?.Background is Brush brush)
             {
-                return new SolidColorBrush(Colors.Transparent);
+                return brush;
             }
 
-            return Application.Current.Resources.TryGetValue("ExplorerShellPanelBorderBrush", out object? value) && value is Brush brush
-                ? brush
+            string fallbackKey = isActive
+                ? "LayerFillColorDefaultBrush"
+                : "LayerOnMicaBaseAltFillColorSecondaryBrush";
+
+            return Application.Current.Resources.TryGetValue(fallbackKey, out object? value) && value is Brush fallbackBrush
+                ? fallbackBrush
                 : null;
+        }
+
+        private Brush? GetPanelToolbarBorderBrush(bool isActive)
+        {
+            Border? probe = isActive ? ActivePaneToolbarBrushProbe : InactivePaneToolbarBrushProbe;
+            if (probe?.BorderBrush is Brush probeBrush)
+            {
+                return probeBrush;
+            }
+
+            string fallbackKey = isActive
+                ? "ExplorerShellPanelBorderBrush"
+                : "InactivePaneBorderBrush";
+
+            return Application.Current.Resources.TryGetValue(fallbackKey, out object? value) && value is Brush fallbackBrush
+                ? fallbackBrush
+                : null;
+        }
+
+        private Brush? GetPanelBodyBorderBrush(bool isActive)
+        {
+            Border? probe = isActive ? ActivePaneBodyBrushProbe : InactivePaneBodyBrushProbe;
+            if (probe?.BorderBrush is Brush probeBrush)
+            {
+                return probeBrush;
+            }
+
+            string fallbackKey = isActive
+                ? "ExplorerShellPanelBorderBrush"
+                : "InactivePaneBorderBrush";
+
+            return Application.Current.Resources.TryGetValue(fallbackKey, out object? value) && value is Brush fallbackBrush
+                ? fallbackBrush
+                : null;
+        }
+
+        private static Thickness GetPanelToolbarBorderThickness(bool isActive)
+        {
+            return new Thickness(1);
+        }
+
+        private static Thickness GetPanelBodyBorderThickness(bool isActive)
+        {
+            return new Thickness(1);
         }
 
         private void InitializeWorkspaceShellState()
@@ -184,10 +286,10 @@ namespace FileExplorerUI
 
         private bool UsesClientPresentationPipeline()
         {
-            return _currentViewMode != EntryViewMode.Details
-                || _currentSortField != EntrySortField.Name
-                || _currentSortDirection != SortDirection.Ascending
-                || _currentGroupField != EntryGroupField.None
+            return GetPanelViewMode(WorkspacePanelId.Primary) != EntryViewMode.Details
+                || GetPanelSortField(WorkspacePanelId.Primary) != EntrySortField.Name
+                || GetPanelSortDirection(WorkspacePanelId.Primary) != SortDirection.Ascending
+                || GetPanelGroupField(WorkspacePanelId.Primary) != EntryGroupField.None
                 || RequiresClientSideEntryFiltering();
         }
 

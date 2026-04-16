@@ -21,16 +21,11 @@ namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
-        private GridLength _nameColumnWidth = new(220);
-        private GridLength _typeColumnWidth = new(150);
-        private GridLength _sizeColumnWidth = new(120);
-        private GridLength _modifiedColumnWidth = new(180);
         private GridLength _sidebarColumnWidth = new(220);
-        private double _detailsContentWidth = 694;
-        private double _detailsRowWidth = 714;
         private UIElement? _activeSplitterElement;
         private SplitterDragMode _activeSplitterDragMode;
         private ColumnSplitterKind? _activeColumnSplitterKind;
+        private WorkspacePanelId _activeColumnSplitterPanelId = WorkspacePanelId.Primary;
         private ColumnResizeState? _activeColumnResizeState;
         private double _splitterDragStartX;
         private double? _sidebarDragStartWidth;
@@ -44,6 +39,7 @@ namespace FileExplorerUI
         private int _sidebarTreeScrollRequestVersion;
         private readonly Dictionary<string, string> _sidebarTreeSelectionMemory = new(StringComparer.OrdinalIgnoreCase);
         private EntryViewModel? _pendingContextRenameEntry;
+        private WorkspacePanelId _pendingContextRenamePanelId = WorkspacePanelId.Primary;
         private EntriesContextRequest? _entriesContextRequest;
         private EntryViewModel? _lastEntriesContextItem;
         private EntriesContextRequest? _pendingEntriesContextRequest;
@@ -51,6 +47,7 @@ namespace FileExplorerUI
         private readonly FavoritesController _favoritesController = new();
         private readonly DirectorySessionController _directorySessionController = new();
         private readonly FileOperationsController _fileOperationsController = new();
+        private readonly PaneFileCommandController _paneFileCommandController;
         private readonly SettingsController _settingsController = new();
         private readonly WatcherController _watcherController = new();
         private readonly FileCommandCatalog _fileCommandCatalog = new();
@@ -59,6 +56,7 @@ namespace FileExplorerUI
         private InlineEditSession? _entriesRenameInlineSession;
         private InlineEditSession? _sidebarTreeRenameInlineSession;
         private InlineEditSession? _addressInlineSession;
+        private InlineEditSession? _secondaryAddressInlineSession;
         private SidebarTreeEntry? _pendingSidebarTreeContextEntry;
         private TreeViewNode? _activeSidebarTreeContextNode;
         private MenuFlyoutItem? _sidebarTreeExpandMenuItem;
@@ -110,16 +108,8 @@ namespace FileExplorerUI
         private const uint InitialPageSize = 96;
         private const uint MinPageSize = 64;
         private const uint MaxPageSize = 1000;
-        private readonly BatchObservableCollection<EntryViewModel> _entries = new();
-        private readonly ObservableCollection<GroupedEntryColumnViewModel> _groupedEntryColumns = new();
-        private readonly List<EntryViewModel> _presentationSourceEntries = new();
-        private bool _presentationSourceInitialized;
-        private List<GroupedEntryColumnViewModel>? _groupedColumnsProjectionCache;
-        private int _presentationSourceVersion;
-        private int _groupedColumnsCacheSourceVersion = -1;
-        private EntrySortField _groupedColumnsCacheSortField;
-        private SortDirection _groupedColumnsCacheSortDirection;
-        private EntryGroupField _groupedColumnsCacheGroupField;
+        private PanelViewState PrimaryPanelState => CurrentWorkspaceShellState.Primary;
+        private PanelDataSession PrimaryPanelDataSession => PrimaryPanelState.DataSession;
         private readonly EntriesPresentationBuilder _entriesPresentationBuilder = new();
         private readonly EntriesRepeaterLayoutProfile _detailsRepeaterLayoutProfile;
         private readonly FixedExtentVirtualizingLayout _detailsVirtualizingLayout;
@@ -128,48 +118,86 @@ namespace FileExplorerUI
         private IEntriesViewHost? _detailsEntriesViewHost;
         private IEntriesViewHost? _groupedEntriesViewHost;
         private NavigationPerfSession? _activeNavigationPerfSession;
-        public ObservableCollection<BreadcrumbItemViewModel> Breadcrumbs { get; } = new();
-        public ObservableCollection<BreadcrumbItemViewModel> VisibleBreadcrumbs { get; } = new();
-        private ulong _nextCursor;
-        private bool _hasMore;
-        private bool _isLoading;
+        public ObservableCollection<BreadcrumbItemViewModel> Breadcrumbs => PrimaryPanelNavigation.Breadcrumbs;
+        public ObservableCollection<BreadcrumbItemViewModel> VisibleBreadcrumbs => PrimaryPanelNavigation.VisibleBreadcrumbs;
         private bool _entriesFlyoutOpen;
         private CommandMenuFlyout? _activeEntriesContextFlyout;
-        private string _currentPath = ShellMyComputerPath;
-        private string? _selectedEntryPath;
-        private string? _focusedEntryPath;
-        private string? _pendingParentReturnAnchorPath;
-        private string? _pendingHistoryStateRestorePath;
-        private readonly Dictionary<string, DirectoryViewState> _directoryViewStates = new(StringComparer.OrdinalIgnoreCase);
-        private uint _currentPageSize = InitialPageSize;
-        private uint _lastFetchMs;
-        private uint _totalEntries;
-        private DirectorySortMode _currentSortMode = DirectorySortMode.FolderFirstNameAsc;
-        private EntryViewMode _currentViewMode = EntryViewMode.Details;
-        private EntrySortField _currentSortField = EntrySortField.Name;
-        private SortDirection _currentSortDirection = SortDirection.Ascending;
-        private EntryGroupField _currentGroupField = EntryGroupField.None;
+        private string? _selectedEntryPath
+        {
+            get => PrimaryPanelState.SelectedEntryPath;
+            set => PrimaryPanelState.SelectedEntryPath = value;
+        }
+
+        private string? _focusedEntryPath
+        {
+            get => PrimaryPanelState.FocusedEntryPath;
+            set => PrimaryPanelState.FocusedEntryPath = value;
+        }
+        private string? _pendingParentReturnAnchorPath
+        {
+            get => PrimaryPanelState.PendingParentReturnAnchorPath;
+            set => PrimaryPanelState.PendingParentReturnAnchorPath = value;
+        }
+
+        private string? _pendingHistoryStateRestorePath
+        {
+            get => PrimaryPanelState.PendingHistoryStateRestorePath;
+            set => PrimaryPanelState.PendingHistoryStateRestorePath = value;
+        }
+        private EntryViewMode _currentViewMode
+        {
+            get => PrimaryPanelState.ViewMode;
+            set => PrimaryPanelState.ViewMode = value;
+        }
+        private EntrySortField _currentSortField
+        {
+            get => PrimaryPanelState.SortField;
+            set => PrimaryPanelState.SortField = value;
+        }
+        private SortDirection _currentSortDirection
+        {
+            get => PrimaryPanelState.SortDirection;
+            set => PrimaryPanelState.SortDirection = value;
+        }
+        private EntryGroupField _currentGroupField
+        {
+            get => PrimaryPanelState.GroupField;
+            set => PrimaryPanelState.GroupField = value;
+        }
         private ShellMode _shellMode = ShellMode.Explorer;
         private SettingsSection _currentSettingsSection = SettingsSection.General;
         private bool _suppressSettingsNavigationSelection;
         private readonly AppSettingsService _appSettingsService = new();
         private AppSettings _appSettings = new();
         private EntryViewDensityMode _currentEntryViewDensityMode = EntryViewDensityMode.Normal;
-        private double _lastDetailsHorizontalOffset = double.NaN;
-        private double _lastDetailsVerticalOffset = double.NaN;
-        private double _lastGroupedHorizontalOffset = double.NaN;
-        private double _lastGroupedVerticalOffset = double.NaN;
-        private double _lastDetailsVerticalDelta;
-        private int _lastDetailsViewportStartIndex = -1;
-        private int _lastDetailsViewportIndexDelta;
+        private double _lastDetailsHorizontalOffset
+        {
+            get => PrimaryPanelState.LastDetailsHorizontalOffset;
+            set => PrimaryPanelState.LastDetailsHorizontalOffset = value;
+        }
+
+        private double _lastDetailsVerticalOffset
+        {
+            get => PrimaryPanelState.LastDetailsVerticalOffset;
+            set => PrimaryPanelState.LastDetailsVerticalOffset = value;
+        }
+
+        private double _lastGroupedHorizontalOffset
+        {
+            get => PrimaryPanelState.LastGroupedHorizontalOffset;
+            set => PrimaryPanelState.LastGroupedHorizontalOffset = value;
+        }
+
+        private double _lastGroupedVerticalOffset
+        {
+            get => PrimaryPanelState.LastGroupedVerticalOffset;
+            set => PrimaryPanelState.LastGroupedVerticalOffset = value;
+        }
         private double _estimatedItemHeight = 32.0;
-        private int _groupedListRowsPerColumn = -1;
-        private readonly Stack<string> _backStack = new();
-        private readonly Stack<string> _forwardStack = new();
-        private string _currentQuery = string.Empty;
+        private Stack<string> _backStack => PrimaryPanelNavigation.BackStack;
+        private Stack<string> _forwardStack => PrimaryPanelNavigation.ForwardStack;
         private readonly ExplorerService _explorerService = new();
         private readonly FileManagementCoordinator _fileManagementCoordinator;
-        private IEntryResultSet? _activeEntryResultSet;
         private readonly HashSet<string> _suppressedWatcherRefreshPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _sparseViewportGate = new();
         private int? _pendingSparseViewportTargetIndex;
@@ -177,22 +205,20 @@ namespace FileExplorerUI
         private bool _isSparseViewportLoadActive;
         private readonly string _engineVersion;
         private EntryViewModel? _activeRenameOverlayEntry;
+        private WorkspacePanelId _activeRenameOverlayPanelId = WorkspacePanelId.Primary;
         private EntryViewModel? _pendingCreatedEntrySelection;
         private bool _isCommittingRenameOverlay;
+        private bool _suppressRenameOverlayFocusRestoreOnCancel;
         private RustUsnCapability _usnCapability;
         private FileSystemWatcher? _dirWatcher;
         private CancellationTokenSource? _watcherDebounceCts;
         private readonly Dictionary<string, FileSystemWatcher> _favoriteWatchers = new(StringComparer.OrdinalIgnoreCase);
-        private CancellationTokenSource? _navigationLoadCts;
-        private CancellationTokenSource? _directoryLoadCts;
-        private CancellationTokenSource? _metadataPrefetchCts;
         private bool _localizedUiRefreshScheduled;
         private bool _localizedUiRefreshPending;
         private int _localizedUiRefreshVersion;
         private int _localizedUiDeferredRefreshVersion;
-        private int _metadataViewportRequestVersion;
-        private long _directorySnapshotVersion;
-        private long _lastDetailsScrollInteractionTick;
+        private string? _lastNotifiedCurrentTabTitleText;
+        private string? _lastNotifiedTitleBarTabGlyph;
         private CommandDockSide _commandDockSide = CommandDockSide.Top;
         private bool _showCommandDock = false;
         private bool _sidebarInitialized;
@@ -204,31 +230,64 @@ namespace FileExplorerUI
         private int _lastRestoredWindowHeight;
         private bool _windowSizeRestorePending;
         private bool _hasSeenFirstActivation;
-        private bool _groupedColumnsRefreshQueued;
-        private CancellationTokenSource? _groupedColumnsResizeDebounceCts;
-        private int _groupedColumnsRefreshVersion;
-        private long _lastGroupedColumnsRefreshAppliedStamp;
         private double _lastWindowWidth = double.NaN;
         private double _lastWindowHeight = double.NaN;
-        private double _lastGroupedViewportHeight = double.NaN;
-        private long _lastGroupedColumnsLiveResizeRefreshTick;
-        private readonly Dictionary<string, bool> _groupExpansionStates = new(StringComparer.Ordinal);
-        private readonly WorkspaceShellState _workspaceShellState = new();
-        private readonly WorkspaceLayoutHost _workspaceLayoutHost;
+        private readonly WorkspaceSession _workspaceSession;
+        private WorkspaceTabManager _workspaceTabManager => _workspaceSession.TabManager;
+        private WorkspaceLayoutHost _workspaceLayoutHost => _workspaceSession.LayoutHost;
+        private WorkspaceShellState CurrentWorkspaceShellState => _workspaceSession.CurrentShellState;
+        private bool _startupWorkspaceSessionRestored;
+        private readonly WorkspaceUiApplier _workspaceUiApplier;
+        private readonly WorkspaceTabController _workspaceTabController;
+        private readonly WorkspaceTabStripHost _workspaceTabStripHost;
+        private readonly WorkspaceChromeCoordinator _workspaceChromeCoordinator;
+        private PanelNavigationState PrimaryPanelNavigation => PrimaryPanelState.Navigation;
         private DataTransferManager? _shareDataTransferManager;
         private FileCommandTarget? _pendingShareTarget;
         private IntPtr _windowHandle;
         private IntPtr _originalWndProc;
         private WndProcDelegate? _wndProcDelegate;
         private MenuFlyout? _activeBreadcrumbFlyout;
-        private readonly List<BreadcrumbItemViewModel> _hiddenBreadcrumbItems = new();
-        private bool _breadcrumbWidthsReady;
-        private int _breadcrumbVisibleStartIndex = -1;
+        private List<BreadcrumbItemViewModel> _hiddenBreadcrumbItems => PrimaryPanelNavigation.HiddenBreadcrumbItems;
+        private bool _breadcrumbWidthsReady
+        {
+            get => PrimaryPanelNavigation.BreadcrumbWidthsReady;
+            set => PrimaryPanelNavigation.BreadcrumbWidthsReady = value;
+        }
+
+        private int _breadcrumbVisibleStartIndex
+        {
+            get => PrimaryPanelNavigation.BreadcrumbVisibleStartIndex;
+            set => PrimaryPanelNavigation.BreadcrumbVisibleStartIndex = value;
+        }
         private bool _lastTitleWasReadFailed;
         private readonly SemaphoreSlim _statusDialogSemaphore = new(1, 1);
         private DispatcherTimer? _renameInputTeachingTipTimer;
         private DispatcherTimer? _addressInputTeachingTipTimer;
         private bool _suppressRenameTextFiltering;
+        private Controls.ModalActionDialog? _operationFeedbackDialog;
         private Controls.ModalActionDialog? _pasteConflictDialog;
+
+        private readonly record struct PrimaryPresentationNotificationState(
+            EntryViewMode ViewMode,
+            EntrySortField SortField,
+            SortDirection SortDirection,
+            EntryGroupField GroupField,
+            EntryViewDensityMode DensityMode);
+
+        private readonly record struct PanelColumnLayoutNotificationState(
+            bool IsSplit,
+            double PrimaryNameColumnWidth,
+            double PrimaryTypeColumnWidth,
+            double PrimarySizeColumnWidth,
+            double PrimaryModifiedColumnWidth,
+            double PrimaryDetailsContentWidth,
+            double PrimaryDetailsRowWidth,
+            double SecondaryNameColumnWidth,
+            double SecondaryTypeColumnWidth,
+            double SecondarySizeColumnWidth,
+            double SecondaryModifiedColumnWidth,
+            double SecondaryDetailsContentWidth,
+            double SecondaryDetailsRowWidth);
     }
 }

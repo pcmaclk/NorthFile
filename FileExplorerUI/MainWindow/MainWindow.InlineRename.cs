@@ -83,10 +83,7 @@ namespace FileExplorerUI
                 DefaultButton = ContentDialogButton.Primary
             };
 
-            if (this.Content is FrameworkElement root)
-            {
-                dialog.XamlRoot = root.XamlRoot;
-            }
+            PrepareWindowDialog(dialog);
 
             ContentDialogResult result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary)
@@ -105,6 +102,12 @@ namespace FileExplorerUI
                 return;
             }
 
+            if (_activeRenameOverlayPanelId == WorkspacePanelId.Secondary)
+            {
+                CancelActiveRenameOverlayWithoutFocusRestore();
+                return;
+            }
+
             await _inlineEditCoordinator.CommitActiveSessionAsync();
         }
 
@@ -120,8 +123,9 @@ namespace FileExplorerUI
             if (e.Key == Windows.System.VirtualKey.Escape)
             {
                 e.Handled = true;
+                WorkspacePanelId ownerPanelId = _activeRenameOverlayPanelId;
                 HideRenameOverlay();
-                FocusEntriesList();
+                FocusRenameOverlayOwnerList(ownerPanelId);
                 return;
             }
 
@@ -129,11 +133,19 @@ namespace FileExplorerUI
                 or Windows.System.VirtualKey.Home or Windows.System.VirtualKey.End or Windows.System.VirtualKey.PageUp or Windows.System.VirtualKey.PageDown)
             {
                 e.Handled = true;
+                WorkspacePanelId ownerPanelId = _activeRenameOverlayPanelId;
                 HideRenameOverlay();
-                FocusEntriesList();
+                FocusRenameOverlayOwnerList(ownerPanelId);
                 _ = DispatcherQueue.TryEnqueue(() =>
                 {
-                    HandleEntriesNavigationKey(e.Key);
+                    if (ownerPanelId == WorkspacePanelId.Secondary)
+                    {
+                        HandleSecondaryEntriesNavigationKey(e.Key);
+                    }
+                    else
+                    {
+                        HandleEntriesNavigationKey(e.Key);
+                    }
                 });
             }
         }
@@ -293,41 +305,71 @@ namespace FileExplorerUI
 
         private int FindInsertIndexForEntry(EntryViewModel entry)
         {
-            return _entriesPresentationBuilder.FindInsertIndex(_entries, entry, _currentSortMode);
+            return _entriesPresentationBuilder.FindInsertIndex(
+                PrimaryEntries,
+                entry,
+                GetPanelDirectorySortMode(WorkspacePanelId.Primary));
         }
 
         private int CompareEntries(EntryViewModel left, EntryViewModel right)
         {
-            return _entriesPresentationBuilder.Compare(left, right, _currentSortMode);
+            return _entriesPresentationBuilder.Compare(
+                left,
+                right,
+                GetPanelDirectorySortMode(WorkspacePanelId.Primary));
         }
 
-        private async Task<bool> BeginRenameOverlayAsync(EntryViewModel entry, bool ensureVisible = true, bool updateSelection = true)
+        private async Task<bool> BeginRenameOverlayAsync(
+            EntryViewModel entry,
+            bool ensureVisible = true,
+            bool updateSelection = true,
+            WorkspacePanelId panelId = WorkspacePanelId.Primary)
         {
             _inlineEditCoordinator.CancelActiveSession();
             HideRenameOverlay();
-            bool alreadySelected =
-                string.Equals(_selectedEntryPath, entry.FullPath, StringComparison.OrdinalIgnoreCase);
+            bool alreadySelected = panelId == WorkspacePanelId.Secondary
+                ? string.Equals(SecondaryPanelState.SelectedEntryPath, entry.FullPath, StringComparison.OrdinalIgnoreCase)
+                : string.Equals(_selectedEntryPath, entry.FullPath, StringComparison.OrdinalIgnoreCase);
 
             if (updateSelection && !alreadySelected)
             {
-                SelectEntryInList(entry, ensureVisible);
+                if (panelId == WorkspacePanelId.Secondary)
+                {
+                    SecondarySelectEntryInList(entry);
+                    if (ensureVisible)
+                    {
+                        SecondaryScrollEntryIntoView(entry);
+                    }
+                }
+                else
+                {
+                    SelectEntryInList(entry, ensureVisible);
+                }
             }
             bool scrolledIntoViewForRetry = false;
 
             for (int attempt = 0; attempt < 4; attempt++)
             {
                 await Task.Delay(16);
-                GetVisibleEntriesRoot().UpdateLayout();
-                if (!TryPositionRenameOverlay(entry))
+                GetRenameOverlayHost(panelId).UpdateLayout();
+                if (!TryPositionRenameOverlay(entry, panelId))
                 {
                     if (!scrolledIntoViewForRetry && attempt >= 1)
                     {
                         scrolledIntoViewForRetry = true;
-                        ScrollEntryIntoView(entry);
+                        if (panelId == WorkspacePanelId.Secondary)
+                        {
+                            SecondaryScrollEntryIntoView(entry);
+                        }
+                        else
+                        {
+                            ScrollEntryIntoView(entry);
+                        }
                     }
                     continue;
                 }
 
+                _activeRenameOverlayPanelId = panelId;
                 _activeRenameOverlayEntry = entry;
                 entry.IsNameEditing = true;
                 RenameOverlayTextBox.Text = entry.Name;
@@ -336,8 +378,12 @@ namespace FileExplorerUI
                     () => CommitRenameOverlayIfActiveAsync(),
                     () =>
                     {
+                        WorkspacePanelId ownerPanelId = _activeRenameOverlayPanelId;
                         HideRenameOverlay();
-                        FocusEntriesList();
+                        if (!_suppressRenameOverlayFocusRestoreOnCancel)
+                        {
+                            FocusRenameOverlayOwnerList(ownerPanelId);
+                        }
                     },
                     source => IsDescendantOf(source, RenameOverlayBorder));
                 _inlineEditCoordinator.BeginSession(_entriesRenameInlineSession);
@@ -350,9 +396,9 @@ namespace FileExplorerUI
             return false;
         }
 
-        private bool TryPositionRenameOverlay(EntryViewModel entry)
+        private bool TryPositionRenameOverlay(EntryViewModel entry, WorkspacePanelId panelId)
         {
-            if (!TryGetEntryAnchor(entry, out EntryNameCell? anchor))
+            if (!TryGetEntryAnchor(entry, panelId, out EntryNameCell? anchor))
             {
                 return false;
             }
@@ -395,13 +441,13 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (!TryPositionRenameOverlay(_activeRenameOverlayEntry))
+            if (!TryPositionRenameOverlay(_activeRenameOverlayEntry, _activeRenameOverlayPanelId))
             {
                 HideRenameOverlay();
             }
         }
 
-        private bool TryGetEntryAnchor<T>(EntryViewModel entry, [NotNullWhen(true)] out T? anchor) where T : FrameworkElement
+        private bool TryGetEntryAnchor<T>(EntryViewModel entry, WorkspacePanelId panelId, [NotNullWhen(true)] out T? anchor) where T : FrameworkElement
         {
             anchor = null;
             if (entry is null || string.IsNullOrWhiteSpace(entry.FullPath))
@@ -409,17 +455,31 @@ namespace FileExplorerUI
                 return false;
             }
 
-            IEntriesViewHost? host = GetActiveEntriesViewHost();
-            if (host is null)
+            FrameworkElement? found = null;
+            if (panelId == WorkspacePanelId.Secondary)
             {
-                return false;
+                SecondaryEntriesScrollViewer.UpdateLayout();
+                if (TryGetSecondaryEntryAnchor(entry, out FrameworkElement? element))
+                {
+                    found = typeof(T) == typeof(EntryNameCell)
+                        ? element is null ? null : FindDescendant<EntryNameCell>(element)
+                        : element;
+                }
+            }
+            else
+            {
+                IEntriesViewHost? host = GetActiveEntriesViewHost();
+                if (host is null)
+                {
+                    return false;
+                }
+
+                GetVisibleEntriesRoot().UpdateLayout();
+                found = typeof(T) == typeof(EntryNameCell)
+                    ? host.FindEntryNameCell(entry.FullPath)
+                    : host.FindEntryContainer(entry.FullPath);
             }
 
-            GetVisibleEntriesRoot().UpdateLayout();
-
-            FrameworkElement? found = typeof(T) == typeof(EntryNameCell)
-                ? host.FindEntryNameCell(entry.FullPath)
-                : host.FindEntryContainer(entry.FullPath);
             if (found is T typed)
             {
                 anchor = typed;
@@ -454,19 +514,25 @@ namespace FileExplorerUI
             {
                 EntryViewModel entry = _activeRenameOverlayEntry;
                 string proposedName = RenameOverlayTextBox.Text?.Trim() ?? string.Empty;
-                int index = _entries.IndexOf(entry);
+                int primaryIndex = _activeRenameOverlayPanelId == WorkspacePanelId.Primary
+                    ? PrimaryEntries.IndexOf(entry)
+                    : -1;
 
                 if (entry.IsPendingCreate)
                 {
                     if (string.IsNullOrWhiteSpace(proposedName))
                     {
-                        CancelPendingCreateEntry(index);
+                        CancelPendingCreateEntry(primaryIndex);
                         HideRenameOverlay();
                         FocusEntriesList();
                         return;
                     }
 
-                    if (!_fileManagementCoordinator.TryValidateName(_currentPath, entry.Name, proposedName, out string pendingValidationError))
+                    if (!_fileManagementCoordinator.TryValidateName(
+                            GetPanelCurrentPath(WorkspacePanelId.Primary),
+                            entry.Name,
+                            proposedName,
+                            out string pendingValidationError))
                     {
                         ShowRenameValidationTeachingTip(RenameOverlayTextBox, pendingValidationError);
                         RenameOverlayTextBox.Focus(FocusState.Programmatic);
@@ -474,12 +540,13 @@ namespace FileExplorerUI
                         return;
                     }
 
-                    await CommitPendingCreateAsync(entry, index, proposedName);
+                    await CommitPendingCreateAsync(entry, primaryIndex, proposedName);
                     return;
                 }
 
                 if (string.Equals(proposedName, entry.Name, StringComparison.Ordinal))
                 {
+                    WorkspacePanelId ownerPanelId = _activeRenameOverlayPanelId;
                     HideRenameOverlay();
                     if (ReferenceEquals(_pendingCreatedEntrySelection, entry))
                     {
@@ -487,12 +554,15 @@ namespace FileExplorerUI
                     }
                     else
                     {
-                        _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                        _ = DispatcherQueue.TryEnqueue(() => FocusRenameOverlayOwnerList(ownerPanelId));
                     }
                     return;
                 }
 
-                if (!_fileManagementCoordinator.TryValidateName(_currentPath, entry.Name, proposedName, out string validationError))
+                string renameDirectoryPath = _activeRenameOverlayPanelId == WorkspacePanelId.Secondary
+                    ? SecondaryPanelState.CurrentPath
+                    : GetPanelCurrentPath(WorkspacePanelId.Primary);
+                if (!_fileManagementCoordinator.TryValidateName(renameDirectoryPath, entry.Name, proposedName, out string validationError))
                 {
                     ShowRenameValidationTeachingTip(RenameOverlayTextBox, validationError);
                     RenameOverlayTextBox.Focus(FocusState.Programmatic);
@@ -500,13 +570,20 @@ namespace FileExplorerUI
                     return;
                 }
 
-                if (index < 0)
+                if (_activeRenameOverlayPanelId == WorkspacePanelId.Primary && primaryIndex < 0)
                 {
                     HideRenameOverlay();
                     return;
                 }
 
-                await RenameEntryAsync(entry, index, proposedName);
+                if (_activeRenameOverlayPanelId == WorkspacePanelId.Secondary)
+                {
+                    await RenameSecondaryEntryInlineAsync(entry, proposedName);
+                }
+                else
+                {
+                    await RenameEntryAsync(entry, primaryIndex, proposedName);
+                }
             }
             finally
             {
@@ -521,17 +598,88 @@ namespace FileExplorerUI
                 return;
             }
 
+            WorkspacePanelId ownerPanelId = _activeRenameOverlayPanelId;
             await CommitRenameOverlayAsync();
 
             if (focusEntriesList && RenameOverlayBorder.Visibility != Visibility.Visible)
             {
-                FocusEntriesList();
+                FocusRenameOverlayOwnerList(ownerPanelId);
+            }
+        }
+
+        private async Task RenameSecondaryEntryInlineAsync(EntryViewModel entry, string newName)
+        {
+            string oldName = entry.Name;
+            string currentDirectoryPath = SecondaryPanelState.CurrentPath;
+            if (string.IsNullOrWhiteSpace(currentDirectoryPath) ||
+                string.Equals(currentDirectoryPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                HideRenameOverlay();
+                UpdateStatusKey("StatusRenameFailedSelectLoaded");
+                return;
+            }
+
+            TreeViewNode? renamedTreeNode = entry.IsDirectory ? FindSidebarTreeNodeByPath(entry.FullPath) : null;
+            while (true)
+            {
+                try
+                {
+                    FileOperationResult<RenamedEntryInfo> renameResult =
+                        await _fileManagementCoordinator.TryRenameEntryAsync(currentDirectoryPath, entry.Name, newName);
+                    FileOperationsController.RenameDecision renameDecision = _fileOperationsController.AnalyzeRenameResult(
+                        renameResult,
+                        S("ErrorFileOperationUnknown"));
+                    if (!renameDecision.Succeeded || renameDecision.RenamedInfo is null)
+                    {
+                        if (!await ShowRenameFailureDialogAsync(
+                                oldName,
+                                renameResult.Failure?.Error ?? FileOperationError.Unknown,
+                                renameDecision.FailureMessage ?? S("ErrorFileOperationUnknown")))
+                        {
+                            RenameOverlayTextBox.Focus(FocusState.Programmatic);
+                            SelectRenameTargetText(RenameOverlayTextBox, entry);
+                            return;
+                        }
+
+                        continue;
+                    }
+
+                    RenamedEntryInfo renamed = renameDecision.RenamedInfo.Value;
+                    HideRenameOverlay();
+                    TryUpdateFavoritePathsForRename(renamed.SourcePath, renamed.TargetPath);
+
+                    if (entry.IsDirectory)
+                    {
+                        if (renamedTreeNode is not null)
+                        {
+                            UpdateSidebarTreeNodePath(renamedTreeNode, renamed.SourcePath, renamed.TargetPath, newName);
+                        }
+                        else if (FindSidebarTreeNodeByPath(currentDirectoryPath) is TreeViewNode parentNode && parentNode.IsExpanded)
+                        {
+                            await PopulateSidebarTreeChildrenAsync(parentNode, currentDirectoryPath, CancellationToken.None, expandAfterLoad: true);
+                        }
+                    }
+
+                    await ReloadPanelWithSelectionAsync(WorkspacePanelId.Secondary, renamed.TargetPath);
+                    UpdateStatusKey("StatusRenameSuccess", oldName, newName);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    if (!await ShowRenameFailureDialogAsync(oldName, FileOperationErrors.Classify(ex), FileOperationErrors.ToUserMessage(ex)))
+                    {
+                        RenameOverlayTextBox.Focus(FocusState.Programmatic);
+                        SelectRenameTargetText(RenameOverlayTextBox, entry);
+                        return;
+                    }
+                }
             }
         }
 
         private async Task CommitPendingCreateAsync(EntryViewModel entry, int index, string proposedName)
         {
-            string targetPath = Path.Combine(_currentPath, proposedName);
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            string targetPath = Path.Combine(currentPath, proposedName);
             try
             {
                 if (entry.PendingCreateIsDirectory)
@@ -545,16 +693,18 @@ namespace FileExplorerUI
 
                 try
                 {
-                    _explorerService.MarkPathChanged(_currentPath);
+                    _explorerService.MarkPathChanged(currentPath);
                 }
                 catch
                 {
-                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, entry.PendingCreateIsDirectory ? "create-folder" : "create-file");
+                    EnsurePersistentRefreshFallbackInvalidation(
+                        currentPath,
+                        entry.PendingCreateIsDirectory ? "create-folder" : "create-file");
                 }
 
                 HideRenameOverlay();
 
-                if (index < 0 || index >= _entries.Count)
+                if (index < 0 || index >= PrimaryEntries.Count)
                 {
                     return;
                 }
@@ -574,9 +724,11 @@ namespace FileExplorerUI
                 entry.IsMetadataLoaded = true;
                 InvalidatePresentationSourceCache();
 
-                if (entry.PendingCreateIsDirectory && FindSidebarTreeNodeByPath(_currentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
+                if (entry.PendingCreateIsDirectory &&
+                    FindSidebarTreeNodeByPath(currentPath) is TreeViewNode parentNode &&
+                    parentNode.IsExpanded)
                 {
-                    await PopulateSidebarTreeChildrenAsync(parentNode, _currentPath, CancellationToken.None, expandAfterLoad: true);
+                    await PopulateSidebarTreeChildrenAsync(parentNode, currentPath, CancellationToken.None, expandAfterLoad: true);
                 }
 
                 UpdateStatusKey("StatusCreateSuccess", proposedName);
@@ -604,12 +756,12 @@ namespace FileExplorerUI
 
         private void CancelPendingCreateEntry(int index)
         {
-            if (index < 0 || index >= _entries.Count)
+            if (index < 0 || index >= PrimaryEntries.Count)
             {
                 return;
             }
 
-            _entries.RemoveAt(index);
+            PrimaryEntries.RemoveAt(index);
             InvalidatePresentationSourceCache();
         }
 
@@ -625,7 +777,53 @@ namespace FileExplorerUI
                 _activeRenameOverlayEntry.IsNameEditing = false;
             }
             _activeRenameOverlayEntry = null;
+            _activeRenameOverlayPanelId = WorkspacePanelId.Primary;
             RenameOverlayBorder.Visibility = Visibility.Collapsed;
+        }
+
+        private void CancelActiveRenameOverlayWithoutFocusRestore()
+        {
+            _suppressRenameOverlayFocusRestoreOnCancel = true;
+            try
+            {
+                _inlineEditCoordinator.CancelActiveSession();
+            }
+            finally
+            {
+                _suppressRenameOverlayFocusRestoreOnCancel = false;
+            }
+        }
+
+        private void CancelRenameOverlayForPanelSwitch(WorkspacePanelId targetPanelId)
+        {
+            if (RenameOverlayBorder.Visibility != Visibility.Visible ||
+                _activeRenameOverlayEntry is null ||
+                _activeRenameOverlayPanelId == targetPanelId)
+            {
+                return;
+            }
+
+            CancelActiveRenameOverlayWithoutFocusRestore();
+        }
+
+        private FrameworkElement GetRenameOverlayHost(WorkspacePanelId panelId)
+        {
+            return panelId == WorkspacePanelId.Secondary
+                ? SecondaryEntriesScrollViewer
+                : GetVisibleEntriesRoot();
+        }
+
+        private void FocusRenameOverlayOwnerList(WorkspacePanelId? ownerPanelId = null)
+        {
+            WorkspacePanelId panelId = ownerPanelId ?? _activeRenameOverlayPanelId;
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                FocusSecondaryEntriesList();
+            }
+            else
+            {
+                FocusEntriesList();
+            }
         }
 
         private bool IsFocusedElementWithinRenameOverlay()

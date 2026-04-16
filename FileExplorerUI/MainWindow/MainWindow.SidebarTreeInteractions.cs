@@ -1,5 +1,6 @@
 using FileExplorerUI.Controls;
 using FileExplorerUI.Services;
+using FileExplorerUI.Workspace;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -210,9 +211,9 @@ namespace FileExplorerUI
                 _sidebarTreeSelectionMemory[entry.FullPath] = selectedEntry.FullPath;
                 shouldSelectCollapsedNode = true;
             }
-            else if (IsPathWithin(_currentPath, entry.FullPath))
+            else if (IsPathWithin(GetPanelCurrentPath(WorkspacePanelId.Primary), entry.FullPath))
             {
-                _sidebarTreeSelectionMemory[entry.FullPath] = _currentPath;
+                _sidebarTreeSelectionMemory[entry.FullPath] = GetPanelCurrentPath(WorkspacePanelId.Primary);
                 shouldSelectCollapsedNode = true;
             }
 
@@ -325,19 +326,16 @@ namespace FileExplorerUI
 
             if (string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                _currentPath = ShellMyComputerPath;
-                PathTextBox.Text = GetDisplayPathText(ShellMyComputerPath);
-                _currentQuery = string.Empty;
-                SearchTextBox.Text = string.Empty;
-                UpdateBreadcrumbs(_currentPath);
+                SetPrimaryPanelNavigationState(ShellMyComputerPath, queryText: string.Empty, syncEditors: true);
+                UpdateBreadcrumbs(GetPanelCurrentPath(WorkspacePanelId.Primary));
                 UpdateNavButtonsState();
-                _ = SelectSidebarTreePathAsync(_currentPath);
-                await LoadFirstPageAsync();
+                _ = SelectSidebarTreePathAsync(GetPanelCurrentPath(WorkspacePanelId.Primary));
+                await LoadPanelDataAsync(WorkspacePanelId.Primary);
                 return;
             }
 
             Debug.WriteLine($"[Tree] Selected: {entry.FullPath}");
-            if (_isLoading)
+            if (GetPanelIsLoading(WorkspacePanelId.Primary))
             {
                 UpdateStatusKey("StatusSidebarTreeNavIgnoredLoading");
                 return;
@@ -351,7 +349,11 @@ namespace FileExplorerUI
             try
             {
                 Debug.WriteLine($"[Tree] Navigate: {entry.FullPath}");
-                await NavigateToPathAsync(entry.FullPath, pushHistory: true, focusEntriesAfterNavigation: false);
+                    await NavigatePanelToPathAsync(
+                        WorkspacePanelId.Primary,
+                        entry.FullPath,
+                        pushHistory: true,
+                        focusEntriesAfterNavigation: false);
             }
             catch (Exception ex)
             {

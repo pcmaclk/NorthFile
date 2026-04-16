@@ -368,6 +368,7 @@ namespace FileExplorerUI
                 FileCommandIds.CreateShortcut => S("CommonCreateShortcut"),
                 FileCommandIds.CopyPath => target.IsDirectory ? S("CommonCopyFolderPath") : S("CommonCopyFilePath"),
                 FileCommandIds.Properties => S("CommonProperties"),
+                FileCommandIds.OpenInNewTab => S("CommonOpenInNewTab"),
                 FileCommandIds.OpenInNewWindow => S("CommonOpenInNewWindow"),
                 FileCommandIds.PinToSidebar or FileCommandIds.UnpinFromSidebar => IsFavoritePath(target.Path)
                     ? S("CommonUnpinFromSidebar")
@@ -425,6 +426,7 @@ namespace FileExplorerUI
                 var value when string.Equals(value, S("CommonCopy"), StringComparison.Ordinal) => "\uE8C8",
                 var value when string.Equals(value, S("CommonRename"), StringComparison.Ordinal) => "\uE8AC",
                 var value when string.Equals(value, S("CommonDelete"), StringComparison.Ordinal) => "\uE74D",
+                var value when string.Equals(value, S("CommonOpenInNewTab"), StringComparison.Ordinal) => "\uE8A9",
                 var value when string.Equals(value, S("CommonOpenInTerminal"), StringComparison.Ordinal) => "\uE756",
                 var value when string.Equals(value, S("CommonRefresh"), StringComparison.Ordinal) => "\uE72C",
                 _ => "\uE8A5"
@@ -551,12 +553,14 @@ namespace FileExplorerUI
             if (_pendingContextRenameEntry is not null)
             {
                 EntryViewModel pendingRenameEntry = _pendingContextRenameEntry;
+                WorkspacePanelId pendingRenamePanelId = _pendingContextRenamePanelId;
                 _pendingContextRenameEntry = null;
+                _pendingContextRenamePanelId = WorkspacePanelId.Primary;
                 _pendingEntriesContextRequest = null;
                 _entriesContextRequest = null;
                 _lastEntriesContextItem = null;
                 _activeEntriesContextFlyout = null;
-                _ = BeginRenameOverlayAsync(pendingRenameEntry);
+                _ = BeginRenameOverlayAsync(pendingRenameEntry, panelId: pendingRenamePanelId);
                 return;
             }
 
@@ -580,6 +584,7 @@ namespace FileExplorerUI
             _lastEntriesContextItem = null;
             _activeEntriesContextFlyout = null;
             _pendingContextRenameEntry = null;
+            _pendingContextRenamePanelId = WorkspacePanelId.Primary;
         }
 
         private void UpdateSidebarTreeExpandCollapseMenuItems(CommandMenuFlyout flyout)
@@ -706,6 +711,13 @@ namespace FileExplorerUI
 
         private FileCommandTarget ResolveEntriesContextTarget(EntryViewModel? contextEntry)
         {
+            if (_entriesContextRequest?.Origin == EntriesContextOrigin.SecondaryEntriesList)
+            {
+                return ResolveSecondaryEntriesContextTarget(contextEntry);
+            }
+
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+
             if (contextEntry is { IsLoaded: true })
             {
                 if (_entriesContextRequest?.Origin == EntriesContextOrigin.SidebarTree && contextEntry.IsDirectory)
@@ -718,7 +730,7 @@ namespace FileExplorerUI
                     return FileCommandTargetResolver.ResolveEntry(contextEntry.FullPath, isDirectory: true);
                 }
 
-                if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) && contextEntry.IsDirectory)
+                if (string.Equals(currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) && contextEntry.IsDirectory)
                 {
                     return FileCommandTargetResolver.ResolveDriveRoot(contextEntry.FullPath);
                 }
@@ -726,12 +738,33 @@ namespace FileExplorerUI
                 return FileCommandTargetResolver.ResolveEntry(contextEntry.FullPath, contextEntry.IsDirectory);
             }
 
-            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 return FileCommandTargetResolver.ResolveVirtualNode(ShellMyComputerPath, S("SidebarMyComputer"));
             }
 
-            return FileCommandTargetResolver.ResolveListBackground(_currentPath);
+            return FileCommandTargetResolver.ResolveListBackground(currentPath);
+        }
+
+        private FileCommandTarget ResolveSecondaryEntriesContextTarget(EntryViewModel? contextEntry)
+        {
+            if (contextEntry is { IsLoaded: true })
+            {
+                if (string.Equals(SecondaryPanelState.CurrentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
+                    contextEntry.IsDirectory)
+                {
+                    return FileCommandTargetResolver.ResolveDriveRoot(contextEntry.FullPath);
+                }
+
+                return FileCommandTargetResolver.ResolveEntry(contextEntry.FullPath, contextEntry.IsDirectory);
+            }
+
+            if (string.Equals(SecondaryPanelState.CurrentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return FileCommandTargetResolver.ResolveVirtualNode(ShellMyComputerPath, S("SidebarMyComputer"));
+            }
+
+            return FileCommandTargetResolver.ResolveListBackground(SecondaryPanelState.CurrentPath);
         }
     }
 }

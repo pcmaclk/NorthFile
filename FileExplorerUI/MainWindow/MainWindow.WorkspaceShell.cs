@@ -7,27 +7,16 @@ namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
-        private static void CopyPanelState(PanelViewState source, PanelViewState target)
-        {
-            target.CurrentPath = source.CurrentPath;
-            target.AddressText = source.AddressText;
-            target.QueryText = source.QueryText;
-            target.SelectedEntryPath = source.SelectedEntryPath;
-            target.ViewMode = source.ViewMode;
-            target.SortField = source.SortField;
-            target.SortDirection = source.SortDirection;
-            target.GroupField = source.GroupField;
-        }
-
         private void InitializeSecondaryPanelStateFromPrimary()
         {
             PanelViewState primary = _workspaceLayoutHost.ShellState.Primary;
             PanelViewState secondary = _workspaceLayoutHost.ShellState.Secondary;
 
-            CopyPanelState(primary, secondary);
+            secondary.CopyNonDataStateFrom(primary);
             secondary.AddressText = string.IsNullOrWhiteSpace(primary.AddressText)
                 ? GetDisplayPathText(primary.CurrentPath)
                 : primary.AddressText;
+            UpdateSecondaryPaneBreadcrumbs(secondary.CurrentPath);
         }
 
         private void ActivateWorkspacePanel(WorkspacePanelId panelId)
@@ -118,9 +107,13 @@ namespace FileExplorerUI
                 return;
             }
 
-            CopyPanelState(_workspaceLayoutHost.ShellState.Secondary, _workspaceLayoutHost.ShellState.Primary);
+            _workspaceLayoutHost.ShellState.Primary.CopyNonDataStateFrom(_workspaceLayoutHost.ShellState.Secondary);
             SetDualPaneEnabled(false);
-            await RestorePrimaryPanelStateAsync(_workspaceLayoutHost.ShellState.Primary);
+            await ReloadPanelDataAsync(
+                WorkspacePanelId.Primary,
+                preserveViewport: true,
+                ensureSelectionVisible: false,
+                focusEntries: true);
         }
 
         private void SecondaryPaneCloseButton_Click(object sender, RoutedEventArgs e)
@@ -160,15 +153,20 @@ namespace FileExplorerUI
             }
 
             ApplyExplorerPaneLayout();
+            if (enabled)
+            {
+                _ = ReloadPanelDataAsync(
+                    WorkspacePanelId.Secondary,
+                    preserveViewport: false,
+                    ensureSelectionVisible: false,
+                    focusEntries: false);
+            }
+
             RaisePropertyChanged(
                 nameof(PrimaryPaneSearchBoxWidth),
                 nameof(PrimaryPaneSearchVisibility),
                 nameof(ToolbarSearchWidth),
-                nameof(SecondaryPaneAddressText),
-                nameof(SecondaryPaneAddressEditorText),
                 nameof(SecondaryPaneSearchPlaceholderText),
-                nameof(SecondaryPaneSearchText),
-                nameof(SecondaryPanePlaceholderText),
                 nameof(ExplorerPaneToolbarActionRailColumnWidth),
                 nameof(ExplorerPaneActionRailColumnWidth),
                 nameof(ExplorerPaneSecondaryColumnWidth),
@@ -177,29 +175,123 @@ namespace FileExplorerUI
                 nameof(ExplorerSecondaryPaneVisibility),
                 nameof(ExplorerPaneToggleGlyph),
                 nameof(ExplorerPaneToggleToolTipText));
+            RaiseSecondaryPaneNavigationPropertiesChanged();
+            RaiseWorkspacePanelShellPropertiesChanged();
+            NotifyTitleBarTextChanged();
         }
 
         private async Task RestorePrimaryPanelStateAsync(PanelViewState panelState)
         {
-            _currentViewMode = panelState.ViewMode;
-            _currentSortField = panelState.SortField;
-            _currentSortDirection = panelState.SortDirection;
-            _currentGroupField = panelState.GroupField;
-            _currentPath = string.IsNullOrWhiteSpace(panelState.CurrentPath)
-                ? ShellMyComputerPath
-                : panelState.CurrentPath;
-            _currentQuery = panelState.QueryText ?? string.Empty;
-            PathTextBox.Text = string.IsNullOrWhiteSpace(panelState.AddressText)
-                ? GetDisplayPathText(_currentPath)
-                : panelState.AddressText;
-            SearchTextBox.Text = _currentQuery;
-            UpdateBreadcrumbs(_currentPath);
+            await RestorePrimaryPanelStateAsync(
+                panelState,
+                preserveViewport: true,
+                ensureSelectionVisible: false,
+                focusEntries: true);
+        }
+
+        private async Task RestorePrimaryPanelStateAsync(
+            PanelViewState panelState,
+            bool preserveViewport,
+            bool ensureSelectionVisible,
+            bool focusEntries)
+        {
+            LogPrimaryTabDataState("RestorePrimaryPanelStateAsync.enter");
+            double detailsHorizontalOffset = preserveViewport
+                ? GetCurrentDetailsHorizontalOffset()
+                : panelState.LastDetailsHorizontalOffset;
+            double detailsVerticalOffset = preserveViewport
+                ? GetCurrentDetailsVerticalOffset()
+                : panelState.LastDetailsVerticalOffset;
+            double groupedHorizontalOffset = preserveViewport
+                ? GetCurrentGroupedHorizontalOffset()
+                : panelState.LastGroupedHorizontalOffset;
+
+            RebindPrimaryPaneDataSession();
+            SetPrimaryPanelPresentationState(
+                panelState.ViewMode,
+                panelState.SortField,
+                panelState.SortDirection,
+                panelState.GroupField);
+            SetPrimaryPanelNavigationState(
+                panelState.CurrentPath,
+                panelState.QueryText,
+                panelState.AddressText,
+                syncEditors: true);
+            UpdateBreadcrumbs(GetPanelCurrentPath(WorkspacePanelId.Primary));
             UpdateNavButtonsState();
             NotifyPresentationModeChanged();
             SyncActivePanelPresentationState();
-            await LoadFirstPageAsync();
-            ClearListSelection();
-            _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+
+            if (CanReusePanelDataForRestore(WorkspacePanelId.Primary, panelState))
+            {
+                WorkspaceTabPerf.Mark("primary.restore.reuse");
+                LogPrimaryTabDataState("RestorePrimaryPanelStateAsync.reuse");
+                FinalizePrimaryPanelRestore(
+                    panelState,
+                    preserveViewport,
+                    detailsHorizontalOffset,
+                    detailsVerticalOffset,
+                    groupedHorizontalOffset,
+                    ensureSelectionVisible,
+                    focusEntries);
+                return;
+            }
+
+            await LoadPrimaryPanelDataAsync(panelState);
+            WorkspaceTabPerf.Mark("primary.restore.reload");
+            LogPrimaryTabDataState("RestorePrimaryPanelStateAsync.reload");
+            FinalizePrimaryPanelRestore(
+                panelState,
+                preserveViewport,
+                detailsHorizontalOffset,
+                detailsVerticalOffset,
+                groupedHorizontalOffset,
+                ensureSelectionVisible,
+                focusEntries);
+        }
+
+        private void FinalizePrimaryPanelRestore(
+            PanelViewState panelState,
+            bool preserveViewport,
+            double detailsHorizontalOffset,
+            double detailsVerticalOffset,
+            double groupedHorizontalOffset,
+            bool ensureSelectionVisible,
+            bool focusEntries)
+        {
+            UpdateFileCommandStates();
+            _lastTitleWasReadFailed = false;
+            UpdateWindowTitle();
+            if (string.Equals(panelState.CurrentPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateStatus(SF("StatusDriveCount", GetPanelTotalEntries(WorkspacePanelId.Primary)));
+            }
+            else
+            {
+                UpdateStatus(SF("StatusCurrentFolderItems", GetPanelTotalEntries(WorkspacePanelId.Primary)));
+            }
+
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                RestoreCurrentViewportOffsets(
+                    detailsHorizontalOffset,
+                    detailsVerticalOffset,
+                    groupedHorizontalOffset);
+
+                if (ensureSelectionVisible)
+                {
+                    RestoreListSelectionByPath(ensureVisible: true);
+                }
+                else
+                {
+                    RestoreListSelectionByPathRespectingViewport();
+                }
+
+                if (focusEntries)
+                {
+                    FocusEntriesList();
+                }
+            });
         }
     }
 }

@@ -1,6 +1,7 @@
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using System;
+using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -14,24 +15,25 @@ namespace FileExplorerUI
         private void RebuildGroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries, bool applyEntryState = true)
         {
             List<GroupedEntryColumnViewModel> projection = BuildGroupedEntryColumns(orderedEntries, applyEntryState);
-            _groupedColumnsProjectionCache = projection;
+            SetPrimaryGroupedColumnsProjectionCache(projection);
             ApplyGroupedColumnsProjection(projection);
             UpdateGroupedColumnsCacheStamp();
         }
 
         private void ApplyGroupedColumnsProjection(IReadOnlyList<GroupedEntryColumnViewModel> projection)
         {
-            _groupedEntryColumns.Clear();
+            ObservableCollection<GroupedEntryColumnViewModel> groupedEntryColumns = GetPrimaryGroupedEntryColumns();
+            groupedEntryColumns.Clear();
             foreach (GroupedEntryColumnViewModel column in projection)
             {
-                _groupedEntryColumns.Add(column);
+                groupedEntryColumns.Add(column);
             }
         }
 
         private List<GroupedEntryColumnViewModel> BuildGroupedEntryColumns(IReadOnlyList<EntryViewModel> orderedEntries, bool applyEntryState)
         {
             int rowsPerColumn = GetGroupedListRowsPerColumn();
-            if (_currentGroupField == EntryGroupField.None)
+            if (GetPanelGroupField(WorkspacePanelId.Primary) == EntryGroupField.None)
             {
                 return BuildUngroupedEntryColumns(orderedEntries, rowsPerColumn, applyEntryState);
             }
@@ -112,7 +114,7 @@ namespace FileExplorerUI
         {
             double rowPitch = EntryItemMetrics.RowHeight + 4;
             double verticalPadding = GroupedEntriesScrollViewer.Padding.Top + GroupedEntriesScrollViewer.Padding.Bottom;
-            double headerHeight = _currentGroupField == EntryGroupField.None ? 0 : EntryItemMetrics.GroupHeaderHeight;
+            double headerHeight = GetPanelGroupField(WorkspacePanelId.Primary) == EntryGroupField.None ? 0 : EntryItemMetrics.GroupHeaderHeight;
             double viewportHeight = GroupedEntriesScrollViewer.ActualHeight;
             if (viewportHeight <= headerHeight)
             {
@@ -133,16 +135,19 @@ namespace FileExplorerUI
             // Keep a small hysteresis band so resize feels responsive without oscillation.
             const double hysteresisFactor = 0.35;
             double hysteresis = rowPitch * hysteresisFactor;
-            int currentRows = _groupedListRowsPerColumn > 0 ? _groupedListRowsPerColumn : floorRows;
+            int groupedListRowsPerColumn = GetPrimaryGroupedListRowsPerColumn();
+            int currentRows = groupedListRowsPerColumn > 0 ? groupedListRowsPerColumn : floorRows;
 
-            if (double.IsNaN(_lastGroupedViewportHeight))
+            double lastGroupedViewportHeight = GetPanelLastGroupedViewportHeight(WorkspacePanelId.Primary);
+            if (double.IsNaN(lastGroupedViewportHeight))
             {
-                _lastGroupedViewportHeight = viewportHeight;
+                lastGroupedViewportHeight = viewportHeight;
+                SetPanelLastGroupedViewportHeight(WorkspacePanelId.Primary, viewportHeight);
             }
 
-            bool growing = viewportHeight > _lastGroupedViewportHeight + 0.5;
-            bool shrinking = viewportHeight < _lastGroupedViewportHeight - 0.5;
-            _lastGroupedViewportHeight = viewportHeight;
+            bool growing = viewportHeight > lastGroupedViewportHeight + 0.5;
+            bool shrinking = viewportHeight < lastGroupedViewportHeight - 0.5;
+            SetPanelLastGroupedViewportHeight(WorkspacePanelId.Primary, viewportHeight);
 
             int targetRows = currentRows;
             if (currentRows < floorRows)
@@ -178,7 +183,7 @@ namespace FileExplorerUI
         private void RefreshGroupedColumnsForViewport(int refreshVersion = -1, bool force = false)
         {
             var sw = Stopwatch.StartNew();
-            if (refreshVersion >= 0 && refreshVersion != _groupedColumnsRefreshVersion)
+            if (refreshVersion >= 0 && refreshVersion != GetPanelGroupedColumnsRefreshVersion(WorkspacePanelId.Primary))
             {
                 return;
             }
@@ -189,9 +194,10 @@ namespace FileExplorerUI
             }
 
             long nowStamp = Stopwatch.GetTimestamp();
-            if (_lastGroupedColumnsRefreshAppliedStamp != 0)
+            long lastGroupedColumnsRefreshAppliedStamp = GetPanelLastGroupedColumnsRefreshAppliedStamp(WorkspacePanelId.Primary);
+            if (lastGroupedColumnsRefreshAppliedStamp != 0)
             {
-                double elapsedMs = (nowStamp - _lastGroupedColumnsRefreshAppliedStamp) * 1000.0 / Stopwatch.Frequency;
+                double elapsedMs = (nowStamp - lastGroupedColumnsRefreshAppliedStamp) * 1000.0 / Stopwatch.Frequency;
                 if (elapsedMs < 20)
                 {
                     return;
@@ -199,14 +205,14 @@ namespace FileExplorerUI
             }
 
             int rowsPerColumn = GetGroupedListRowsPerColumn();
-            int previousRowsPerColumn = _groupedListRowsPerColumn;
-            if (!force && rowsPerColumn == _groupedListRowsPerColumn)
+            int previousRowsPerColumn = GetPrimaryGroupedListRowsPerColumn();
+            if (!force && rowsPerColumn == GetPrimaryGroupedListRowsPerColumn())
             {
                 return;
             }
 
-            _groupedListRowsPerColumn = rowsPerColumn;
-            if (refreshVersion >= 0 && refreshVersion != _groupedColumnsRefreshVersion)
+            SetPrimaryGroupedListRowsPerColumn(rowsPerColumn);
+            if (refreshVersion >= 0 && refreshVersion != GetPanelGroupedColumnsRefreshVersion(WorkspacePanelId.Primary))
             {
                 return;
             }
@@ -215,9 +221,9 @@ namespace FileExplorerUI
             {
                 GroupedEntriesScrollViewer.UpdateLayout();
             }
-            _lastGroupedColumnsRefreshAppliedStamp = nowStamp;
+            SetPanelLastGroupedColumnsRefreshAppliedStamp(WorkspacePanelId.Primary, nowStamp);
             TraceListResize(
-                $"refresh-done rows={previousRowsPerColumn}->{rowsPerColumn} force={force} visible={_entries.Count} " +
+                $"refresh-done rows={previousRowsPerColumn}->{rowsPerColumn} force={force} visible={PrimaryEntries.Count} " +
                 $"elapsed={sw.ElapsedMilliseconds}ms");
         }
 
@@ -225,21 +231,24 @@ namespace FileExplorerUI
         {
             if (!UsesColumnsListPresentation())
             {
-                CancelAndDispose(ref _groupedColumnsResizeDebounceCts);
-                _groupedColumnsRefreshQueued = false;
+                CancellationTokenSource? groupedColumnsResizeDebounceCts = GetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary);
+                CancelAndDispose(ref groupedColumnsResizeDebounceCts);
+                SetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary, null);
+                SetPanelGroupedColumnsRefreshQueued(WorkspacePanelId.Primary, false);
                 return;
             }
 
-            if (_groupedColumnsRefreshQueued)
+            if (GetPanelGroupedColumnsRefreshQueued(WorkspacePanelId.Primary))
             {
                 return;
             }
 
-            int refreshVersion = Interlocked.Increment(ref _groupedColumnsRefreshVersion);
-            _groupedColumnsRefreshQueued = true;
+            int refreshVersion = GetPanelGroupedColumnsRefreshVersion(WorkspacePanelId.Primary) + 1;
+            SetPanelGroupedColumnsRefreshVersion(WorkspacePanelId.Primary, refreshVersion);
+            SetPanelGroupedColumnsRefreshQueued(WorkspacePanelId.Primary, true);
             _ = DispatcherQueue.TryEnqueue(() =>
             {
-                _groupedColumnsRefreshQueued = false;
+                SetPanelGroupedColumnsRefreshQueued(WorkspacePanelId.Primary, false);
                 RefreshGroupedColumnsForViewport(refreshVersion, force);
             });
         }
@@ -248,13 +257,17 @@ namespace FileExplorerUI
         {
             if (!UsesColumnsListPresentation())
             {
-                CancelAndDispose(ref _groupedColumnsResizeDebounceCts);
+                CancellationTokenSource? groupedColumnsResizeDebounceCts = GetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary);
+                CancelAndDispose(ref groupedColumnsResizeDebounceCts);
+                SetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary, null);
                 return;
             }
 
-            CancelAndDispose(ref _groupedColumnsResizeDebounceCts);
+            CancellationTokenSource? activeGroupedColumnsResizeDebounceCts = GetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary);
+            CancelAndDispose(ref activeGroupedColumnsResizeDebounceCts);
+            SetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary, null);
             var cts = new CancellationTokenSource();
-            _groupedColumnsResizeDebounceCts = cts;
+            SetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary, cts);
             _ = DispatcherQueue.TryEnqueue(async () =>
             {
                 try
@@ -266,12 +279,14 @@ namespace FileExplorerUI
                     return;
                 }
 
-                if (cts.IsCancellationRequested || !ReferenceEquals(_groupedColumnsResizeDebounceCts, cts))
+                if (cts.IsCancellationRequested || !ReferenceEquals(GetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary), cts))
                 {
                     return;
                 }
 
-                CancelAndDispose(ref _groupedColumnsResizeDebounceCts);
+                CancellationTokenSource? completedGroupedColumnsResizeDebounceCts = GetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary);
+                CancelAndDispose(ref completedGroupedColumnsResizeDebounceCts);
+                SetPanelGroupedColumnsResizeDebounceCts(WorkspacePanelId.Primary, null);
                 RequestGroupedColumnsRefresh(force);
             });
         }
@@ -290,7 +305,7 @@ namespace FileExplorerUI
 
         private bool CanApplyPresentationFastPath(PresentationReloadReason reason)
         {
-            if (_presentationSourceInitialized)
+            if (GetPrimaryPresentationSourceInitialized())
             {
                 return true;
             }
@@ -300,7 +315,7 @@ namespace FileExplorerUI
                 return false;
             }
 
-            if (_hasMore)
+            if (GetPanelHasMore(WorkspacePanelId.Primary))
             {
                 return false;
             }
@@ -311,12 +326,13 @@ namespace FileExplorerUI
                 return false;
             }
 
-            return _totalEntries == 0 || loadedEntries.Count >= _totalEntries;
+            uint totalEntries = GetPanelTotalEntries(WorkspacePanelId.Primary);
+            return totalEntries == 0 || loadedEntries.Count >= totalEntries;
         }
 
         private void EnsurePresentationSourceCacheFromCurrentEntries()
         {
-            if (_presentationSourceInitialized)
+            if (GetPrimaryPresentationSourceInitialized())
             {
                 return;
             }
@@ -332,8 +348,8 @@ namespace FileExplorerUI
 
         private List<EntryViewModel> GetLoadedEntriesFromCurrentCollection()
         {
-            var loadedEntries = new List<EntryViewModel>(_entries.Count);
-            foreach (EntryViewModel entry in _entries)
+            var loadedEntries = new List<EntryViewModel>(PrimaryEntries.Count);
+            foreach (EntryViewModel entry in PrimaryEntries)
             {
                 if (entry.IsLoaded && !entry.IsGroupHeader)
                 {
@@ -345,46 +361,48 @@ namespace FileExplorerUI
 
         private bool TryUseGroupedColumnsCache()
         {
-            return _groupedColumnsCacheSourceVersion == _presentationSourceVersion
-                && _groupedColumnsCacheSortField == _currentSortField
-                && _groupedColumnsCacheSortDirection == _currentSortDirection
-                && _groupedColumnsCacheGroupField == _currentGroupField
-                && _groupedListRowsPerColumn > 0
-                && _groupedColumnsCacheRowsPerColumn == _groupedListRowsPerColumn
-                && _groupedColumnsProjectionCache is { Count: > 0 };
+            return GetPrimaryGroupedColumnsCacheSourceVersion() == GetPrimaryPresentationSourceVersion()
+                && GetPrimaryGroupedColumnsCacheSortField() == GetPanelSortField(WorkspacePanelId.Primary)
+                && GetPrimaryGroupedColumnsCacheSortDirection() == GetPanelSortDirection(WorkspacePanelId.Primary)
+                && GetPrimaryGroupedColumnsCacheGroupField() == GetPanelGroupField(WorkspacePanelId.Primary)
+                && GetPrimaryGroupedListRowsPerColumn() > 0
+                && _groupedColumnsCacheRowsPerColumn == GetPrimaryGroupedListRowsPerColumn()
+                && GetPrimaryGroupedColumnsProjectionCache() is { Count: > 0 };
         }
 
         private void UpdateGroupedColumnsCacheStamp()
         {
-            _groupedColumnsCacheSourceVersion = _presentationSourceVersion;
-            _groupedColumnsCacheSortField = _currentSortField;
-            _groupedColumnsCacheSortDirection = _currentSortDirection;
-            _groupedColumnsCacheGroupField = _currentGroupField;
-            _groupedColumnsCacheRowsPerColumn = _groupedListRowsPerColumn;
+            SetPrimaryGroupedColumnsCacheSourceVersion(GetPrimaryPresentationSourceVersion());
+            SetPrimaryGroupedColumnsCacheSortField(GetPanelSortField(WorkspacePanelId.Primary));
+            SetPrimaryGroupedColumnsCacheSortDirection(GetPanelSortDirection(WorkspacePanelId.Primary));
+            SetPrimaryGroupedColumnsCacheGroupField(GetPanelGroupField(WorkspacePanelId.Primary));
+            _groupedColumnsCacheRowsPerColumn = GetPrimaryGroupedListRowsPerColumn();
         }
 
         private void InvalidateProjectionCaches()
         {
-            _groupedColumnsCacheSourceVersion = -1;
+            SetPrimaryGroupedColumnsCacheSourceVersion(-1);
             _groupedColumnsCacheRowsPerColumn = -1;
-            _groupedColumnsProjectionCache = null;
+            SetPrimaryGroupedColumnsProjectionCache(null);
         }
 
         private void InvalidatePresentationSourceCache()
         {
-            _presentationSourceEntries.Clear();
-            _presentationSourceInitialized = false;
-            _presentationSourceVersion++;
+            GetPrimaryPresentationSourceEntries().Clear();
+            SetPrimaryPresentationSourceInitialized(false);
+            IncrementPrimaryPresentationSourceVersion();
             InvalidateProjectionCaches();
         }
 
         private void SetPresentationSourceEntries(IReadOnlyList<EntryViewModel> entries)
         {
-            _presentationSourceEntries.Clear();
-            _presentationSourceEntries.AddRange(entries);
-            _presentationSourceInitialized = true;
-            _presentationSourceVersion++;
+            List<EntryViewModel> presentationSourceEntries = GetPrimaryPresentationSourceEntries();
+            presentationSourceEntries.Clear();
+            presentationSourceEntries.AddRange(entries);
+            SetPrimaryPresentationSourceInitialized(true);
+            IncrementPrimaryPresentationSourceVersion();
             InvalidateProjectionCaches();
+            LogPrimaryTabDataState("SetPresentationSourceEntries");
         }
 
         private sealed class EntryRangeList : IReadOnlyList<EntryViewModel>

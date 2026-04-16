@@ -41,6 +41,7 @@ public sealed class AppSettingsService
                     StartupLocationPreference = ReadEnum(localSettings, nameof(AppSettings.StartupLocationPreference), StartupLocationPreference.ThisPc),
                     StartupSpecifiedPath = ReadString(localSettings, nameof(AppSettings.StartupSpecifiedPath), "shell:mycomputer"),
                     LastOpenedPath = ReadString(localSettings, nameof(AppSettings.LastOpenedPath), "shell:mycomputer"),
+                    LastWorkspaceSessionJson = ReadString(localSettings, nameof(AppSettings.LastWorkspaceSessionJson), string.Empty),
                     DefaultSortField = ReadEnum(localSettings, nameof(AppSettings.DefaultSortField), EntrySortField.Name),
                     DefaultGroupField = ReadEnum(localSettings, nameof(AppSettings.DefaultGroupField), EntryGroupField.None),
                     ConfirmDelete = ReadBool(localSettings, nameof(AppSettings.ConfirmDelete), true),
@@ -84,6 +85,7 @@ public sealed class AppSettingsService
                 localSettings.Values[nameof(AppSettings.StartupLocationPreference)] = (int)settings.StartupLocationPreference;
                 localSettings.Values[nameof(AppSettings.StartupSpecifiedPath)] = settings.StartupSpecifiedPath;
                 localSettings.Values[nameof(AppSettings.LastOpenedPath)] = settings.LastOpenedPath;
+                localSettings.Values[nameof(AppSettings.LastWorkspaceSessionJson)] = settings.LastWorkspaceSessionJson ?? string.Empty;
                 localSettings.Values[nameof(AppSettings.DefaultSortField)] = (int)settings.DefaultSortField;
                 localSettings.Values[nameof(AppSettings.DefaultGroupField)] = (int)settings.DefaultGroupField;
                 localSettings.Values[nameof(AppSettings.ConfirmDelete)] = settings.ConfirmDelete;

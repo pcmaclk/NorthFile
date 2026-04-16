@@ -60,6 +60,7 @@
                             x:Name="SecondaryButton"
                             Height="36"
                             HorizontalAlignment="Stretch"
+                            Visibility="{x:Bind SecondaryButtonVisibility, Mode=OneWay}"
                             Content="{x:Bind SecondaryText, Mode=OneWay}"
                             UseSystemFocusVisuals="False"
                             Click="SecondaryButton_Click" />

@@ -38,6 +38,17 @@ namespace FileExplorerUI
             GetVisibleEntriesRoot().Focus(FocusState.Programmatic);
         }
 
+        private void FocusSecondaryEntriesList()
+        {
+            if (!_isDualPaneEnabled)
+            {
+                return;
+            }
+
+            SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
+            SecondaryEntriesScrollViewer.Focus(FocusState.Programmatic);
+        }
+
         private void FocusSidebarTree()
         {
             _sidebarTreeView?.Focus(FocusState.Pointer);
@@ -51,7 +62,11 @@ namespace FileExplorerUI
 
         private void SetActiveSelectionSurface(SelectionSurfaceId surface)
         {
+            WorkspaceTabPerf.Mark("selection.active.enter", $"surface={surface}");
+            WorkspacePanelId previousActivePanel = _workspaceLayoutHost.ActivePanel;
+            bool previousDualPaneEnabled = _isDualPaneEnabled;
             SyncActivePanelPresentationState();
+            WorkspaceTabPerf.Mark("selection.active.presentation");
 
             if (surface == SelectionSurfaceId.PrimaryPane)
             {
@@ -64,7 +79,11 @@ namespace FileExplorerUI
 
             _selectionSurfaceCoordinator.SetActiveSurface(surface);
             UpdateSelectionActivityState();
-            NotifyWorkspacePanelVisualStateChanged();
+            WorkspaceTabPerf.Mark("selection.active.state");
+            NotifyWorkspacePanelVisualStateChanged(previousActivePanel, previousDualPaneEnabled);
+            WorkspaceTabPerf.Mark("selection.active.visual");
+            UpdateFileCommandStates();
+            WorkspaceTabPerf.Mark("selection.active.commands");
         }
 
         private void UpdateSelectionActivityState()
@@ -81,32 +100,75 @@ namespace FileExplorerUI
 
             if (_isEntriesSelectionActive == entriesSelectionActive)
             {
+                UpdateSecondaryEntrySelectionVisuals();
                 return;
             }
 
             _isEntriesSelectionActive = entriesSelectionActive;
             UpdateEntrySelectionVisuals();
+            UpdateSecondaryEntrySelectionVisuals();
         }
 
         private void NotifyWorkspacePanelVisualStateChanged()
         {
             RaisePropertyChanged(
                 nameof(IsPrimaryWorkspacePanelActive),
-                nameof(IsSecondaryWorkspacePanelActive),
-                nameof(PrimaryPaneToolbarBackground),
-                nameof(PrimaryPaneBodyBackground),
-                nameof(PrimaryPaneInputBackground),
-                nameof(PrimaryPaneBorderBrush),
-                nameof(PrimaryPaneBodyTranslation),
-                nameof(SecondaryPaneToolbarBackground),
-                nameof(SecondaryPaneBodyBackground),
-                nameof(SecondaryPaneInputBackground),
-                nameof(SecondaryPaneBorderBrush),
-                nameof(SecondaryPaneBodyTranslation));
+                nameof(IsSecondaryWorkspacePanelActive));
+            RaiseWorkspacePanelShellPropertiesChanged();
+        }
+
+        private void NotifyWorkspacePanelVisualStateChanged(
+            WorkspacePanelId previousActivePanel,
+            bool previousDualPaneEnabled)
+        {
+            if (previousDualPaneEnabled == _isDualPaneEnabled &&
+                previousActivePanel == _workspaceLayoutHost.ActivePanel)
+            {
+                return;
+            }
+
+            bool previousPrimaryActive = !previousDualPaneEnabled || previousActivePanel == WorkspacePanelId.Primary;
+            bool previousSecondaryActive = previousDualPaneEnabled && previousActivePanel == WorkspacePanelId.Secondary;
+            bool currentPrimaryActive = IsWorkspacePanelActive(WorkspacePanelId.Primary);
+            bool currentSecondaryActive = IsWorkspacePanelActive(WorkspacePanelId.Secondary);
+
+            if (previousPrimaryActive != currentPrimaryActive)
+            {
+                RaisePropertyChanged(nameof(IsPrimaryWorkspacePanelActive));
+                RaiseWorkspacePanelShellPropertiesChanged(WorkspacePanelId.Primary);
+            }
+
+            if (previousSecondaryActive != currentSecondaryActive)
+            {
+                RaisePropertyChanged(nameof(IsSecondaryWorkspacePanelActive));
+                RaiseWorkspacePanelShellPropertiesChanged(WorkspacePanelId.Secondary);
+            }
         }
 
         private void PrimaryPaneSurface_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
+            if (!e.GetCurrentPoint(sender as UIElement).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            CancelRenameOverlayForPanelSwitch(WorkspacePanelId.Primary);
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+        }
+
+        private void PrimaryPaneInput_GotFocus(object sender, RoutedEventArgs e)
+        {
+            SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
+        }
+
+        private void PrimaryPaneInput_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (!e.GetCurrentPoint(sender as UIElement).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            CancelRenameOverlayForPanelSwitch(WorkspacePanelId.Primary);
             SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
         }
 
@@ -117,6 +179,12 @@ namespace FileExplorerUI
                 return;
             }
 
+            if (!e.GetCurrentPoint(sender as UIElement).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            CancelRenameOverlayForPanelSwitch(WorkspacePanelId.Secondary);
             SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
         }
 

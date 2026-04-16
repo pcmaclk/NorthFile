@@ -100,6 +100,41 @@ public sealed class ExplorerService
         return candidate;
     }
 
+    public string GenerateUniqueCopyTargetPath(string directoryPath, string sourcePath)
+    {
+        string normalizedSourcePath = sourcePath.TrimEnd('\\');
+        bool isDirectory = Directory.Exists(sourcePath);
+        string baseName;
+        string extension;
+
+        if (isDirectory)
+        {
+            baseName = Path.GetFileName(normalizedSourcePath);
+            extension = string.Empty;
+        }
+        else
+        {
+            baseName = Path.GetFileNameWithoutExtension(normalizedSourcePath);
+            extension = Path.GetExtension(normalizedSourcePath);
+        }
+
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+            baseName = normalizedSourcePath;
+        }
+
+        string candidate = $"{baseName} (2){extension}";
+        int suffix = 3;
+
+        while (PathExists(Path.Combine(directoryPath, candidate)))
+        {
+            candidate = $"{baseName} ({suffix}){extension}";
+            suffix++;
+        }
+
+        return Path.Combine(directoryPath, candidate);
+    }
+
     public string GetDefaultZipExtractionFolderName(string archivePath)
     {
         string baseName = Path.GetFileNameWithoutExtension(archivePath.TrimEnd('\\'));
