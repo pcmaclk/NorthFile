@@ -35,6 +35,10 @@
             <Grid
                 Height="{x:Bind ShellTitleBarHeight, Mode=OneWay}"
                 Visibility="{x:Bind SidebarTopChromeVisibility, Mode=OneWay}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
                 <StackPanel
                     Orientation="Horizontal"
                     Padding="4, 0, 0, 0"
@@ -83,7 +87,7 @@
                         Click="LanguageToggleButton_Click"
                         UseSystemFocusVisuals="False">
                         <ToolTipService.ToolTip>
-                            <ToolTip x:Uid="LanguageToggleButtonToolTip" />
+                            <ToolTip Content="{Binding Source={StaticResource Strings}, Path=[ToolTipToggleTheme]}" />
                         </ToolTipService.ToolTip>
                         <FontIcon
                             FontFamily="Segoe Fluent Icons"
@@ -91,12 +95,17 @@
                             Glyph="{x:Bind ThemeToggleGlyph, Mode=OneWay}" />
                     </Button>
                 </StackPanel>
+                <Grid
+                    x:Name="LeftTitleBarDragRegion"
+                    Grid.Column="1"
+                    Background="Transparent"
+                    SizeChanged="TitleBarDragRegion_SizeChanged" />
             </Grid>
 
             <!-- Explorer sidebar host occupies the left shell column. -->
             <Grid
                 Grid.Row="1"
-                Padding="0, 4, 0, 0"
+                Padding="{x:Bind SidebarContentPadding, Mode=OneWay}"
                 HorizontalAlignment="Stretch"
                 Background="Transparent"
                 Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}">
@@ -281,7 +290,8 @@
                         Width="{x:Bind ShellControlSize, Mode=OneWay}"
                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
                         Padding="0"
-                        Margin="4,0,0,0"
+                        Margin="{x:Bind AddWorkspaceTabButtonMargin, Mode=OneWay}"
+                        VerticalAlignment="Top"
                         Style="{ThemeResource SubtleButtonStyle}"
                         Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}"
                         Click="AddWorkspaceTabButton_Click">
@@ -296,7 +306,8 @@
                     <Grid
                         x:Name="WindowTabDragRegion"
                         Grid.Column="1"
-                        Background="Transparent" />
+                        Background="Transparent"
+                        SizeChanged="TitleBarDragRegion_SizeChanged" />
                 </Grid>
             </TabView.TabStripFooter>
         </TabView>
@@ -434,7 +445,7 @@
                                         SizeChanged="AddressBreadcrumbBorder_SizeChanged"
                                         Tapped="AddressBreadcrumbBorder_Tapped">
                                         <Grid
-                                            ColumnDefinitions="Auto,*"
+                                            ColumnDefinitions="Auto,*,40"
                                             VerticalAlignment="Center">
                                             <Button
                                                 x:Name="OverflowBreadcrumbButton"
@@ -573,6 +584,10 @@
                                                 Visibility="{x:Bind AddressTextFallbackVisibility, Mode=OneWay}"
                                                 Text="{x:Bind DisplayAddressText, Mode=OneWay}"
                                                 TextTrimming="CharacterEllipsis" />
+                                            <Grid
+                                                x:Name="PrimaryAddressEditHitTarget"
+                                                Grid.Column="2"
+                                                Background="Transparent" />
                                         </Grid>
                                     </Border>
                                     <TextBox
@@ -641,6 +656,7 @@
                     Width="{x:Bind ShellControlSize, Mode=OneWay}"
                     Height="{x:Bind ShellControlSize, Mode=OneWay}"
                     Padding="0"
+                    Margin="{x:Bind ExplorerPaneToggleButtonMargin, Mode=OneWay}"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Top"
                     Style="{ThemeResource SubtleButtonStyle}"
@@ -769,7 +785,7 @@
                                         SizeChanged="SecondaryAddressBreadcrumbBorder_SizeChanged"
                                         Tapped="SecondaryAddressBreadcrumbBorder_Tapped">
                                         <Grid
-                                            ColumnDefinitions="Auto,*"
+                                            ColumnDefinitions="Auto,*,40"
                                             VerticalAlignment="Center">
                                             <Button
                                                 x:Name="SecondaryOverflowBreadcrumbButton"
@@ -905,6 +921,10 @@
                                                 Visibility="{x:Bind SecondaryPaneAddressTextFallbackVisibility, Mode=OneWay}"
                                                 Text="{x:Bind SecondaryPaneDisplayAddressText, Mode=OneWay}"
                                                 TextTrimming="CharacterEllipsis" />
+                                            <Grid
+                                                x:Name="SecondaryAddressEditHitTarget"
+                                                Grid.Column="2"
+                                                Background="Transparent" />
                                         </Grid>
                                     </Border>
                                     <TextBox
@@ -1499,11 +1519,225 @@
                         x:Name="ExplorerPaneActionRailHost"
                         Grid.Column="1"
                         Visibility="{x:Bind ExplorerPaneActionRailVisibility, Mode=OneWay}">
+                        <local:ColumnSplitter
+                            x:Name="ExplorerPaneLeftSplitter"
+                            AutomationProperties.AutomationId="ExplorerPaneLeftSplitter"
+                            AutomationProperties.Name="调整主面板宽度"
+                            Width="{x:Bind ShellSplitterWidth, Mode=OneWay}"
+                            Margin="-4,0,0,0"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            GuideBrush="{ThemeResource SidebarGroupSeparatorBrush}"
+                            ShowGuide="False"
+                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                            PointerExited="ColumnSplitterHover_PointerExited"
+                            PointerPressed="PaneSplitter_PointerPressed"
+                            PointerMoved="PaneSplitter_PointerMoved"
+                            PointerReleased="PaneSplitter_PointerReleased"
+                            PointerCanceled="PaneSplitter_PointerReleased"
+                            PointerCaptureLost="PaneSplitter_PointerReleased" />
+                        <local:ColumnSplitter
+                            x:Name="ExplorerPaneRightSplitter"
+                            AutomationProperties.AutomationId="ExplorerPaneRightSplitter"
+                            AutomationProperties.Name="调整次面板宽度"
+                            Width="{x:Bind ShellSplitterWidth, Mode=OneWay}"
+                            Margin="0,0,-4,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Stretch"
+                            GuideBrush="{ThemeResource SidebarGroupSeparatorBrush}"
+                            ShowGuide="False"
+                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                            PointerExited="ColumnSplitterHover_PointerExited"
+                            PointerPressed="PaneSplitter_PointerPressed"
+                            PointerMoved="PaneSplitter_PointerMoved"
+                            PointerReleased="PaneSplitter_PointerReleased"
+                            PointerCanceled="PaneSplitter_PointerReleased"
+                            PointerCaptureLost="PaneSplitter_PointerReleased" />
                         <StackPanel
                             x:Name="ExplorerPaneActionButtonsHost"
                             Orientation="Vertical"
                             HorizontalAlignment="Center"
-                            VerticalAlignment="Center" />
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <Button
+                                x:Name="CopySelectedPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopySelectedPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制左侧选中项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B5;" />
+                            </Button>
+                            <Button
+                                x:Name="CopyAllPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopyAllPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制左侧全部项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B6;" />
+                            </Button>
+                            <Button
+                                x:Name="MoveSelectedPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveSelectedPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动左侧选中项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xEDE1;" />
+                            </Button>
+                            <Button
+                                x:Name="MoveAllPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveAllPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动左侧全部项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <controls:ExportAllIcon />
+                            </Button>
+                            <Button
+                                x:Name="SyncPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SyncPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="左侧同步到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE72A;" />
+                            </Button>
+                            <Button
+                                x:Name="SwapExplorerPanesButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SwapExplorerPanesButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="交换左右面板" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8AB;" />
+                            </Button>
+                            <Button
+                                x:Name="SyncSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SyncSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="右侧同步到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE72B;" />
+                            </Button>
+                            <Button
+                                x:Name="CopySelectedSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopySelectedSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制右侧选中项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B5;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="CopyAllSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopyAllSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制右侧全部项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B6;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="MoveSelectedSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveSelectedSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动右侧选中项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xEDE1;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="MoveAllSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveAllSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动右侧全部项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <controls:ExportAllIcon RenderTransformOrigin="0.5,0.5">
+                                    <controls:ExportAllIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </controls:ExportAllIcon.RenderTransform>
+                                </controls:ExportAllIcon>
+                            </Button>
+                        </StackPanel>
                     </Grid>
 
                     <Grid
@@ -1709,8 +1943,12 @@
                                                     RightTapped="SecondaryEntryRow_RightTapped"
                                                     SelectedBackground="{Binding RowBackground}"
                                                     SelectedPointerOverBackground="{Binding RowBackground}"
-                                                    SelectedPressedBackground="{Binding RowBackground}">
-                                                    <Grid Margin="6,0,0,0" HorizontalAlignment="Stretch">
+                                                    SelectedPressedBackground="{Binding RowBackground}"
+                                                    Loaded="SecondaryEntryRow_Loaded">
+                                                    <Grid
+                                                        Margin="6,0,0,0"
+                                                        HorizontalAlignment="Stretch"
+                                                        Loaded="SecondaryDetailsRowGrid_Loaded">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryNameColumnWidth}" MinWidth="120" />
                                                             <ColumnDefinition Width="6" />
@@ -1819,9 +2057,14 @@
                 </Grid>
 
                 <Grid Grid.Row="1" Height="{x:Bind ShellStatusBarHeight, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="PrimaryStatusPaneColumn" Width="{x:Bind ExplorerPanePrimaryColumnWidth, Mode=OneWay}" />
+                        <ColumnDefinition x:Name="ExplorerPaneActionRailStatusColumn" Width="{x:Bind ExplorerPaneActionRailColumnWidth, Mode=OneWay}" />
+                        <ColumnDefinition x:Name="SecondaryStatusPaneColumn" Width="{x:Bind ExplorerPaneSecondaryColumnWidth, Mode=OneWay}" />
+                    </Grid.ColumnDefinitions>
+
                     <TextBlock
-                        x:Name="StatusTextBlock"
-                        x:Uid="StatusTextBlock"
+                        x:Name="PrimaryStatusTextBlock"
                         Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
                         VerticalAlignment="Center"
                         FontSize="11"
@@ -1829,7 +2072,22 @@
                         LineHeight="11"
                         LineStackingStrategy="BlockLineHeight"
                         Opacity="0.72"
+                        Text="{x:Bind PrimaryPaneStatusText, Mode=OneWay}"
                         TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                    <TextBlock
+                        x:Name="SecondaryStatusTextBlock"
+                        Grid.Column="2"
+                        Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                        LineHeight="11"
+                        LineStackingStrategy="BlockLineHeight"
+                        Opacity="0.72"
+                        Text="{x:Bind SecondaryPaneStatusText, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}"
                         TextWrapping="NoWrap" />
                 </Grid>
         </Grid>
@@ -1843,6 +2101,7 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Top"
             Background="Transparent"
+            SizeChanged="TitleBarDragRegion_SizeChanged"
             Visibility="{x:Bind SettingsShellVisibility, Mode=OneWay}" />
 
         <StackPanel Grid.RowSpan="3" Grid.ColumnSpan="2" Visibility="Collapsed">

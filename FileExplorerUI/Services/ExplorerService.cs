@@ -399,6 +399,7 @@ public sealed class ExplorerService
         {
             if (Directory.Exists(sourcePath))
             {
+                ValidateDirectoryTargetIsNotSelfOrDescendant(sourcePath, targetPath);
                 CopyDirectory(sourcePath, targetPath);
                 return;
             }
@@ -436,6 +437,7 @@ public sealed class ExplorerService
         {
             if (Directory.Exists(sourcePath))
             {
+                ValidateDirectoryTargetIsNotSelfOrDescendant(sourcePath, targetPath);
                 MoveDirectory(sourcePath, targetPath);
                 return;
             }
@@ -807,6 +809,24 @@ public sealed class ExplorerService
 
             File.Copy(file, destinationPath, overwrite: false);
         }
+    }
+
+    public void ValidateDirectoryTargetIsNotSelfOrDescendant(string sourcePath, string targetPath)
+    {
+        if (IsDirectoryTargetSelfOrDescendant(sourcePath, targetPath))
+        {
+            throw new DirectoryTargetIsSourceDescendantException();
+        }
+    }
+
+    public bool IsDirectoryTargetSelfOrDescendant(string sourcePath, string targetPath)
+    {
+        string normalizedSource = Path.GetFullPath(sourcePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string normalizedTarget = Path.GetFullPath(targetPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        return string.Equals(normalizedSource, normalizedTarget, StringComparison.OrdinalIgnoreCase) ||
+            normalizedTarget.StartsWith(normalizedSource + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+            normalizedTarget.StartsWith(normalizedSource + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void MoveDirectory(string sourcePath, string targetPath)

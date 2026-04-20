@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using System;
 using System.Diagnostics;
@@ -64,16 +65,27 @@ namespace FileExplorerUI
         {
             int width = _appSettings.WindowWidth;
             int height = _appSettings.WindowHeight;
-            if (width < MinPersistedWindowWidth || height < MinPersistedWindowHeight)
+            bool hasValidSize = width >= MinPersistedWindowWidth && height >= MinPersistedWindowHeight;
+            bool hasValidPosition = _appSettings.WindowPosX != UnsetWindowPosition &&
+                _appSettings.WindowPosY != UnsetWindowPosition;
+
+            if (!hasValidSize && !_appSettings.WindowMaximized)
             {
-                TraceWindowSize("启动恢复", $"skip-invalid width={width} height={height}");
+                TraceWindowSize(
+                    "启动恢复",
+                    $"skip-invalid width={width} height={height} x={_appSettings.WindowPosX} y={_appSettings.WindowPosY} maximized={_appSettings.WindowMaximized}");
                 return;
             }
 
             _lastRestoredWindowWidth = width;
             _lastRestoredWindowHeight = height;
+            _lastRestoredWindowPosX = hasValidPosition ? _appSettings.WindowPosX : UnsetWindowPosition;
+            _lastRestoredWindowPosY = hasValidPosition ? _appSettings.WindowPosY : UnsetWindowPosition;
+            _lastRestoredWindowMaximized = _appSettings.WindowMaximized;
             _windowSizeRestorePending = true;
-            TraceWindowSize("启动恢复", $"scheduled width={width} height={height}");
+            TraceWindowSize(
+                "启动恢复",
+                $"scheduled width={width} height={height} x={_lastRestoredWindowPosX} y={_lastRestoredWindowPosY} maximized={_lastRestoredWindowMaximized}");
         }
 
         private void TryApplyPendingWindowSizeRestore()
@@ -90,10 +102,16 @@ namespace FileExplorerUI
             _windowSizeRestorePending = false;
             try
             {
-                TraceWindowSize("启动恢复", $"apply width={_lastRestoredWindowWidth} height={_lastRestoredWindowHeight}");
-                AppWindow.Resize(new SizeInt32(_lastRestoredWindowWidth, _lastRestoredWindowHeight));
+                TraceWindowSize(
+                    "启动恢复",
+                    $"apply width={_lastRestoredWindowWidth} height={_lastRestoredWindowHeight} x={_lastRestoredWindowPosX} y={_lastRestoredWindowPosY} maximized={_lastRestoredWindowMaximized}");
+                ApplyRestoredWindowBounds();
+                ApplyRestoredWindowPresenterState();
                 SizeInt32 appliedSize = AppWindow.Size;
-                TraceWindowSize("启动恢复", $"applied-result width={appliedSize.Width} height={appliedSize.Height}");
+                PointInt32 appliedPosition = AppWindow.Position;
+                TraceWindowSize(
+                    "启动恢复",
+                    $"applied-result width={appliedSize.Width} height={appliedSize.Height} x={appliedPosition.X} y={appliedPosition.Y} maximized={IsWindowMaximized()}");
             }
             catch (Exception ex)
             {
@@ -102,7 +120,54 @@ namespace FileExplorerUI
             }
         }
 
-        private void PersistCurrentWindowSize()
+        private void ApplyRestoredWindowBounds()
+        {
+            bool hasValidSize = _lastRestoredWindowWidth >= MinPersistedWindowWidth &&
+                _lastRestoredWindowHeight >= MinPersistedWindowHeight;
+            bool hasValidPosition = _lastRestoredWindowPosX != UnsetWindowPosition &&
+                _lastRestoredWindowPosY != UnsetWindowPosition;
+
+            if (hasValidSize && hasValidPosition)
+            {
+                AppWindow!.MoveAndResize(new RectInt32(
+                    _lastRestoredWindowPosX,
+                    _lastRestoredWindowPosY,
+                    _lastRestoredWindowWidth,
+                    _lastRestoredWindowHeight));
+                return;
+            }
+
+            if (hasValidSize)
+            {
+                AppWindow!.Resize(new SizeInt32(_lastRestoredWindowWidth, _lastRestoredWindowHeight));
+                return;
+            }
+
+            if (hasValidPosition)
+            {
+                AppWindow!.Move(new PointInt32(_lastRestoredWindowPosX, _lastRestoredWindowPosY));
+            }
+        }
+
+        private void ApplyRestoredWindowPresenterState()
+        {
+            if (!_lastRestoredWindowMaximized ||
+                AppWindow?.Presenter is not OverlappedPresenter presenter ||
+                presenter.State == OverlappedPresenterState.Maximized)
+            {
+                return;
+            }
+
+            presenter.Maximize();
+        }
+
+        private bool IsWindowMaximized()
+        {
+            return AppWindow?.Presenter is OverlappedPresenter presenter &&
+                presenter.State == OverlappedPresenterState.Maximized;
+        }
+
+        private void PersistCurrentWindowPlacement()
         {
             if (AppWindow is null)
             {
@@ -111,27 +176,50 @@ namespace FileExplorerUI
             }
 
             SizeInt32 liveSize = AppWindow.Size;
-            if (liveSize.Width < MinPersistedWindowWidth || liveSize.Height < MinPersistedWindowHeight)
+            PointInt32 livePosition = AppWindow.Position;
+            bool isMaximized = IsWindowMaximized();
+            bool hasValidSize = liveSize.Width >= MinPersistedWindowWidth &&
+                liveSize.Height >= MinPersistedWindowHeight;
+
+            if (!hasValidSize && !isMaximized)
             {
                 TraceWindowSize(
                     "保存到设置",
-                    $"skip-live-too-small width={liveSize.Width} height={liveSize.Height}");
+                    $"skip-live-too-small width={liveSize.Width} height={liveSize.Height} x={livePosition.X} y={livePosition.Y} maximized={isMaximized}");
                 return;
             }
 
-            if (_appSettings.WindowWidth == liveSize.Width && _appSettings.WindowHeight == liveSize.Height)
+            bool changed = _appSettings.WindowMaximized != isMaximized;
+            if (!isMaximized && hasValidSize)
+            {
+                changed =
+                    changed ||
+                    _appSettings.WindowWidth != liveSize.Width ||
+                    _appSettings.WindowHeight != liveSize.Height ||
+                    _appSettings.WindowPosX != livePosition.X ||
+                    _appSettings.WindowPosY != livePosition.Y;
+            }
+
+            if (!changed)
             {
                 TraceWindowSize(
                     "保存到设置",
-                    $"skip-unchanged width={liveSize.Width} height={liveSize.Height}");
+                    $"skip-unchanged width={liveSize.Width} height={liveSize.Height} x={livePosition.X} y={livePosition.Y} maximized={isMaximized}");
                 return;
             }
 
-            _appSettings.WindowWidth = liveSize.Width;
-            _appSettings.WindowHeight = liveSize.Height;
+            if (!isMaximized && hasValidSize)
+            {
+                _appSettings.WindowWidth = liveSize.Width;
+                _appSettings.WindowHeight = liveSize.Height;
+                _appSettings.WindowPosX = livePosition.X;
+                _appSettings.WindowPosY = livePosition.Y;
+            }
+
+            _appSettings.WindowMaximized = isMaximized;
             TraceWindowSize(
                 "保存到设置",
-                $"save-request width={_appSettings.WindowWidth} height={_appSettings.WindowHeight}");
+                $"save-request width={_appSettings.WindowWidth} height={_appSettings.WindowHeight} x={_appSettings.WindowPosX} y={_appSettings.WindowPosY} maximized={_appSettings.WindowMaximized}");
             _appSettingsService.Save(_appSettings);
         }
 
@@ -191,7 +279,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            PersistCurrentWindowSize();
+            PersistCurrentWindowPlacement();
             _isHiddenToTray = true;
             UpdateTrayIcon();
             NativeMethods.ShowWindow(_windowHandle, SW_HIDE);
@@ -245,7 +333,7 @@ namespace FileExplorerUI
         private void MainWindow_Closed(object sender, WindowEventArgs args)
         {
             PersistLastWorkspaceSession();
-            PersistCurrentWindowSize();
+            PersistCurrentWindowPlacement();
             RemoveTrayIcon();
             DisposeFavoriteWatchers();
         }

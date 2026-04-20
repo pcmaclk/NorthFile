@@ -17,9 +17,10 @@ namespace FileExplorerUI
         {
             InitializeComponent();
             ExtendsContentIntoTitleBar = true;
-            SetTitleBar(WindowTabDragRegion);
+            SetTitleBar(null);
             WindowTabDragRegion.MinWidth = 188;
             SettingsTitleBarDragRegion.MinWidth = 188;
+            RefreshTitleBarDragRectangles();
             _hasExplicitInitialPath = !string.IsNullOrWhiteSpace(initialPath);
             _initialPath = string.IsNullOrWhiteSpace(initialPath)
                 ? ShellMyComputerPath
@@ -142,6 +143,7 @@ namespace FileExplorerUI
             WireShellCommandsAndStartup();
             ApplyExplorerPaneLayout();
             InitializeWorkspaceTabs();
+            RefreshTitleBarDragRectangles();
         }
 
         private void ExplorerBodyBorder_Loaded(object sender, RoutedEventArgs e)

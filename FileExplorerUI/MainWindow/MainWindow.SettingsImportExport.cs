@@ -14,7 +14,7 @@ namespace FileExplorerUI
     {
         private async void SettingsViewControl_ExportSettingsRequested()
         {
-            PersistCurrentWindowSize();
+            PersistCurrentWindowPlacement();
             var picker = new FileSavePicker();
             picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
             picker.SuggestedFileName = "northfile.settings";

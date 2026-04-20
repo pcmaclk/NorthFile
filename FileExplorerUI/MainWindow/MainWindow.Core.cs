@@ -151,6 +151,10 @@ namespace FileExplorerUI
 
         public bool IsSecondaryWorkspacePanelActive => IsWorkspacePanelActive(WorkspacePanelId.Secondary);
 
+        public string PrimaryPaneStatusText => _primaryPaneStatusText;
+
+        public string SecondaryPaneStatusText => _secondaryPaneStatusText;
+
         public Brush? PrimaryPaneToolbarBackground => GetPanelToolbarBackgroundBrush(WorkspacePanelId.Primary);
 
         public Brush? PrimaryPaneBodyBackground => GetPanelBodyBackgroundBrush(WorkspacePanelId.Primary);

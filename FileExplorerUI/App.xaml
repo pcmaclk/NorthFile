@@ -27,6 +27,7 @@
                     <StaticResource x:Key="ActivePaneForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
                     <StaticResource x:Key="InactivePaneForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
                     <StaticResource x:Key="DetailsHeaderSecondaryForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+                    <SolidColorBrush x:Key="SidebarGroupSeparatorBrush" Color="#22000000" />
                     <LinearGradientBrush x:Key="ExplorerShellPanelBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
                         <GradientStop Color="#10000000" Offset="0" />
                         <GradientStop Color="#10000000" Offset="1" />
@@ -40,10 +41,11 @@
                     <StaticResource x:Key="AddressSearchChromeBorderBrush" ResourceKey="ControlStrokeColorSecondaryBrush" />
                     <StaticResource x:Key="InactivePaneBorderBrush" ResourceKey="ControlStrokeColorSecondaryBrush" />
                     <StaticResource x:Key="ActivePaneInputBackgroundBrush" ResourceKey="TextControlBackground" />
-                    <StaticResource x:Key="InactivePaneInputBackgroundBrush" ResourceKey="LayerOnMicaBaseAltFillColorTertiaryBrush" />
+                    <SolidColorBrush x:Key="InactivePaneInputBackgroundBrush" Color="Transparent" />
                     <StaticResource x:Key="ActivePaneForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
                     <StaticResource x:Key="InactivePaneForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
                     <StaticResource x:Key="DetailsHeaderSecondaryForegroundBrush" ResourceKey="TextFillColorTertiaryBrush" />
+                    <SolidColorBrush x:Key="SidebarGroupSeparatorBrush" Color="#24FFFFFF" />
                     <LinearGradientBrush x:Key="ExplorerShellPanelBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
                         <GradientStop Color="#10FFFFFF" Offset="0" />
                         <GradientStop Color="#10FFFFFF" Offset="1" />

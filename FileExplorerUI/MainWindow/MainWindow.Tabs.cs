@@ -69,6 +69,7 @@ namespace FileExplorerUI
                 nameof(PrimaryPaneSearchVisibility),
                 nameof(ToolbarSearchWidth),
                 nameof(SecondaryPaneSearchPlaceholderText),
+                nameof(ExplorerPanePrimaryColumnWidth),
                 nameof(ExplorerPaneToolbarActionRailColumnWidth),
                 nameof(ExplorerPaneActionRailColumnWidth),
                 nameof(ExplorerPaneSecondaryColumnWidth),
@@ -132,6 +133,8 @@ namespace FileExplorerUI
             WorkspaceTabPerf.Mark("mainwindow.prepare.presentation-mode");
             SyncActivePanelPresentationState();
             WorkspaceTabPerf.Mark("mainwindow.prepare.active-presentation");
+            RefreshPanelStatus(WorkspacePanelId.Primary);
+            WorkspaceTabPerf.Mark("mainwindow.prepare.status-primary");
             LogPrimaryTabDataState("PrepareWorkspaceShellStateForRestore.after-primary");
 
             if (!shellState.IsSplit)
@@ -150,6 +153,8 @@ namespace FileExplorerUI
             WorkspaceTabPerf.Mark("mainwindow.prepare.secondary-presentation");
             RaiseSecondaryPaneStateChanged(navigationChanged: true, dataChanged: true);
             WorkspaceTabPerf.Mark("mainwindow.prepare.secondary-state");
+            RefreshPanelStatus(WorkspacePanelId.Secondary);
+            WorkspaceTabPerf.Mark("mainwindow.prepare.status-secondary");
         }
 
         private void RaisePanelColumnLayoutPropertiesChanged(PanelColumnLayoutNotificationState? previousState = null)

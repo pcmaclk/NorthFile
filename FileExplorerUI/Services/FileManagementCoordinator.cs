@@ -27,7 +27,8 @@ public readonly record struct FilePasteItemResult(
     bool Conflict,
     bool SamePath,
     bool IsDirectory,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    FileOperationError Error = FileOperationError.Unknown);
 
 public sealed record FilePasteResult(
     FileTransferMode Mode,
@@ -323,8 +324,6 @@ public sealed class FileManagementCoordinator
                 samePath = false;
             }
 
-            bool conflict = !samePath && _explorerService.PathExists(targetPath);
-
             if (samePath)
             {
                 results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: false, SamePath: true, IsDirectory: item.IsDirectory, ErrorMessage: S("ErrorPasteSameSourceAndTarget")));
@@ -332,6 +331,14 @@ public sealed class FileManagementCoordinator
                 continue;
             }
 
+            if (item.IsDirectory && _explorerService.IsDirectoryTargetSelfOrDescendant(item.SourcePath, targetDirectoryPath))
+            {
+                results.Add(CreateTargetIsSourceDescendantResult(item, targetPath));
+                allApplied = false;
+                continue;
+            }
+
+            bool conflict = _explorerService.PathExists(targetPath);
             if (conflict)
             {
                 results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: true, SamePath: false, IsDirectory: item.IsDirectory, ErrorMessage: S("ErrorPasteTargetAlreadyExists")));
@@ -361,7 +368,15 @@ public sealed class FileManagementCoordinator
             }
             catch (Exception ex)
             {
-                results.Add(new FilePasteItemResult(item.SourcePath, targetPath, Applied: false, Conflict: false, SamePath: false, IsDirectory: item.IsDirectory, ErrorMessage: FileOperationErrors.ToUserMessage(ex)));
+                results.Add(new FilePasteItemResult(
+                    item.SourcePath,
+                    targetPath,
+                    Applied: false,
+                    Conflict: false,
+                    SamePath: false,
+                    IsDirectory: item.IsDirectory,
+                    ErrorMessage: FileOperationErrors.ToUserMessage(ex),
+                    Error: FileOperationErrors.Classify(ex)));
                 allApplied = false;
             }
         }
@@ -390,19 +405,27 @@ public sealed class FileManagementCoordinator
         }
     }
 
-    public async Task<FilePasteOperationResult> TryResolvePasteConflictsAsync(FilePasteResult priorResult)
+    public async Task<FilePasteOperationResult> TryResolvePasteConflictsAsync(FilePasteResult priorResult, bool replaceAll = true)
     {
         try
         {
             var resolvedItems = new List<FilePasteItemResult>(priorResult.Items.Count);
             bool targetChanged = priorResult.TargetChanged;
             bool sourceChanged = priorResult.SourceChanged;
+            bool resolvedConflict = false;
 
             foreach (FilePasteItemResult item in priorResult.Items)
             {
-                if (!item.Conflict)
+                if (!item.Conflict || (!replaceAll && resolvedConflict))
                 {
                     resolvedItems.Add(item);
+                    continue;
+                }
+
+                string itemTargetDirectory = Path.GetDirectoryName(item.TargetPath) ?? item.TargetPath;
+                if (item.IsDirectory && _explorerService.IsDirectoryTargetSelfOrDescendant(item.SourcePath, itemTargetDirectory))
+                {
+                    resolvedItems.Add(CreateTargetIsSourceDescendantResult(item, item.TargetPath));
                     continue;
                 }
 
@@ -428,6 +451,7 @@ public sealed class FileManagementCoordinator
                     Conflict = false,
                     ErrorMessage = null
                 });
+                resolvedConflict = true;
             }
 
             return new FilePasteOperationResult(
@@ -440,6 +464,32 @@ public sealed class FileManagementCoordinator
                 PasteResult: null,
                 new FileOperationFailure(FileOperationErrors.Classify(ex), FileOperationErrors.ToUserMessage(ex)));
         }
+    }
+
+    private static FilePasteItemResult CreateTargetIsSourceDescendantResult(FileClipboardItem item, string targetPath)
+    {
+        return new FilePasteItemResult(
+            item.SourcePath,
+            targetPath,
+            Applied: false,
+            Conflict: false,
+            SamePath: false,
+            IsDirectory: item.IsDirectory,
+            ErrorMessage: FileOperationErrors.ToUserMessage(FileOperationError.TargetIsSourceDescendant),
+            Error: FileOperationError.TargetIsSourceDescendant);
+    }
+
+    private static FilePasteItemResult CreateTargetIsSourceDescendantResult(FilePasteItemResult item, string targetPath)
+    {
+        return item with
+        {
+            TargetPath = targetPath,
+            Applied = false,
+            Conflict = false,
+            SamePath = false,
+            ErrorMessage = FileOperationErrors.ToUserMessage(FileOperationError.TargetIsSourceDescendant),
+            Error = FileOperationError.TargetIsSourceDescendant
+        };
     }
 
     private bool TryMarkPathChanged(string path)

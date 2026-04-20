@@ -210,6 +210,9 @@
   <data name="CommonOpenInNewWindow" xml:space="preserve">
     <value>Open in new window</value>
   </data>
+  <data name="CommonOpenInNewTab" xml:space="preserve">
+    <value>Open in new tab</value>
+  </data>
   <data name="CommonPinToggle" xml:space="preserve">
     <value>Add to favorites / Remove from favorites</value>
   </data>
@@ -373,7 +376,7 @@
     <value>Paste</value>
   </data>
   <data name="LanguageToggleButtonToolTip.Content" xml:space="preserve">
-    <value>Switch language</value>
+    <value>Toggle theme</value>
   </data>
   <data name="OverflowBreadcrumbButtonToolTip.Content" xml:space="preserve">
     <value>Show hidden path segments</value>
@@ -416,6 +419,15 @@
   </data>
   <data name="SearchTextBox.PlaceholderText" xml:space="preserve">
     <value>Search current folder</value>
+  </data>
+  <data name="SecondaryPanePlaceholderLoading" xml:space="preserve">
+    <value>Loading secondary pane...</value>
+  </data>
+  <data name="SecondaryPanePlaceholderIdle" xml:space="preserve">
+    <value>Secondary pane placeholder</value>
+  </data>
+  <data name="SecondaryPanePlaceholderEmptyFolder" xml:space="preserve">
+    <value>This folder is empty.</value>
   </data>
   <data name="ColumnNameHeader" xml:space="preserve">
     <value>Name</value>
@@ -720,8 +732,14 @@
   <data name="StatusOpenedInNewWindow" xml:space="preserve">
     <value>Opened in new window: {0}</value>
   </data>
+  <data name="StatusOpenedInNewTab" xml:space="preserve">
+    <value>Opened in new tab: {0}</value>
+  </data>
   <data name="StatusOpenInNewWindowFailed" xml:space="preserve">
     <value>This item couldn't be opened in a new window: {0}</value>
+  </data>
+  <data name="StatusOpenInNewTabFailed" xml:space="preserve">
+    <value>This item couldn't be opened in a new tab: {0}</value>
   </data>
   <data name="StatusOpenTerminalSuccess" xml:space="preserve">
     <value>Opened terminal: {0}</value>
@@ -807,6 +825,9 @@
   <data name="DialogRenameTitle" xml:space="preserve">
     <value>Rename</value>
   </data>
+  <data name="DialogRenameBody" xml:space="preserve">
+    <value>Enter a new name for "{0}".</value>
+  </data>
   <data name="DialogRenamePrimaryButton" xml:space="preserve">
     <value>Rename</value>
   </data>
@@ -821,6 +842,9 @@
   </data>
   <data name="DialogCancelButton" xml:space="preserve">
     <value>Cancel</value>
+  </data>
+  <data name="DialogSkipButton" xml:space="preserve">
+    <value>Skip</value>
   </data>
   <data name="DialogCloseButton" xml:space="preserve">
     <value>Close</value>
@@ -1134,6 +1158,15 @@
   <data name="PasteFailureDialogTitle" xml:space="preserve">
     <value>Paste couldn't be completed</value>
   </data>
+  <data name="PasteInterruptedDialogTitle" xml:space="preserve">
+    <value>1 interrupted action</value>
+  </data>
+  <data name="PasteTargetIsSourceDescendantDialogMessage" xml:space="preserve">
+    <value>The destination folder is a subfolder of the source folder.</value>
+  </data>
+  <data name="PasteTargetIsSourceDescendantDialogMessageWithItem" xml:space="preserve">
+    <value>The destination folder is a subfolder of the source folder.&#x0a;&#x0a;{0}</value>
+  </data>
   <data name="PasteConflictDialogTitle" xml:space="preserve">
     <value>Replace or skip files</value>
   </data>
@@ -1146,11 +1179,17 @@
   <data name="PasteConflictDialogPrimaryMultiple" xml:space="preserve">
     <value>The destination already has {0} items with the same name.</value>
   </data>
+  <data name="PasteConflictDialogPrimaryMultipleWithCurrent" xml:space="preserve">
+    <value>The destination already has {0} items with the same name. Current item: "{1}".</value>
+  </data>
   <data name="PasteConflictDialogReplaceSingleButton" xml:space="preserve">
     <value>Replace the item in the destination</value>
   </data>
   <data name="PasteConflictDialogReplaceMultipleButton" xml:space="preserve">
-    <value>Replace the items in the destination</value>
+    <value>Replace this item</value>
+  </data>
+  <data name="PasteConflictDialogReplaceAllButton" xml:space="preserve">
+    <value>Replace all</value>
   </data>
   <data name="PasteConflictDialogSkipSingleButton" xml:space="preserve">
     <value>Skip this item</value>
@@ -1169,6 +1208,9 @@
   </data>
   <data name="ErrorFileOperationNotSupported" xml:space="preserve">
     <value>This operation is not supported.</value>
+  </data>
+  <data name="ErrorPasteTargetIsSourceDescendant" xml:space="preserve">
+    <value>The destination folder is a subfolder of the source folder.</value>
   </data>
   <data name="ErrorFileOperationInvalidArchive" xml:space="preserve">
     <value>The archive is invalid or corrupted.</value>

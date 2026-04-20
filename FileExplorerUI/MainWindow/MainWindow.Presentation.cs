@@ -578,13 +578,63 @@ namespace FileExplorerUI
             UpdateFileCommandStates();
             _lastTitleWasReadFailed = false;
             UpdateWindowTitle();
-            UpdateStatus(SF("StatusDriveCount", PrimaryEntries.Count));
+            UpdateStatus(WorkspacePanelId.Primary, SF("StatusDriveCount", PrimaryEntries.Count));
             LogPrimaryTabDataState("PopulateMyComputerEntries");
         }
 
         private void UpdateStatus(string message)
         {
-            StatusTextBlock.Text = message;
+            WorkspacePanelId panelId = _isDualPaneEnabled
+                ? _workspaceLayoutHost.ActivePanel
+                : WorkspacePanelId.Primary;
+            UpdateStatus(panelId, message);
+        }
+
+        private void UpdateStatus(WorkspacePanelId panelId, string message)
+        {
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                if (_secondaryPaneStatusText == message)
+                {
+                    return;
+                }
+
+                _secondaryPaneStatusText = message;
+                RaisePropertyChanged(nameof(SecondaryPaneStatusText));
+                return;
+            }
+
+            if (_primaryPaneStatusText == message)
+            {
+                return;
+            }
+
+            _primaryPaneStatusText = message;
+            RaisePropertyChanged(nameof(PrimaryPaneStatusText));
+        }
+
+        private void RefreshPanelStatus(WorkspacePanelId panelId)
+        {
+            string currentPath = GetPanelCurrentPath(panelId);
+            if (string.IsNullOrWhiteSpace(currentPath))
+            {
+                UpdateStatus(panelId, string.Empty);
+                return;
+            }
+
+            string message = string.Equals(currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase)
+                ? SF("StatusDriveCount", GetPanelTotalEntries(panelId))
+                : SF("StatusCurrentFolderItems", GetPanelTotalEntries(panelId));
+            UpdateStatus(panelId, message);
+        }
+
+        private void RefreshAllPanelStatus()
+        {
+            RefreshPanelStatus(WorkspacePanelId.Primary);
+            if (_isDualPaneEnabled)
+            {
+                RefreshPanelStatus(WorkspacePanelId.Secondary);
+            }
         }
 
         private void ShowStatusDialog(string message, bool warning)

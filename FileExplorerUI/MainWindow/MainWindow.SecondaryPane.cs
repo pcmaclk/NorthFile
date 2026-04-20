@@ -30,6 +30,63 @@ namespace FileExplorerUI
             RaiseSecondaryPaneStateChanged(navigationChanged: false, dataChanged: true);
         }
 
+        private void SecondaryDetailsRowGrid_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is Grid rowGrid)
+            {
+                ApplySecondaryDetailsRowColumnWidths(rowGrid);
+            }
+        }
+
+        private void SecondaryEntryRow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is Controls.EntryItemHost rowHost)
+            {
+                ApplySecondaryDetailsRowLayout(rowHost);
+            }
+        }
+
+        private void RefreshRealizedSecondaryDetailsRowColumnWidths()
+        {
+            if (SecondaryEntriesRepeater is null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < SecondaryPanelState.DataSession.Entries.Count; i++)
+            {
+                if (SecondaryEntriesRepeater.TryGetElement(i) is not Controls.EntryItemHost rowHost)
+                {
+                    continue;
+                }
+
+                ApplySecondaryDetailsRowLayout(rowHost);
+            }
+        }
+
+        private void ApplySecondaryDetailsRowLayout(Controls.EntryItemHost rowHost)
+        {
+            rowHost.Width = SecondaryDetailsRowWidth;
+
+            if (rowHost.Content is Grid rowGrid)
+            {
+                ApplySecondaryDetailsRowColumnWidths(rowGrid);
+            }
+        }
+
+        private void ApplySecondaryDetailsRowColumnWidths(Grid rowGrid)
+        {
+            if (rowGrid.ColumnDefinitions.Count < 7)
+            {
+                return;
+            }
+
+            rowGrid.ColumnDefinitions[0].Width = SecondaryNameColumnWidth;
+            rowGrid.ColumnDefinitions[2].Width = SecondaryTypeColumnWidth;
+            rowGrid.ColumnDefinitions[4].Width = SecondarySizeColumnWidth;
+            rowGrid.ColumnDefinitions[6].Width = SecondaryModifiedColumnWidth;
+        }
+
         private void RaiseSecondaryPaneStateChanged(bool navigationChanged, bool dataChanged)
         {
             if (navigationChanged)
@@ -149,6 +206,7 @@ namespace FileExplorerUI
                 WorkspaceTabPerf.Mark($"{panelId.ToString().ToLowerInvariant()}.restore.reuse");
                 RaisePanelNavigationStateChanged(panelId);
                 RaiseSimplePanelDataStateChanged(panelId);
+                RefreshPanelStatus(panelId);
                 _ = DispatcherQueue.TryEnqueue(() =>
                 {
                     if (!preserveViewport)
@@ -224,6 +282,7 @@ namespace FileExplorerUI
             }
 
             panelState.DataSession.IsLoading = false;
+            RefreshPanelStatus(panelId);
             if (panelId == WorkspacePanelId.Secondary)
             {
                 RaiseSecondaryPaneDataStateChanged();
@@ -275,7 +334,7 @@ namespace FileExplorerUI
                 GetPanelActiveEntryResultSet(panelId),
                 loadResult.Page.NextCursor,
                 loadResult.Page.HasMore,
-                loadResult.Page.TotalEntries == 0
+                !loadResult.Page.HasMore || loadResult.Page.TotalEntries == 0
                     ? (uint)loadResult.VisibleRows.Count
                     : loadResult.Page.TotalEntries);
         }
@@ -335,9 +394,10 @@ namespace FileExplorerUI
                 ApplyPanelPageRows(panelId, path, loadResult.VisibleRows, append: true);
                 SetPanelNextCursor(panelId, loadResult.Page.NextCursor);
                 SetPanelHasMore(panelId, loadResult.Page.HasMore);
-                SetPanelTotalEntries(panelId, loadResult.Page.TotalEntries == 0
+                SetPanelTotalEntries(panelId, !loadResult.Page.HasMore || loadResult.Page.TotalEntries == 0
                     ? (uint)panelState.DataSession.Entries.Count
                     : loadResult.Page.TotalEntries);
+                RefreshPanelStatus(panelId);
                 if (panelId == WorkspacePanelId.Secondary)
                 {
                     UpdateSecondaryEntrySelectionVisuals();
@@ -379,6 +439,11 @@ namespace FileExplorerUI
             session.HasMore = loadResult.HasMore;
             session.TotalEntries = loadResult.TotalEntries;
             MarkPanelDataLoadedForCurrentNavigation(panelId);
+            RefreshPanelStatus(panelId);
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                ConfigureDirectoryWatcher(panelId, panelState.CurrentPath);
+            }
 
             ApplySimplePanelPresentationAfterLoad(panelId, panelState);
 
@@ -405,6 +470,11 @@ namespace FileExplorerUI
             ApplySimplePanelPresentation(panelId, panelState);
             UpdateSimplePanelSelectionVisuals(panelId);
             RaiseSimplePanelDataStateChanged(panelId);
+
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                _ = DispatcherQueue.TryEnqueue(RefreshRealizedSecondaryDetailsRowColumnWidths);
+            }
         }
 
         private void ApplySimplePanelPostLoadUi(

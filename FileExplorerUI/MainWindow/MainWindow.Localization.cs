@@ -74,19 +74,7 @@ namespace FileExplorerUI
                 RefreshLocalizedEntryPresentation();
                 UpdateDetailsHeaders();
 
-                if (GetPanelIsLoading(WorkspacePanelId.Primary))
-                {
-                    UpdateStatus(S("StatusLoading"));
-                    return;
-                }
-
-                if (string.Equals(GetPanelCurrentPath(WorkspacePanelId.Primary), ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    UpdateStatus(SF("StatusDriveCount", PrimaryEntries.Count));
-                    return;
-                }
-
-                UpdateStatus(SF("StatusCurrentFolderItems", GetPanelTotalEntries(WorkspacePanelId.Primary)));
+                RefreshAllPanelStatus();
             });
         }
 

@@ -136,9 +136,12 @@ namespace FileExplorerUI
 
         private string GetPaneEntryPath(WorkspacePanelId panelId, EntryViewModel entry)
         {
-            return panelId == WorkspacePanelId.Secondary
-                ? entry.FullPath
-                : System.IO.Path.Combine(GetPanelCurrentPath(panelId), entry.Name);
+            if (!string.IsNullOrWhiteSpace(entry.FullPath))
+            {
+                return entry.FullPath;
+            }
+
+            return System.IO.Path.Combine(GetPanelCurrentPath(panelId), entry.Name);
         }
 
         private static DirectorySortMode GetPanelDirectorySortMode(WorkspacePanelId panelId)
@@ -338,6 +341,13 @@ namespace FileExplorerUI
                 ? ShellMyComputerPath
                 : panel.CurrentPath;
             session.LoadedQueryText = panel.QueryText?.Trim() ?? string.Empty;
+        }
+
+        private void InvalidatePanelDataLoadedForCurrentNavigation(WorkspacePanelId panelId)
+        {
+            PanelDataSession session = GetPanelState(panelId).DataSession;
+            session.LoadedPath = string.Empty;
+            session.LoadedQueryText = string.Empty;
         }
 
         private void ClearPanelEntriesIfNavigationIsStale(WorkspacePanelId panelId)

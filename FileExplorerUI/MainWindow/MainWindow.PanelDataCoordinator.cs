@@ -108,7 +108,7 @@ namespace FileExplorerUI
                 resultSet,
                 cursor,
                 false,
-                totalEntries == 0 ? (uint)loadedEntries.Count : totalEntries);
+                (uint)loadedEntries.Count);
         }
 
         private Task ReloadPanelDataAsync(
@@ -235,13 +235,25 @@ namespace FileExplorerUI
                 SetPanelFocusedEntryPath(panelId, firstAppliedPath);
             }
 
+            PreparePanelDirectoryMutation(panelId, targetDirectoryPath);
+
             if (string.Equals(targetDirectoryPath, GetPanelCurrentPath(panelId), StringComparison.OrdinalIgnoreCase))
             {
-                await ReloadPanelDataAsync(
-                    panelId,
-                    preserveViewport: true,
-                    ensureSelectionVisible: shouldEnsureSelectionVisible,
-                    focusEntries: true);
+                if (!TryApplyLocalPasteTargetMutationForPanel(
+                        panelId,
+                        targetDirectoryPath,
+                        selectPastedEntry,
+                        appliedCount,
+                        firstAppliedPath,
+                        itemResults))
+                {
+                    InvalidatePanelDataLoadedForCurrentNavigation(panelId);
+                    await ReloadPanelDataAsync(
+                        panelId,
+                        preserveViewport: true,
+                        ensureSelectionVisible: shouldEnsureSelectionVisible,
+                        focusEntries: true);
+                }
             }
 
             if (panelId == WorkspacePanelId.Primary &&
@@ -256,6 +268,72 @@ namespace FileExplorerUI
             {
                 await RefreshPanelsForMoveSourcesAsync(targetDirectoryPath, itemResults);
             }
+        }
+
+        private bool TryApplyLocalPasteTargetMutationForPanel(
+            WorkspacePanelId panelId,
+            string targetDirectoryPath,
+            bool selectPastedEntry,
+            int appliedCount,
+            string? firstAppliedPath,
+            IReadOnlyList<FilePasteItemResult> itemResults)
+        {
+            if (appliedCount <= 0 ||
+                string.Equals(targetDirectoryPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) ||
+                !string.IsNullOrWhiteSpace(GetPanelQueryText(panelId)))
+            {
+                return false;
+            }
+
+            var appliedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (FilePasteItemResult item in itemResults)
+            {
+                if (!item.Applied || string.IsNullOrWhiteSpace(item.TargetPath))
+                {
+                    continue;
+                }
+
+                string? targetParent = _explorerService.GetParentPath(item.TargetPath);
+                if (string.IsNullOrWhiteSpace(targetParent) ||
+                    !string.Equals(targetParent, targetDirectoryPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                if (!appliedTargets.Add(item.TargetPath))
+                {
+                    continue;
+                }
+
+                if (!TryApplyLocalUpsertToPane(panelId, item.TargetPath, item.IsDirectory))
+                {
+                    return false;
+                }
+            }
+
+            if (appliedTargets.Count == 0)
+            {
+                return false;
+            }
+
+            if (selectPastedEntry &&
+                appliedCount == 1 &&
+                !string.IsNullOrWhiteSpace(firstAppliedPath))
+            {
+                SetPanelSelectedEntryPath(panelId, firstAppliedPath);
+                SetPanelFocusedEntryPath(panelId, firstAppliedPath);
+                if (panelId == WorkspacePanelId.Primary)
+                {
+                    UpdateEntrySelectionVisuals();
+                }
+                else
+                {
+                    UpdateSecondaryEntrySelectionVisuals();
+                }
+            }
+
+            RefreshPanelStatus(panelId);
+            return true;
         }
 
         private async Task RefreshPanelsForMoveSourcesAsync(
@@ -278,6 +356,7 @@ namespace FileExplorerUI
                 }
 
                 sourceParents.Add(sourceParentPath);
+                SuppressNextWatcherRefresh(sourceParentPath);
             }
 
             if (sourceParents.Count == 0)
@@ -292,11 +371,35 @@ namespace FileExplorerUI
                     continue;
                 }
 
-                await ReloadPanelDataAsync(
-                    candidatePanelId,
-                    preserveViewport: true,
-                    ensureSelectionVisible: false,
-                    focusEntries: false);
+                bool appliedLocalDelete = true;
+                foreach (FilePasteItemResult item in itemResults)
+                {
+                    if (!item.Applied || string.IsNullOrWhiteSpace(item.SourcePath))
+                    {
+                        continue;
+                    }
+
+                    string? sourceParentPath = _explorerService.GetParentPath(item.SourcePath);
+                    if (!string.Equals(sourceParentPath, GetPanelCurrentPath(candidatePanelId), StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    appliedLocalDelete &= ApplyLocalDeleteToPane(candidatePanelId, item.SourcePath);
+                }
+
+                if (!appliedLocalDelete)
+                {
+                    InvalidatePanelDataLoadedForCurrentNavigation(candidatePanelId);
+                    await ReloadPanelDataAsync(
+                        candidatePanelId,
+                        preserveViewport: true,
+                        ensureSelectionVisible: false,
+                        focusEntries: false);
+                    continue;
+                }
+
+                RefreshPanelStatus(candidatePanelId);
             }
         }
 
@@ -335,7 +438,8 @@ namespace FileExplorerUI
                 int insertIndex = _entriesPresentationBuilder.FindInsertIndex(
                     GetPanelEntries(panelId),
                     createdEntry,
-                    GetPanelDirectorySortMode(panelId));
+                    GetPanelSortField(panelId),
+                    GetPanelSortDirection(panelId));
                 InsertLocalCreatedEntryToPane(panelId, createdEntry, insertIndex);
                 SetPanelSelectedEntryPath(panelId, createdEntry.FullPath);
                 SetPanelFocusedEntryPath(panelId, createdEntry.FullPath);
@@ -369,7 +473,7 @@ namespace FileExplorerUI
 
         private void PreparePanelDirectoryMutation(WorkspacePanelId panelId, string directoryPath)
         {
-            if (panelId != WorkspacePanelId.Primary || string.IsNullOrWhiteSpace(directoryPath))
+            if (string.IsNullOrWhiteSpace(directoryPath))
             {
                 return;
             }

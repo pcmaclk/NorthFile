@@ -38,7 +38,14 @@ namespace FileExplorerUI
         private async void LoadButton_Click(object sender, RoutedEventArgs e)
         {
             SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
-            await NavigatePanelToPathAsync(WorkspacePanelId.Primary, NormalizeAddressInputPath(PathTextBox.Text), pushHistory: true);
+            string targetPath = NormalizeAddressInputPath(PathTextBox.Text);
+            if (string.Equals(targetPath, GetPanelCurrentPath(WorkspacePanelId.Primary), StringComparison.OrdinalIgnoreCase))
+            {
+                await ForceRefreshPanelDirectoryAsync(WorkspacePanelId.Primary, preserveViewport: true);
+                return;
+            }
+
+            await NavigatePanelToPathAsync(WorkspacePanelId.Primary, targetPath, pushHistory: true);
         }
 
         private async void NextButton_Click(object sender, RoutedEventArgs e)

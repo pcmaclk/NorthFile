@@ -68,6 +68,12 @@ public sealed class AppSettings
 
     public int WindowHeight { get; set; } = 0;
 
+    public int WindowPosX { get; set; } = int.MinValue;
+
+    public int WindowPosY { get; set; } = int.MinValue;
+
+    public bool WindowMaximized { get; set; } = false;
+
     public bool FavoritesInitialized { get; set; } = false;
 
     public List<FavoriteItem> Favorites { get; set; } = new();

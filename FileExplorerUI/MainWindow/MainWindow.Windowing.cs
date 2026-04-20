@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -24,6 +25,11 @@ namespace FileExplorerUI
                 if (IsDescendantOf(pointerSource, StyledSidebarView))
                 {
                     SetActiveSelectionSurface(SelectionSurfaceId.Sidebar);
+                }
+                else if (IsDescendantOf(pointerSource, ExplorerPaneActionRailHost) ||
+                    IsDescendantOf(pointerSource, ExplorerPaneActionToolbarHost))
+                {
+                    // The center rail is a pane-level affordance; using it must not switch panel focus.
                 }
                 else if (IsDescendantOf(pointerSource, ExplorerBodyGrid))
                 {
@@ -72,6 +78,15 @@ namespace FileExplorerUI
             splitter.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
             splitter.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
             splitter.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(ColumnSplitter_PointerReleased), true);
+        }
+
+        private void RegisterPaneSplitterHandlers(UIElement splitter)
+        {
+            splitter.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(PaneSplitter_PointerPressed), true);
+            splitter.AddHandler(UIElement.PointerMovedEvent, new PointerEventHandler(PaneSplitter_PointerMoved), true);
+            splitter.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(PaneSplitter_PointerReleased), true);
+            splitter.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(PaneSplitter_PointerReleased), true);
+            splitter.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(PaneSplitter_PointerReleased), true);
         }
 
         private void ColumnSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -276,6 +291,7 @@ namespace FileExplorerUI
             _activeColumnSplitterKind = null;
             _activeColumnSplitterPanelId = WorkspacePanelId.Primary;
             _activeColumnResizeState = null;
+            _activePaneResizeState = null;
             _sidebarDragStartWidth = null;
             _splitterDragStartX = 0;
         }
@@ -288,7 +304,82 @@ namespace FileExplorerUI
             _activeColumnSplitterKind = null;
             _activeColumnSplitterPanelId = WorkspacePanelId.Primary;
             _activeColumnResizeState = null;
+            _activePaneResizeState = null;
             _sidebarDragStartWidth = null;
+        }
+
+        private void PaneSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not UIElement splitter || !_isDualPaneEnabled)
+            {
+                return;
+            }
+
+            if (!e.GetCurrentPoint(splitter).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            double primaryWidth = PrimaryPaneHost?.ActualWidth ?? 0;
+            double secondaryWidth = SecondaryPaneHost?.ActualWidth ?? 0;
+            double totalWidth = primaryWidth + secondaryWidth;
+            if (totalWidth <= ExplorerPaneMinWidth * 2)
+            {
+                return;
+            }
+
+            _activeSplitterElement = splitter;
+            _activeSplitterDragMode = SplitterDragMode.Pane;
+            _activePaneResizeState = new PaneResizeState(primaryWidth, secondaryWidth, totalWidth);
+            _splitterDragStartX = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            splitter.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+
+        private void PaneSplitter_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is not UIElement splitter
+                || !ReferenceEquals(splitter, _activeSplitterElement)
+                || _activeSplitterDragMode != SplitterDragMode.Pane
+                || _activePaneResizeState is not PaneResizeState state)
+            {
+                return;
+            }
+
+            if (!e.GetCurrentPoint(splitter).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            double x = e.GetCurrentPoint(this.Content as UIElement).Position.X;
+            double delta = x - _splitterDragStartX;
+            if (Math.Abs(delta) < 0.5)
+            {
+                return;
+            }
+
+            double minPaneWidth = Math.Min(ExplorerPaneMinWidth, Math.Max(120, state.TotalWidth / 2 - 1));
+            double primaryWidth = Math.Clamp(state.PrimaryWidth + delta, minPaneWidth, state.TotalWidth - minPaneWidth);
+            double secondaryWidth = state.TotalWidth - primaryWidth;
+            CurrentWorkspaceShellState.SetPaneWidthWeights(primaryWidth, secondaryWidth);
+            ApplyExplorerPaneLayout();
+            RaisePropertyChanged(
+                nameof(ExplorerPanePrimaryColumnWidth),
+                nameof(ExplorerPaneSecondaryColumnWidth));
+            e.Handled = true;
+        }
+
+        private void PaneSplitter_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            if (_activeSplitterDragMode != SplitterDragMode.Pane)
+            {
+                return;
+            }
+
+            EndActiveSplitterDrag(sender as UIElement);
+            UpdateVisibleBreadcrumbs(WorkspacePanelId.Primary);
+            UpdateVisibleBreadcrumbs(WorkspacePanelId.Secondary);
+            e.Handled = true;
         }
 
         private void SidebarSplitter_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -469,6 +560,73 @@ namespace FileExplorerUI
             if (_activeSplitterElement is null)
             {
                 TryResetSystemCursorToArrow();
+            }
+        }
+
+        private void TitleBarDragRegion_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            RefreshTitleBarDragRectangles();
+        }
+
+        private void RefreshTitleBarDragRectangles()
+        {
+            if (AppWindow is null || WindowRootGrid is null)
+            {
+                return;
+            }
+
+            var rectangles = new List<RectInt32>(3);
+            if (_shellMode == ShellMode.Settings)
+            {
+                TryAddTitleBarDragRectangle(rectangles, SettingsTitleBarDragRegion);
+            }
+            else
+            {
+                TryAddTitleBarDragRectangle(rectangles, LeftTitleBarDragRegion);
+                TryAddTitleBarDragRectangle(rectangles, WindowTabDragRegion);
+            }
+
+            try
+            {
+                AppWindow.TitleBar.SetDragRectangles(rectangles.ToArray());
+            }
+            catch
+            {
+                // Non-fatal: window remains usable even if the platform rejects a transient zero-sized rectangle.
+            }
+        }
+
+        private void TryAddTitleBarDragRectangle(List<RectInt32> rectangles, FrameworkElement? element)
+        {
+            if (element is null ||
+                element.Visibility != Visibility.Visible ||
+                element.ActualWidth <= 1 ||
+                element.ActualHeight <= 1 ||
+                element.XamlRoot is null)
+            {
+                return;
+            }
+
+            try
+            {
+                Windows.Foundation.Rect bounds = element
+                    .TransformToVisual(WindowRootGrid)
+                    .TransformBounds(new Windows.Foundation.Rect(0, 0, element.ActualWidth, element.ActualHeight));
+                double scale = element.XamlRoot.RasterizationScale;
+                int x = (int)Math.Round(bounds.X * scale);
+                int y = (int)Math.Round(bounds.Y * scale);
+                int width = (int)Math.Round(bounds.Width * scale);
+                int height = (int)Math.Round(bounds.Height * scale);
+
+                if (width <= 1 || height <= 1)
+                {
+                    return;
+                }
+
+                rectangles.Add(new RectInt32(x, y, width, height));
+            }
+            catch
+            {
             }
         }
 

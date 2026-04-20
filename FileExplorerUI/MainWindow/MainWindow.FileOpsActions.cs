@@ -14,6 +14,7 @@ namespace FileExplorerUI
         private enum PasteConflictDialogDecision
         {
             Replace,
+            ReplaceAll,
             Skip
         }
 
@@ -333,11 +334,34 @@ namespace FileExplorerUI
             return allowRetry && result == Controls.ModalActionDialogResult.Primary;
         }
 
+        private async Task<bool> ShowPasteTargetIsSourceDescendantDialogAsync(string? itemName)
+        {
+            EnsureOperationFeedbackOverlay();
+            if (_operationFeedbackDialog is null)
+            {
+                return false;
+            }
+
+            string message = string.IsNullOrWhiteSpace(itemName)
+                ? S("PasteTargetIsSourceDescendantDialogMessage")
+                : SF("PasteTargetIsSourceDescendantDialogMessageWithItem", itemName);
+
+            Controls.ModalActionDialogResult result = await _operationFeedbackDialog.ShowAsync(
+                S("PasteInterruptedDialogTitle"),
+                message,
+                S("DialogSkipButton"),
+                S("DialogCancelButton"));
+            return result == Controls.ModalActionDialogResult.Primary;
+        }
+
         private async Task<PasteConflictDialogDecision> ShowPasteConflictDialogAsync(string? itemName, bool isDirectory, int conflictCount)
         {
-            string primaryMessage = conflictCount == 1 && !string.IsNullOrWhiteSpace(itemName)
-                ? SF(isDirectory ? "PasteConflictDialogPrimarySingleFolder" : "PasteConflictDialogPrimarySingleFile", itemName)
-                : SF("PasteConflictDialogPrimaryMultiple", conflictCount);
+            string primaryMessage = conflictCount switch
+            {
+                1 when !string.IsNullOrWhiteSpace(itemName) => SF(isDirectory ? "PasteConflictDialogPrimarySingleFolder" : "PasteConflictDialogPrimarySingleFile", itemName),
+                > 1 when !string.IsNullOrWhiteSpace(itemName) => SF("PasteConflictDialogPrimaryMultipleWithCurrent", conflictCount, itemName),
+                _ => SF("PasteConflictDialogPrimaryMultiple", conflictCount)
+            };
 
             EnsurePasteConflictOverlay();
             if (_pasteConflictDialog is null)
@@ -353,10 +377,17 @@ namespace FileExplorerUI
                     : S("PasteConflictDialogReplaceMultipleButton"),
                 conflictCount == 1
                     ? S("PasteConflictDialogSkipSingleButton")
-                    : S("PasteConflictDialogSkipMultipleButton"));
-            return result == Controls.ModalActionDialogResult.Primary
-                ? PasteConflictDialogDecision.Replace
-                : PasteConflictDialogDecision.Skip;
+                    : S("PasteConflictDialogSkipMultipleButton"),
+                conflictCount == 1
+                    ? string.Empty
+                    : S("PasteConflictDialogReplaceAllButton"));
+
+            return result switch
+            {
+                Controls.ModalActionDialogResult.Primary => PasteConflictDialogDecision.Replace,
+                Controls.ModalActionDialogResult.Tertiary => PasteConflictDialogDecision.ReplaceAll,
+                _ => PasteConflictDialogDecision.Skip
+            };
         }
 
         private void EnsurePasteConflictOverlay()

@@ -72,6 +72,8 @@ public static class WorkspaceSessionSnapshot
         {
             LayoutMode = shell.LayoutMode,
             ActivePanel = shell.ActivePanel,
+            PrimaryPaneWidthWeight = shell.PrimaryPaneWidthWeight,
+            SecondaryPaneWidthWeight = shell.SecondaryPaneWidthWeight,
             Primary = FromPanel(shell.Primary),
             Secondary = FromPanel(shell.Secondary)
         };
@@ -115,6 +117,9 @@ public static class WorkspaceSessionSnapshot
     {
         shell.LayoutMode = dto.LayoutMode;
         shell.ActivePanel = shell.IsSplit ? dto.ActivePanel : WorkspacePanelId.Primary;
+        shell.SetPaneWidthWeights(
+            ClampPaneWidthWeight(dto.PrimaryPaneWidthWeight),
+            ClampPaneWidthWeight(dto.SecondaryPaneWidthWeight));
         ApplyPanel(shell.Primary, dto.Primary ?? new PanelDto(), shellRootPath);
         ApplyPanel(shell.Secondary, dto.Secondary ?? new PanelDto(), shellRootPath);
     }
@@ -178,6 +183,13 @@ public static class WorkspaceSessionSnapshot
             : Math.Clamp(value, min, max);
     }
 
+    private static double ClampPaneWidthWeight(double value)
+    {
+        return double.IsNaN(value) || double.IsInfinity(value) || value <= 0
+            ? 1
+            : Math.Clamp(value, 0.25, 4);
+    }
+
     private sealed class SnapshotDto
     {
         public int Version { get; set; }
@@ -195,6 +207,8 @@ public static class WorkspaceSessionSnapshot
     {
         public WorkspaceLayoutMode LayoutMode { get; set; } = WorkspaceLayoutMode.Single;
         public WorkspacePanelId ActivePanel { get; set; } = WorkspacePanelId.Primary;
+        public double PrimaryPaneWidthWeight { get; set; } = 1;
+        public double SecondaryPaneWidthWeight { get; set; } = 1;
         public PanelDto? Primary { get; set; }
         public PanelDto? Secondary { get; set; }
     }

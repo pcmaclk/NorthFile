@@ -210,6 +210,9 @@
   <data name="CommonOpenInNewWindow" xml:space="preserve">
     <value>在新窗口中打开</value>
   </data>
+  <data name="CommonOpenInNewTab" xml:space="preserve">
+    <value>在新标签页中打开</value>
+  </data>
   <data name="CommonPinToggle" xml:space="preserve">
     <value>添加到收藏 / 从收藏中移除</value>
   </data>
@@ -373,7 +376,7 @@
     <value>粘贴</value>
   </data>
   <data name="LanguageToggleButtonToolTip.Content" xml:space="preserve">
-    <value>切换语言</value>
+    <value>切换主题</value>
   </data>
   <data name="OverflowBreadcrumbButtonToolTip.Content" xml:space="preserve">
     <value>显示隐藏的路径层级</value>
@@ -416,6 +419,15 @@
   </data>
   <data name="SearchTextBox.PlaceholderText" xml:space="preserve">
     <value>搜索当前文件夹</value>
+  </data>
+  <data name="SecondaryPanePlaceholderLoading" xml:space="preserve">
+    <value>正在加载次面板...</value>
+  </data>
+  <data name="SecondaryPanePlaceholderIdle" xml:space="preserve">
+    <value>次面板占位区</value>
+  </data>
+  <data name="SecondaryPanePlaceholderEmptyFolder" xml:space="preserve">
+    <value>此文件夹为空。</value>
   </data>
   <data name="ColumnNameHeader" xml:space="preserve">
     <value>名称</value>
@@ -720,8 +732,14 @@
   <data name="StatusOpenedInNewWindow" xml:space="preserve">
     <value>已在新窗口中打开“{0}”。</value>
   </data>
+  <data name="StatusOpenedInNewTab" xml:space="preserve">
+    <value>已在新标签页中打开“{0}”。</value>
+  </data>
   <data name="StatusOpenInNewWindowFailed" xml:space="preserve">
     <value>无法在新窗口中打开：{0}</value>
+  </data>
+  <data name="StatusOpenInNewTabFailed" xml:space="preserve">
+    <value>无法在新标签页中打开：{0}</value>
   </data>
   <data name="StatusOpenTerminalSuccess" xml:space="preserve">
     <value>已打开“{0}”中的终端。</value>
@@ -807,6 +825,9 @@
   <data name="DialogRenameTitle" xml:space="preserve">
     <value>重命名</value>
   </data>
+  <data name="DialogRenameBody" xml:space="preserve">
+    <value>输入“{0}”的新名称。</value>
+  </data>
   <data name="DialogRenamePrimaryButton" xml:space="preserve">
     <value>重命名</value>
   </data>
@@ -827,6 +848,9 @@
   </data>
   <data name="DialogCancelButton" xml:space="preserve">
     <value>取消</value>
+  </data>
+  <data name="DialogSkipButton" xml:space="preserve">
+    <value>跳过</value>
   </data>
   <data name="DialogCloseButton" xml:space="preserve">
     <value>关闭</value>
@@ -1140,6 +1164,15 @@
   <data name="PasteFailureDialogTitle" xml:space="preserve">
     <value>无法完成粘贴</value>
   </data>
+  <data name="PasteInterruptedDialogTitle" xml:space="preserve">
+    <value>1 个已中断的操作</value>
+  </data>
+  <data name="PasteTargetIsSourceDescendantDialogMessage" xml:space="preserve">
+    <value>目标文件夹是源文件夹的子文件夹。</value>
+  </data>
+  <data name="PasteTargetIsSourceDescendantDialogMessageWithItem" xml:space="preserve">
+    <value>目标文件夹是源文件夹的子文件夹。&#x0a;&#x0a;{0}</value>
+  </data>
   <data name="PasteConflictDialogTitle" xml:space="preserve">
     <value>替换或跳过文件</value>
   </data>
@@ -1152,11 +1185,17 @@
   <data name="PasteConflictDialogPrimaryMultiple" xml:space="preserve">
     <value>目标已包含 {0} 个同名项目。</value>
   </data>
+  <data name="PasteConflictDialogPrimaryMultipleWithCurrent" xml:space="preserve">
+    <value>目标已包含 {0} 个同名项目。当前项：“{1}”。</value>
+  </data>
   <data name="PasteConflictDialogReplaceSingleButton" xml:space="preserve">
     <value>替换目标中的项目</value>
   </data>
   <data name="PasteConflictDialogReplaceMultipleButton" xml:space="preserve">
-    <value>替换目标中的项目</value>
+    <value>替换此项</value>
+  </data>
+  <data name="PasteConflictDialogReplaceAllButton" xml:space="preserve">
+    <value>全部替换</value>
   </data>
   <data name="PasteConflictDialogSkipSingleButton" xml:space="preserve">
     <value>跳过此项</value>
@@ -1175,6 +1214,9 @@
   </data>
   <data name="ErrorFileOperationNotSupported" xml:space="preserve">
     <value>当前操作不受支持。</value>
+  </data>
+  <data name="ErrorPasteTargetIsSourceDescendant" xml:space="preserve">
+    <value>目标文件夹是源文件夹的子文件夹。</value>
   </data>
   <data name="ErrorFileOperationInvalidArchive" xml:space="preserve">
     <value>压缩包无效或已损坏。</value>

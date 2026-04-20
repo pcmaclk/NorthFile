@@ -1,5 +1,33 @@
 # WinUI 内容区多视图与双面板重构计划
 
+## 当前进度（2026-04-12）
+
+- 双面板当前已进入“真实 pane 行为收口”阶段，不再只是壳层骨架：
+  - 次 pane 已接入真实 entries surface、真实地址栏/搜索栏状态、独立返回/前进/上级/刷新命令。
+  - pane-local 文件命令已统一进入 `PaneFileCommandController` / pane core，不再继续保留“主 pane 本地实现、次 pane 特判补丁”的长期形态。
+- pane 壳层状态与导航通知开始收敛到共享 helper：
+  - `工具栏 / 内容区 / 输入框 / 前景色 / 边框 / 阴影层级` 的 active/inactive 视觉属性，当前已统一走 `WorkspacePanelId -> shell helper` 查询，不再在主/次 pane 属性里各自拼条件。
+  - 次 pane 的 `地址栏 / 面包屑 / 搜索 / 可导航状态 / 占位态` 属性通知名单，当前也开始收敛到共享 raising 入口，后续继续统一主 pane 导航链时不需要再复制一整串 `nameof(...)`。
+- 次 pane 的 details 滚动分页链当前已打通：
+  - `SecondaryEntriesScrollViewer.ViewChanged` 已接入与主 pane 同一套 viewport 调度入口。
+  - 次 pane 已支持滚动到阈值后按 `readRange` 结果集窗口继续追加下一页，而不是每次整页重载。
+  - `System32` 级别大目录场景下，`secondary-append.begin/end` 已能稳定触发，追加后继续滚动未再复现之前的 WinUI 崩溃链。
+- 双面板 active / 焦点路由已补齐两层保护：
+  - 第一层是交互入口显式切 active：次 pane 的工具栏、地址栏、搜索栏、内容区背景、行项、列头、右键背景、双击项等入口都会先切到 `SecondaryPane`。
+  - 第二层是命令执行阶段按 `EntriesContextOrigin` 再同步一次 active surface：
+    - `SecondaryEntriesList` -> `SecondaryPane`
+    - `SidebarPinned / SidebarTree` -> `Sidebar`
+    - 其他 entries context -> `PrimaryPane`
+  - 这样即使未来某个 pointer 入口样式或结构调整，右键菜单与快捷键链也不会轻易把命令打回主 pane。
+- 当前对双面板交互的一条明确约束：
+  - “视觉激活”和“命令命中 pane”必须保持同源，不允许只改边框/背景而不改 `SelectionSurface` / `ActivePanel`。
+  - 任何新接入的 pane 级交互入口，如果会改变用户接下来快捷键、右键、地址栏编辑的目标 pane，就必须在入口处显式切 `SetActiveSelectionSurface(...)`，或者在命令 origin 层补对应映射。
+- 当前阶段结论：
+  - 双面板已从“壳层重构”进入“行为一致性收口”阶段。
+  - 后续继续重构 `PanelHost / 导航栏 / entries host` 时，必须保留这套 active 路由约束和次 pane 分页模型，不能退回到“主 pane 保状态、次 pane 整页重载”的旧模式。
+- 对应回归入口：
+  - 见 [双面板行为回归清单](./双面板行为回归清单.md)。
+
 ## 当前进度（2026-04-06）
 
 - 壳层 UI 重构阶段已收口：
@@ -373,3 +401,31 @@
   - 将首帧后补入的剩余真实项继续拆成更小批次，降低第二次可感知顿挫。
 
 - 这两点暂不在当前阶段继续推进，避免偏离“内容区重构与交互收口”的主任务。
+
+## 当前进度（2026-04-20）
+
+- 双面板与标签页主线已经进入收尾验证阶段：
+  - 每个标签页持有自己的主/次 pane 状态，包括路径、双面板开关、active pane、列宽、视口与数据会话。
+  - 主/次 pane 共用 pane 数据加载协调器、命令路由、刷新/粘贴/删除/移动后的局部收尾逻辑。
+  - 次 pane 已补齐分页/视口模型，不再依赖“清空后整页恢复”的旧刷新模型。
+  - 主/次 pane 都有独立地址栏、搜索栏、toolbar、内容区、状态栏和关闭按钮。
+  - 中间操作区已支持方向明确的复制选中、复制全部、移动选中、移动全部、路径同步和面板互换。
+
+- 当前 UI 行为边界：
+  - 地址栏保持“展示态 breadcrumb + 编辑态 TextBox”两段式。
+  - 地址栏只有 `Enter` 提交导航；点击外部或 `Escape` 取消编辑。
+  - 点击 breadcrumb 项本身只执行 breadcrumb 导航；点击地址栏右侧预留空白才进入编辑态。
+  - 双面板窄宽度下，主/次地址栏右侧固定预留透明命中区，避免空白点击区过小。
+  - active / inactive 视觉状态由 XAML theme resource 承担，代码只切 pane 状态和数据。
+
+- 当前数据一致性规则：
+  - pane 的状态栏数量必须和当前过滤后的可见项一致。
+  - 当后端分页结果仍有更多页时，pane 可以暂用后端总数维持虚拟滚动。
+  - 当分页结果已经没有更多页时，pane 总数必须回落到已过滤后的可见项数，避免隐藏/系统项导致主/次 pane 状态栏不一致。
+  - 文件操作产生的局部增删优先就地更新目标 pane；只有局部收尾失败时才触发 pane 级重载。
+
+- 2026-04-20 MCP 回归结论：
+  - Debug x64 构建通过。
+  - 双面板启动、标签切换、主/次刷新、双状态栏和中间操作按钮渲染通过。
+  - `D:\New Folder\asdfjj123` 临时文件刷新回归通过，测试文件已清理。
+  - `D:\ | D:\` 双面板标签下主/次 pane 状态栏已保持一致。

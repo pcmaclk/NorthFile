@@ -308,7 +308,8 @@ namespace FileExplorerUI
             return _entriesPresentationBuilder.FindInsertIndex(
                 PrimaryEntries,
                 entry,
-                GetPanelDirectorySortMode(WorkspacePanelId.Primary));
+                GetPanelSortField(WorkspacePanelId.Primary),
+                GetPanelSortDirection(WorkspacePanelId.Primary));
         }
 
         private int CompareEntries(EntryViewModel left, EntryViewModel right)
@@ -316,7 +317,8 @@ namespace FileExplorerUI
             return _entriesPresentationBuilder.Compare(
                 left,
                 right,
-                GetPanelDirectorySortMode(WorkspacePanelId.Primary));
+                GetPanelSortField(WorkspacePanelId.Primary),
+                GetPanelSortDirection(WorkspacePanelId.Primary));
         }
 
         private async Task<bool> BeginRenameOverlayAsync(

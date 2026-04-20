@@ -168,7 +168,7 @@ namespace FileExplorerUI
             ? LocalizedStrings.Instance.Get("CommonExpand")
             : LocalizedStrings.Instance.Get("CommonCollapse");
 
-        public Thickness ShellToolbarMargin => new(0, 8, 0, ShellToolbarBottomSpacing);
+        public Thickness ShellToolbarMargin => new(0, ShellToolbarBottomSpacing, 0, ShellToolbarBottomSpacing);
 
         public Thickness ShellToolbarPadding => new(8, 4, 8, 4);
 
@@ -176,13 +176,19 @@ namespace FileExplorerUI
 
         public double ExplorerPanelHostSpacing => ShellToolbarBottomSpacing;
 
+        public Thickness SidebarContentPadding => new(0, ShellToolbarBottomSpacing + 4, 0, 0);
+
+        public Thickness AddWorkspaceTabButtonMargin => new(4, 4, 0, 0);
+
+        public Thickness ExplorerPaneToggleButtonMargin => new(0, 4, 0, 0);
+
         public double ShellStatusBarHeight => ShellStatusBarHeightValue;
 
         public Thickness ShellStatusTextMargin => new(22, 0, 18, 0);
 
         public double ShellSplitterWidth => ShellSplitterWidthValue;
 
-        public GridLength ExplorerPanePrimaryColumnWidth => new(1, GridUnitType.Star);
+        public GridLength ExplorerPanePrimaryColumnWidth => GetExplorerPanePrimaryColumnWidth();
 
         public GridLength ExplorerPaneToolbarActionRailColumnWidth => new(ExplorerPaneActionRailWidthValue);
 
@@ -191,7 +197,7 @@ namespace FileExplorerUI
             : new GridLength(0);
 
         public GridLength ExplorerPaneSecondaryColumnWidth => _isDualPaneEnabled
-            ? new GridLength(1, GridUnitType.Star)
+            ? GetExplorerPaneSecondaryColumnWidth()
             : new GridLength(0);
 
         public Visibility ExplorerPaneToolbarActionRailVisibility => Visibility.Visible;
@@ -298,6 +304,7 @@ namespace FileExplorerUI
                 }
                 SecondaryPanelState.NameColumnWidth = value.Value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryNameColumnWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
             }
         }
 
@@ -312,6 +319,7 @@ namespace FileExplorerUI
                 }
                 SecondaryPanelState.TypeColumnWidth = value.Value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryTypeColumnWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
             }
         }
 
@@ -326,6 +334,7 @@ namespace FileExplorerUI
                 }
                 SecondaryPanelState.SizeColumnWidth = value.Value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondarySizeColumnWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
             }
         }
 
@@ -340,6 +349,7 @@ namespace FileExplorerUI
                 }
                 SecondaryPanelState.ModifiedColumnWidth = value.Value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryModifiedColumnWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
             }
         }
 
@@ -401,6 +411,7 @@ namespace FileExplorerUI
                 }
                 SecondaryPanelState.DetailsRowWidth = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryDetailsRowWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
             }
         }
     }

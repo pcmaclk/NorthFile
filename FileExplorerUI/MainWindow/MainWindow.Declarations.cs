@@ -93,7 +93,8 @@ namespace FileExplorerUI
         {
             None,
             Column,
-            Sidebar
+            Sidebar,
+            Pane
         }
 
         private enum ColumnSplitterKind
@@ -110,6 +111,11 @@ namespace FileExplorerUI
             double Size,
             double Modified,
             double ContentWidth);
+
+        private readonly record struct PaneResizeState(
+            double PrimaryWidth,
+            double SecondaryWidth,
+            double TotalWidth);
 
         private static int s_navigationPerfSequence;
         private static readonly object s_navigationPerfLogLock = new();
@@ -151,6 +157,7 @@ namespace FileExplorerUI
         private const string AutoStartRegistryValueName = "NorthFile";
         private const int MinPersistedWindowWidth = 800;
         private const int MinPersistedWindowHeight = 600;
+        private const int UnsetWindowPosition = int.MinValue;
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 

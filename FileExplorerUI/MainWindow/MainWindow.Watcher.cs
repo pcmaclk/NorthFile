@@ -10,23 +10,41 @@ namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
+        private const int WatcherSelfMutationSuppressionMs = 2000;
+
         private void SuppressNextWatcherRefresh(string path)
         {
             if (!string.IsNullOrWhiteSpace(path))
             {
-                _suppressedWatcherRefreshPaths.Add(path);
+                _suppressedWatcherRefreshPaths[path] = Environment.TickCount64 + WatcherSelfMutationSuppressionMs;
             }
         }
 
         private bool ConsumeSuppressedWatcherRefresh(string path)
         {
-            return !string.IsNullOrWhiteSpace(path) && _suppressedWatcherRefreshPaths.Remove(path);
+            if (string.IsNullOrWhiteSpace(path) ||
+                !_suppressedWatcherRefreshPaths.TryGetValue(path, out long suppressUntilTick))
+            {
+                return false;
+            }
+
+            if (Environment.TickCount64 <= suppressUntilTick)
+            {
+                return true;
+            }
+
+            _suppressedWatcherRefreshPaths.Remove(path);
+            return false;
         }
 
         private void ConfigureDirectoryWatcher(string path)
         {
-            _dirWatcher?.Dispose();
-            _dirWatcher = null;
+            ConfigureDirectoryWatcher(WorkspacePanelId.Primary, path);
+        }
+
+        private void ConfigureDirectoryWatcher(WorkspacePanelId panelId, string path)
+        {
+            DisposeDirectoryWatcher(panelId);
 
             if (!_explorerService.DirectoryExists(path))
             {
@@ -42,16 +60,40 @@ namespace FileExplorerUI
                     EnableRaisingEvents = true,
                 };
 
-                watcher.Changed += Watcher_OnChanged;
-                watcher.Created += Watcher_OnChanged;
-                watcher.Deleted += Watcher_OnChanged;
-                watcher.Renamed += Watcher_OnRenamed;
-                _dirWatcher = watcher;
+                watcher.Changed += (_, _) => ScheduleIncrementalRefreshFromWatcher(panelId, "changed");
+                watcher.Created += (_, _) => ScheduleIncrementalRefreshFromWatcher(panelId, "changed");
+                watcher.Deleted += (_, _) => ScheduleIncrementalRefreshFromWatcher(panelId, "changed");
+                watcher.Renamed += (_, _) => ScheduleIncrementalRefreshFromWatcher(panelId, "renamed");
+                SetDirectoryWatcher(panelId, watcher);
             }
             catch
             {
                 // Non-fatal: we can still rely on manual refresh + TTL.
             }
+        }
+
+        private void DisposeDirectoryWatcher(WorkspacePanelId panelId)
+        {
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                _secondaryDirWatcher?.Dispose();
+                _secondaryDirWatcher = null;
+                return;
+            }
+
+            _dirWatcher?.Dispose();
+            _dirWatcher = null;
+        }
+
+        private void SetDirectoryWatcher(WorkspacePanelId panelId, FileSystemWatcher watcher)
+        {
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                _secondaryDirWatcher = watcher;
+                return;
+            }
+
+            _dirWatcher = watcher;
         }
 
         private static bool IsDriveRoot(string path)
@@ -112,19 +154,9 @@ namespace FileExplorerUI
             }
         }
 
-        private void Watcher_OnChanged(object sender, FileSystemEventArgs e)
+        private void ScheduleIncrementalRefreshFromWatcher(WorkspacePanelId panelId, string reason)
         {
-            ScheduleIncrementalRefreshFromWatcher("changed");
-        }
-
-        private void Watcher_OnRenamed(object sender, RenamedEventArgs e)
-        {
-            ScheduleIncrementalRefreshFromWatcher("renamed");
-        }
-
-        private void ScheduleIncrementalRefreshFromWatcher(string reason)
-        {
-            string snapPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            string snapPath = GetPanelCurrentPath(panelId);
             _watcherDebounceCts?.Cancel();
             _watcherDebounceCts = new CancellationTokenSource();
             CancellationToken token = _watcherDebounceCts.Token;
@@ -142,11 +174,11 @@ namespace FileExplorerUI
                     _ = DispatcherQueue.TryEnqueue(() =>
                     {
                         long now = Environment.TickCount64;
-                        string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+                        string currentPath = GetPanelCurrentPath(panelId);
                         WatcherController.RefreshDecision refreshDecision = _watcherController.EvaluateRefresh(
                             snapPath,
                             currentPath,
-                            GetPanelIsLoading(WorkspacePanelId.Primary),
+                            GetPanelIsLoading(panelId),
                             now,
                             _lastWatcherRefreshTick,
                             ConsumeSuppressedWatcherRefresh(currentPath));
@@ -161,18 +193,8 @@ namespace FileExplorerUI
                         }
                         _lastWatcherRefreshTick = refreshDecision.NextRefreshTick;
 
-                        try
-                        {
-                            _explorerService.MarkPathChanged(currentPath);
-                        }
-                        catch
-                        {
-                            // Ignore mark failures; background refresh will still attempt to recover.
-                        }
-
-                        EnsurePersistentRefreshFallbackInvalidation(currentPath, $"watcher_{reason}");
                         RefreshSidebarFavorites(refreshSelection: false);
-                        _ = RefreshCurrentDirectoryInBackgroundAsync();
+                        _ = RefreshPanelsForDirectoryChangeAsync(currentPath, $"watcher_{reason}");
                     });
                 }
                 catch (TaskCanceledException)

@@ -183,6 +183,18 @@ namespace FileExplorerUI
             return CreateLocalCreatedEntryModel(name, isDirectory);
         }
 
+        private EntryViewModel CreateLocalEntryModelForPanePath(WorkspacePanelId panelId, string targetPath, bool isDirectory)
+        {
+            string name = Path.GetFileName(targetPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            EntryViewModel entry = CreateLocalCreatedEntryModelForPane(panelId, name, isDirectory);
+            entry.FullPath = targetPath;
+            entry.IsPendingCreate = false;
+            entry.PendingCreateIsDirectory = false;
+            entry.IsMetadataLoaded = false;
+            PopulateEntryMetadata(entry);
+            return entry;
+        }
+
         private EntryViewModel InsertLocalCreatedEntry(EntryViewModel entry, int insertIndex)
         {
             uint totalEntries = GetPanelTotalEntries(WorkspacePanelId.Primary);
@@ -228,6 +240,38 @@ namespace FileExplorerUI
             }
 
             return InsertLocalCreatedEntry(entry, insertIndex);
+        }
+
+        private bool TryApplyLocalUpsertToPane(WorkspacePanelId panelId, string targetPath, bool isDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(targetPath))
+            {
+                return false;
+            }
+
+            string name = Path.GetFileName(targetPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (string.IsNullOrWhiteSpace(name) || !ShouldIncludeEntry(targetPath, name))
+            {
+                return false;
+            }
+
+            ApplyLocalDeleteToPane(panelId, targetPath);
+
+            EntryViewModel entry = CreateLocalEntryModelForPanePath(panelId, targetPath, isDirectory);
+            int insertIndex = _entriesPresentationBuilder.FindInsertIndex(
+                GetPanelEntries(panelId),
+                entry,
+                GetPanelSortField(panelId),
+                GetPanelSortDirection(panelId));
+            InsertLocalCreatedEntryToPane(panelId, entry, insertIndex);
+
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                InvalidatePresentationSourceCache();
+                RequestMetadataForCurrentViewport();
+            }
+
+            return true;
         }
 
     }

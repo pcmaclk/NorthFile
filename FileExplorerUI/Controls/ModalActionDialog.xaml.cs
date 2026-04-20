@@ -7,6 +7,7 @@ namespace FileExplorerUI.Controls;
 public enum ModalActionDialogResult
 {
     Primary,
+    Tertiary,
     Secondary
 }
 
@@ -23,6 +24,9 @@ public sealed partial class ModalActionDialog : UserControl
 
     public static readonly DependencyProperty SecondaryTextProperty =
         DependencyProperty.Register(nameof(SecondaryText), typeof(string), typeof(ModalActionDialog), new PropertyMetadata(string.Empty));
+
+    public static readonly DependencyProperty TertiaryTextProperty =
+        DependencyProperty.Register(nameof(TertiaryText), typeof(string), typeof(ModalActionDialog), new PropertyMetadata(string.Empty));
 
     private TaskCompletionSource<ModalActionDialogResult>? _completionSource;
 
@@ -59,17 +63,29 @@ public sealed partial class ModalActionDialog : UserControl
         set => SetValue(SecondaryTextProperty, value);
     }
 
+    public string TertiaryText
+    {
+        get => (string)GetValue(TertiaryTextProperty);
+        set => SetValue(TertiaryTextProperty, value);
+    }
+
     public Visibility SecondaryButtonVisibility =>
         string.IsNullOrWhiteSpace(SecondaryText)
             ? Visibility.Collapsed
             : Visibility.Visible;
 
-    public async Task<ModalActionDialogResult> ShowAsync(string title, string message, string primaryText, string secondaryText)
+    public Visibility TertiaryButtonVisibility =>
+        string.IsNullOrWhiteSpace(TertiaryText)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+    public async Task<ModalActionDialogResult> ShowAsync(string title, string message, string primaryText, string secondaryText, string tertiaryText = "")
     {
         Title = title;
         Message = message;
         PrimaryText = primaryText;
         SecondaryText = secondaryText;
+        TertiaryText = tertiaryText;
         Bindings?.Update();
         Visibility = Visibility.Visible;
         UpdateLayout();
@@ -86,6 +102,11 @@ public sealed partial class ModalActionDialog : UserControl
     private void SecondaryButton_Click(object sender, RoutedEventArgs e)
     {
         Close(ModalActionDialogResult.Secondary);
+    }
+
+    private void TertiaryButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close(ModalActionDialogResult.Tertiary);
     }
 
     private void Close(ModalActionDialogResult result)

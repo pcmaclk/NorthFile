@@ -23,12 +23,18 @@
         <x:Double x:Key="SidebarDragOverlaySize">44</x:Double>
         <x:Double x:Key="SidebarDragOverlayGlyphSize">18</x:Double>
         <Thickness x:Key="TreeViewItemBorderThemeThickness">0</Thickness>
-        <Thickness x:Key="TreeViewItemPresenterMargin">0</Thickness>
+        <Thickness x:Key="TreeViewItemPresenterMargin">0,1</Thickness>
         <Thickness x:Key="TreeViewItemPresenterPadding">0</Thickness>
         <Thickness x:Key="TreeViewItemMultiSelectSelectedItemBorderMargin">0</Thickness>
         <x:Double x:Key="TreeViewItemMinHeight">32</x:Double>
         <x:Double x:Key="TreeViewItemMultiSelectCheckBoxMinHeight">32</x:Double>
         <x:Double x:Key="TreeViewItemContentHeight">32</x:Double>
+        <Style x:Key="SidebarGroupSeparatorStyle" TargetType="Border">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Margin" Value="16,6,12,6" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="{ThemeResource SidebarGroupSeparatorBrush}" />
+        </Style>
         <DataTemplate x:Key="SidebarPinnedItemTemplate" x:DataType="local:SidebarNavItemModel">
             <Grid>
                 <Border
@@ -185,6 +191,8 @@
                     Visibility="Visible" />
             </StackPanel>
 
+            <Border x:Name="PinnedTreeSeparator" Style="{StaticResource SidebarGroupSeparatorStyle}" />
+
             <StackPanel x:Name="TreeSectionPanel" Margin="0" Spacing="2">
                 <Border
                     x:Name="TreeCompactBorder"
@@ -222,6 +230,8 @@
                     <Grid x:Name="TreeHostGrid" />
                 </Border>
             </StackPanel>
+
+            <Border x:Name="TreeCloudSeparator" Style="{StaticResource SidebarGroupSeparatorStyle}" />
 
             <StackPanel x:Name="CloudSectionPanel" Margin="0" Spacing="2">
                 <Border
@@ -275,6 +285,8 @@
                     ItemsSource="{x:Bind CloudItems, Mode=OneWay}" />
             </StackPanel>
 
+            <Border x:Name="CloudNetworkSeparator" Style="{StaticResource SidebarGroupSeparatorStyle}" />
+
             <StackPanel x:Name="NetworkSectionPanel" Margin="0" Spacing="2">
                 <Border
                     x:Name="NetworkGroupBorder"
@@ -327,6 +339,8 @@
                     ItemsSource="{x:Bind NetworkItems, Mode=OneWay}"
                     Visibility="Collapsed" />
             </StackPanel>
+
+            <Border x:Name="NetworkTagsSeparator" Style="{StaticResource SidebarGroupSeparatorStyle}" />
 
             <StackPanel x:Name="TagsSectionPanel" Margin="0" Spacing="2">
                 <Border

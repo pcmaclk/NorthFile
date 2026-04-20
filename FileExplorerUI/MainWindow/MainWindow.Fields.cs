@@ -27,6 +27,7 @@ namespace FileExplorerUI
         private ColumnSplitterKind? _activeColumnSplitterKind;
         private WorkspacePanelId _activeColumnSplitterPanelId = WorkspacePanelId.Primary;
         private ColumnResizeState? _activeColumnResizeState;
+        private PaneResizeState? _activePaneResizeState;
         private double _splitterDragStartX;
         private double? _sidebarDragStartWidth;
         private int _splitterHoverCount;
@@ -100,6 +101,7 @@ namespace FileExplorerUI
         private const double ShellStatusBarHeightValue = 32;
         private const double ShellSplitterWidthValue = 8;
         private const double ExplorerPaneActionRailWidthValue = 48;
+        private const double ExplorerPaneMinWidth = 280;
         private const double SettingsNavigationCompactPaneLengthValue = 40;
         private static readonly DataTemplate SidebarTreeItemTemplate = CreateSidebarTreeItemTemplate();
 
@@ -198,7 +200,7 @@ namespace FileExplorerUI
         private Stack<string> _forwardStack => PrimaryPanelNavigation.ForwardStack;
         private readonly ExplorerService _explorerService = new();
         private readonly FileManagementCoordinator _fileManagementCoordinator;
-        private readonly HashSet<string> _suppressedWatcherRefreshPaths = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, long> _suppressedWatcherRefreshPaths = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _sparseViewportGate = new();
         private int? _pendingSparseViewportTargetIndex;
         private bool _pendingSparseViewportPreferMinimalPage;
@@ -211,6 +213,7 @@ namespace FileExplorerUI
         private bool _suppressRenameOverlayFocusRestoreOnCancel;
         private RustUsnCapability _usnCapability;
         private FileSystemWatcher? _dirWatcher;
+        private FileSystemWatcher? _secondaryDirWatcher;
         private CancellationTokenSource? _watcherDebounceCts;
         private readonly Dictionary<string, FileSystemWatcher> _favoriteWatchers = new(StringComparer.OrdinalIgnoreCase);
         private bool _localizedUiRefreshScheduled;
@@ -228,6 +231,9 @@ namespace FileExplorerUI
         private bool _trayIconAdded;
         private int _lastRestoredWindowWidth;
         private int _lastRestoredWindowHeight;
+        private int _lastRestoredWindowPosX = UnsetWindowPosition;
+        private int _lastRestoredWindowPosY = UnsetWindowPosition;
+        private bool _lastRestoredWindowMaximized;
         private bool _windowSizeRestorePending;
         private bool _hasSeenFirstActivation;
         private double _lastWindowWidth = double.NaN;
@@ -262,6 +268,8 @@ namespace FileExplorerUI
         }
         private bool _lastTitleWasReadFailed;
         private readonly SemaphoreSlim _statusDialogSemaphore = new(1, 1);
+        private string _primaryPaneStatusText = string.Empty;
+        private string _secondaryPaneStatusText = string.Empty;
         private DispatcherTimer? _renameInputTeachingTipTimer;
         private DispatcherTimer? _addressInputTeachingTipTimer;
         private bool _suppressRenameTextFiltering;

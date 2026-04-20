@@ -1,6 +1,10 @@
+using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FileExplorerUI
@@ -28,8 +32,9 @@ namespace FileExplorerUI
 
         private void ApplyExplorerPaneLayout()
         {
+            GridLength primaryWidth = GetExplorerPanePrimaryColumnWidth();
             GridLength secondaryWidth = _isDualPaneEnabled
-                ? new GridLength(1, GridUnitType.Star)
+                ? GetExplorerPaneSecondaryColumnWidth()
                 : new GridLength(0);
 
             GridLength actionRailWidth = _isDualPaneEnabled
@@ -56,14 +61,29 @@ namespace FileExplorerUI
                 SecondaryPaneColumn.Width = secondaryWidth;
             }
 
+            if (SecondaryStatusPaneColumn is not null)
+            {
+                SecondaryStatusPaneColumn.Width = secondaryWidth;
+            }
+
             if (PrimaryToolbarPaneColumn is not null)
             {
-                PrimaryToolbarPaneColumn.Width = new GridLength(1, GridUnitType.Star);
+                PrimaryToolbarPaneColumn.Width = primaryWidth;
             }
 
             if (PrimaryPaneColumn is not null)
             {
-                PrimaryPaneColumn.Width = new GridLength(1, GridUnitType.Star);
+                PrimaryPaneColumn.Width = primaryWidth;
+            }
+
+            if (PrimaryStatusPaneColumn is not null)
+            {
+                PrimaryStatusPaneColumn.Width = primaryWidth;
+            }
+
+            if (ExplorerPaneActionRailStatusColumn is not null)
+            {
+                ExplorerPaneActionRailStatusColumn.Width = actionRailWidth;
             }
 
             if (ExplorerPaneActionToolbarHost is not null)
@@ -126,6 +146,295 @@ namespace FileExplorerUI
             SetDualPaneEnabled(false);
         }
 
+        private async void SyncPrimaryPaneToSecondaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await SyncPanePathAsync(WorkspacePanelId.Primary, WorkspacePanelId.Secondary);
+        }
+
+        private async void CopySelectedPrimaryPaneToSecondaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await TransferPaneEntriesToPaneAsync(
+                WorkspacePanelId.Primary,
+                WorkspacePanelId.Secondary,
+                transferAllLoadedEntries: false,
+                FileTransferMode.Copy);
+        }
+
+        private async void CopyAllPrimaryPaneToSecondaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await TransferPaneEntriesToPaneAsync(
+                WorkspacePanelId.Primary,
+                WorkspacePanelId.Secondary,
+                transferAllLoadedEntries: true,
+                FileTransferMode.Copy);
+        }
+
+        private async void MoveSelectedPrimaryPaneToSecondaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await TransferPaneEntriesToPaneAsync(
+                WorkspacePanelId.Primary,
+                WorkspacePanelId.Secondary,
+                transferAllLoadedEntries: false,
+                FileTransferMode.Cut);
+        }
+
+        private async void MoveAllPrimaryPaneToSecondaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await TransferPaneEntriesToPaneAsync(
+                WorkspacePanelId.Primary,
+                WorkspacePanelId.Secondary,
+                transferAllLoadedEntries: true,
+                FileTransferMode.Cut);
+        }
+
+        private async void SyncSecondaryPaneToPrimaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await SyncPanePathAsync(WorkspacePanelId.Secondary, WorkspacePanelId.Primary);
+        }
+
+        private async void CopySelectedSecondaryPaneToPrimaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await TransferPaneEntriesToPaneAsync(
+                WorkspacePanelId.Secondary,
+                WorkspacePanelId.Primary,
+                transferAllLoadedEntries: false,
+                FileTransferMode.Copy);
+        }
+
+        private async void CopyAllSecondaryPaneToPrimaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await TransferPaneEntriesToPaneAsync(
+                WorkspacePanelId.Secondary,
+                WorkspacePanelId.Primary,
+                transferAllLoadedEntries: true,
+                FileTransferMode.Copy);
+        }
+
+        private async void MoveSelectedSecondaryPaneToPrimaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await TransferPaneEntriesToPaneAsync(
+                WorkspacePanelId.Secondary,
+                WorkspacePanelId.Primary,
+                transferAllLoadedEntries: false,
+                FileTransferMode.Cut);
+        }
+
+        private async void MoveAllSecondaryPaneToPrimaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            await TransferPaneEntriesToPaneAsync(
+                WorkspacePanelId.Secondary,
+                WorkspacePanelId.Primary,
+                transferAllLoadedEntries: true,
+                FileTransferMode.Cut);
+        }
+
+        private async void SwapExplorerPanesButton_Click(object sender, RoutedEventArgs e)
+        {
+            await SwapExplorerPanesAsync();
+        }
+
+        private async Task TransferPaneEntriesToPaneAsync(
+            WorkspacePanelId sourcePanelId,
+            WorkspacePanelId targetPanelId,
+            bool transferAllLoadedEntries,
+            FileTransferMode transferMode)
+        {
+            if (!_isDualPaneEnabled)
+            {
+                return;
+            }
+
+            if (!TryGetTransferTargetDirectory(targetPanelId, out string targetDirectoryPath))
+            {
+                return;
+            }
+
+            IReadOnlyList<string> sourcePaths = await GetTransferSourcePathsForPaneAsync(
+                sourcePanelId,
+                transferAllLoadedEntries);
+
+            if (sourcePaths.Count == 0)
+            {
+                bool isDriveRoot = IsPaneTransferSourceDriveRoot(sourcePanelId);
+                string statusKey = transferMode == FileTransferMode.Cut
+                    ? (isDriveRoot ? "StatusCutFailedDriveRootsUnsupported" : "StatusCutFailedSelectLoaded")
+                    : (isDriveRoot ? "StatusCopyFailedDriveRootsUnsupported" : "StatusCopyFailedSelectLoaded");
+                UpdateStatusKey(statusKey);
+                return;
+            }
+
+            _fileManagementCoordinator.SetClipboard(sourcePaths, transferMode);
+            if (!_fileManagementCoordinator.HasClipboardItems)
+            {
+                UpdateStatusKey(transferMode == FileTransferMode.Cut
+                    ? "StatusCutFailedSelectLoaded"
+                    : "StatusCopyFailedSelectLoaded");
+                return;
+            }
+
+            UpdateFileCommandStates();
+            await ExecutePasteIntoPaneDirectoryCoreAsync(
+                targetPanelId,
+                targetDirectoryPath,
+                selectPastedEntry: true);
+        }
+
+        private bool TryGetTransferTargetDirectory(WorkspacePanelId targetPanelId, out string targetDirectoryPath)
+        {
+            targetDirectoryPath = GetPanelCurrentPath(targetPanelId);
+            if (string.IsNullOrWhiteSpace(targetDirectoryPath) ||
+                string.Equals(targetDirectoryPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateStatusKey("StatusPasteFailedOpenFolderFirst");
+                return false;
+            }
+
+            if (!_explorerService.DirectoryExists(targetDirectoryPath))
+            {
+                UpdateStatusKey("StatusPasteFailedWithReason", S("ErrorCurrentFolderUnavailable"));
+                return false;
+            }
+
+            return true;
+        }
+
+        private IReadOnlyList<string> GetSelectedTransferSourcePathsForPane(WorkspacePanelId sourcePanelId)
+        {
+            if (string.Equals(GetPanelCurrentPath(sourcePanelId), ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return [];
+            }
+
+            if (!TryGetSelectedLoadedEntryForPane(sourcePanelId, out EntryViewModel? entry))
+            {
+                return [];
+            }
+
+            string sourcePath = GetPaneEntryPath(sourcePanelId, entry);
+            if (string.IsNullOrWhiteSpace(sourcePath) || IsDriveRoot(sourcePath))
+            {
+                return [];
+            }
+
+            return [sourcePath];
+        }
+
+        private async Task<IReadOnlyList<string>> GetTransferSourcePathsForPaneAsync(
+            WorkspacePanelId sourcePanelId,
+            bool transferAllEntries)
+        {
+            return transferAllEntries
+                ? await GetAllTransferSourcePathsForPaneAsync(sourcePanelId)
+                : GetSelectedTransferSourcePathsForPane(sourcePanelId);
+        }
+
+        private async Task<IReadOnlyList<string>> GetAllTransferSourcePathsForPaneAsync(WorkspacePanelId sourcePanelId)
+        {
+            string sourceDirectoryPath = GetPanelCurrentPath(sourcePanelId);
+            if (string.Equals(sourceDirectoryPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return [];
+            }
+
+            PanelEntriesLoadResult loadResult = await LoadPanelEntriesSnapshotAsync(
+                sourceDirectoryPath,
+                GetPanelQueryText(sourcePanelId),
+                GetPanelLastFetchMs(sourcePanelId),
+                CancellationToken.None,
+                perfPrefix: "pane-transfer-source");
+
+            return loadResult.Entries
+                .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
+                .Select(entry => GetPaneEntryPath(sourcePanelId, entry))
+                .Where(path => !string.IsNullOrWhiteSpace(path) && !IsDriveRoot(path))
+                .Distinct(System.StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private bool IsPaneTransferSourceDriveRoot(WorkspacePanelId sourcePanelId)
+        {
+            if (string.Equals(GetPanelCurrentPath(sourcePanelId), ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return TryGetSelectedLoadedEntryForPane(sourcePanelId, out EntryViewModel? entry) &&
+                IsDriveRoot(GetPaneEntryPath(sourcePanelId, entry));
+        }
+
+        private async Task SyncPanePathAsync(WorkspacePanelId sourcePanelId, WorkspacePanelId targetPanelId)
+        {
+            if (!_isDualPaneEnabled)
+            {
+                return;
+            }
+
+            string sourcePath = _workspaceLayoutHost.GetPanelState(sourcePanelId).CurrentPath;
+            if (string.IsNullOrWhiteSpace(sourcePath))
+            {
+                sourcePath = ShellMyComputerPath;
+            }
+
+            PanelViewState targetPanel = _workspaceLayoutHost.GetPanelState(targetPanelId);
+            if (string.Equals(sourcePath, targetPanel.CurrentPath, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            await NavigatePanelToPathAsync(
+                targetPanelId,
+                sourcePath,
+                pushHistory: true,
+                focusEntriesAfterNavigation: false);
+        }
+
+        private async Task SwapExplorerPanesAsync()
+        {
+            if (!_isDualPaneEnabled)
+            {
+                return;
+            }
+
+            WorkspaceShellState shellState = _workspaceLayoutHost.ShellState;
+            PanelViewState primarySnapshot = shellState.Primary.Clone();
+            PanelViewState secondarySnapshot = shellState.Secondary.Clone();
+
+            shellState.Primary.CopyNonDataStateFrom(secondarySnapshot);
+            shellState.Secondary.CopyNonDataStateFrom(primarySnapshot);
+            shellState.ActivePanel = shellState.ActivePanel == WorkspacePanelId.Primary
+                ? WorkspacePanelId.Secondary
+                : WorkspacePanelId.Primary;
+
+            RebindPrimaryPaneDataSession();
+            RebindSecondaryPaneDataSession();
+            SetPrimaryPanelNavigationState(
+                shellState.Primary.CurrentPath,
+                shellState.Primary.QueryText,
+                shellState.Primary.AddressText,
+                syncEditors: true);
+            UpdateBreadcrumbs(shellState.Primary.CurrentPath);
+            UpdateSecondaryPaneBreadcrumbs(shellState.Secondary.CurrentPath);
+            RaisePanelColumnLayoutPropertiesChanged();
+            RaiseSecondaryPaneStateChanged(navigationChanged: true, dataChanged: true);
+            RaiseWorkspacePanelShellPropertiesChanged();
+            RaisePanelNavigationStateChanged(WorkspacePanelId.Primary);
+            RaisePanelNavigationStateChanged(WorkspacePanelId.Secondary);
+            NotifyTitleBarTextChanged();
+
+            await RestorePanelStateAsync(
+                WorkspacePanelId.Primary,
+                preserveViewport: false,
+                ensureSelectionVisible: false,
+                focusEntries: false);
+            await RestorePanelStateAsync(
+                WorkspacePanelId.Secondary,
+                preserveViewport: false,
+                ensureSelectionVisible: false,
+                focusEntries: false);
+
+            ActivateWorkspacePanel(shellState.ActivePanel);
+        }
+
         private void SetDualPaneEnabled(bool enabled)
         {
             if (_isDualPaneEnabled == enabled)
@@ -145,6 +454,7 @@ namespace FileExplorerUI
 
             if (!enabled)
             {
+                DisposeDirectoryWatcher(WorkspacePanelId.Secondary);
                 ActivateWorkspacePanel(WorkspacePanelId.Primary);
             }
             else
@@ -167,6 +477,7 @@ namespace FileExplorerUI
                 nameof(PrimaryPaneSearchVisibility),
                 nameof(ToolbarSearchWidth),
                 nameof(SecondaryPaneSearchPlaceholderText),
+                nameof(ExplorerPanePrimaryColumnWidth),
                 nameof(ExplorerPaneToolbarActionRailColumnWidth),
                 nameof(ExplorerPaneActionRailColumnWidth),
                 nameof(ExplorerPaneSecondaryColumnWidth),
@@ -178,6 +489,23 @@ namespace FileExplorerUI
             RaiseSecondaryPaneNavigationPropertiesChanged();
             RaiseWorkspacePanelShellPropertiesChanged();
             NotifyTitleBarTextChanged();
+        }
+
+        private GridLength GetExplorerPanePrimaryColumnWidth()
+        {
+            return new GridLength(NormalizePaneWidthWeight(_workspaceLayoutHost.ShellState.PrimaryPaneWidthWeight), GridUnitType.Star);
+        }
+
+        private GridLength GetExplorerPaneSecondaryColumnWidth()
+        {
+            return new GridLength(NormalizePaneWidthWeight(_workspaceLayoutHost.ShellState.SecondaryPaneWidthWeight), GridUnitType.Star);
+        }
+
+        private static double NormalizePaneWidthWeight(double value)
+        {
+            return double.IsNaN(value) || double.IsInfinity(value) || value <= 0
+                ? 1
+                : value;
         }
 
         private async Task RestorePrimaryPanelStateAsync(PanelViewState panelState)
@@ -262,14 +590,7 @@ namespace FileExplorerUI
             UpdateFileCommandStates();
             _lastTitleWasReadFailed = false;
             UpdateWindowTitle();
-            if (string.Equals(panelState.CurrentPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
-            {
-                UpdateStatus(SF("StatusDriveCount", GetPanelTotalEntries(WorkspacePanelId.Primary)));
-            }
-            else
-            {
-                UpdateStatus(SF("StatusCurrentFolderItems", GetPanelTotalEntries(WorkspacePanelId.Primary)));
-            }
+            RefreshPanelStatus(WorkspacePanelId.Primary);
 
             _ = DispatcherQueue.TryEnqueue(() =>
             {

@@ -16,6 +16,7 @@ public enum FileOperationError
     InUse,
     DiskFull,
     NotSupported,
+    TargetIsSourceDescendant,
     InvalidArchive
 }
 
@@ -46,6 +47,11 @@ public static class FileOperationErrors
         if (ex is InvalidDataException)
         {
             return FileOperationError.InvalidArchive;
+        }
+
+        if (ex is DirectoryTargetIsSourceDescendantException)
+        {
+            return FileOperationError.TargetIsSourceDescendant;
         }
 
         int code = ex.HResult & 0xFFFF;
@@ -85,6 +91,7 @@ public static class FileOperationErrors
             FileOperationError.InUse => "ErrorFileOperationInUse",
             FileOperationError.DiskFull => "ErrorFileOperationDiskFull",
             FileOperationError.NotSupported => "ErrorFileOperationNotSupported",
+            FileOperationError.TargetIsSourceDescendant => "ErrorPasteTargetIsSourceDescendant",
             FileOperationError.InvalidArchive => "ErrorFileOperationInvalidArchive",
             _ => "ErrorFileOperationUnknown"
         });
@@ -101,6 +108,14 @@ public static class FileOperationErrors
         return ex.Message.Contains("being used by another process", StringComparison.OrdinalIgnoreCase) ||
             ex.Message.Contains("另一个程序正在使用", StringComparison.OrdinalIgnoreCase) ||
             ex.Message.Contains("文件被", StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+public sealed class DirectoryTargetIsSourceDescendantException : IOException
+{
+    public DirectoryTargetIsSourceDescendantException()
+        : base("The destination folder is a subfolder of the source folder.")
+    {
     }
 }
 
