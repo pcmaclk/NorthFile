@@ -858,6 +858,24 @@
   <data name="DialogRetryButton" xml:space="preserve">
     <value>重试</value>
   </data>
+  <data name="PaneTransferAllCopyConfirmTitle" xml:space="preserve">
+    <value>确认全部复制</value>
+  </data>
+  <data name="PaneTransferAllCopyConfirmMessage" xml:space="preserve">
+    <value>将复制“{0}”中的所有可见项目到“{1}”。如果项目较多，这可能需要一些时间。</value>
+  </data>
+  <data name="PaneTransferAllCopyConfirmPrimaryButton" xml:space="preserve">
+    <value>继续复制</value>
+  </data>
+  <data name="PaneTransferAllMoveConfirmTitle" xml:space="preserve">
+    <value>确认全部移动</value>
+  </data>
+  <data name="PaneTransferAllMoveConfirmMessage" xml:space="preserve">
+    <value>将移动“{0}”中的所有可见项目到“{1}”。源目录中的这些项目会被移除。</value>
+  </data>
+  <data name="PaneTransferAllMoveConfirmPrimaryButton" xml:space="preserve">
+    <value>继续移动</value>
+  </data>
   <data name="CommonOpenTarget" xml:space="preserve">
     <value>打开目标位置</value>
   </data>

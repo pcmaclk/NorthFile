@@ -852,6 +852,24 @@
   <data name="DialogRetryButton" xml:space="preserve">
     <value>Retry</value>
   </data>
+  <data name="PaneTransferAllCopyConfirmTitle" xml:space="preserve">
+    <value>Copy all items?</value>
+  </data>
+  <data name="PaneTransferAllCopyConfirmMessage" xml:space="preserve">
+    <value>Copy all visible items from "{0}" to "{1}". This may take some time if there are many items.</value>
+  </data>
+  <data name="PaneTransferAllCopyConfirmPrimaryButton" xml:space="preserve">
+    <value>Continue copying</value>
+  </data>
+  <data name="PaneTransferAllMoveConfirmTitle" xml:space="preserve">
+    <value>Move all items?</value>
+  </data>
+  <data name="PaneTransferAllMoveConfirmMessage" xml:space="preserve">
+    <value>Move all visible items from "{0}" to "{1}". These items will be removed from the source folder.</value>
+  </data>
+  <data name="PaneTransferAllMoveConfirmPrimaryButton" xml:space="preserve">
+    <value>Continue moving</value>
+  </data>
   <data name="CommonOpenTarget" xml:space="preserve">
     <value>Open Target</value>
   </data>

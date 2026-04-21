@@ -249,6 +249,12 @@ namespace FileExplorerUI
                 return;
             }
 
+            if (transferAllLoadedEntries &&
+                !await ConfirmTransferAllPaneEntriesAsync(sourcePanelId, targetDirectoryPath, transferMode))
+            {
+                return;
+            }
+
             IReadOnlyList<string> sourcePaths = await GetTransferSourcePathsForPaneAsync(
                 sourcePanelId,
                 transferAllLoadedEntries);
@@ -277,6 +283,36 @@ namespace FileExplorerUI
                 targetPanelId,
                 targetDirectoryPath,
                 selectPastedEntry: true);
+        }
+
+        private async Task<bool> ConfirmTransferAllPaneEntriesAsync(
+            WorkspacePanelId sourcePanelId,
+            string targetDirectoryPath,
+            FileTransferMode transferMode)
+        {
+            string sourceDirectoryPath = GetPanelCurrentPath(sourcePanelId);
+            if (string.IsNullOrWhiteSpace(sourceDirectoryPath) ||
+                string.Equals(sourceDirectoryPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            EnsureOperationFeedbackOverlay();
+            if (_operationFeedbackDialog is null)
+            {
+                return false;
+            }
+
+            bool isMove = transferMode == FileTransferMode.Cut;
+            Controls.ModalActionDialogResult result = await _operationFeedbackDialog.ShowAsync(
+                S(isMove ? "PaneTransferAllMoveConfirmTitle" : "PaneTransferAllCopyConfirmTitle"),
+                SF(
+                    isMove ? "PaneTransferAllMoveConfirmMessage" : "PaneTransferAllCopyConfirmMessage",
+                    GetDisplayPathText(sourceDirectoryPath),
+                    GetDisplayPathText(targetDirectoryPath)),
+                S(isMove ? "PaneTransferAllMoveConfirmPrimaryButton" : "PaneTransferAllCopyConfirmPrimaryButton"),
+                S("DialogCancelButton"));
+            return result == Controls.ModalActionDialogResult.Primary;
         }
 
         private bool TryGetTransferTargetDirectory(WorkspacePanelId targetPanelId, out string targetDirectoryPath)
