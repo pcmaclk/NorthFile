@@ -26,7 +26,7 @@ namespace FileExplorerUI
             {
                 if (row.IsGroupHeader)
                 {
-                    _groupExpansionStates[row.GroupKey] = !row.IsGroupExpanded;
+                    GetPrimaryGroupExpansionStates()[row.GroupKey] = !row.IsGroupExpanded;
                     ApplyCurrentPresentation();
                     e.Handled = true;
                     return;
@@ -60,20 +60,20 @@ namespace FileExplorerUI
                 return;
             }
 
+            if (!e.GetCurrentPoint(row).Properties.IsLeftButtonPressed)
+            {
+                return;
+            }
+
+            CancelRenameOverlayForPanelSwitch(WorkspacePanelId.Primary);
             SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
-            var point = e.GetCurrentPoint(row);
             if (!IsEntryAlreadySelected(entry))
             {
                 SelectEntryInList(entry, ensureVisible: false);
             }
 
             FocusEntriesList();
-
-            if (point.Properties.IsLeftButtonPressed)
-            {
-                e.Handled = true;
-                return;
-            }
+            e.Handled = true;
         }
 
         private void GroupHeaderBorder_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -86,7 +86,7 @@ namespace FileExplorerUI
                 return;
             }
 
-            _groupExpansionStates[entry.GroupKey] = !entry.IsGroupExpanded;
+            GetPrimaryGroupExpansionStates()[entry.GroupKey] = !entry.IsGroupExpanded;
             ApplyCurrentPresentation();
             e.Handled = true;
         }
@@ -98,8 +98,9 @@ namespace FileExplorerUI
 
         private async Task OpenEntryAsync(EntryViewModel row, bool clearSelectionBeforeDirectoryNavigation)
         {
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
             string targetPath = string.IsNullOrWhiteSpace(row.FullPath)
-                ? Path.Combine(_currentPath, row.Name)
+                ? Path.Combine(currentPath, row.Name)
                 : row.FullPath;
 
             if (row.IsDirectory)
@@ -109,7 +110,7 @@ namespace FileExplorerUI
                     ClearListSelection();
                 }
 
-                await NavigateToPathAsync(targetPath, pushHistory: true);
+                await NavigatePanelToPathAsync(WorkspacePanelId.Primary, targetPath, pushHistory: true);
                 return;
             }
 

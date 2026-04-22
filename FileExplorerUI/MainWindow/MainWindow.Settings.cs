@@ -9,9 +9,11 @@ namespace FileExplorerUI
     {
         private void ApplyAppSettingsToPresentationDefaults()
         {
-            _currentSortField = _appSettings.DefaultSortField;
-            _currentSortDirection = GetDefaultSortDirection(_currentSortField);
-            _currentGroupField = _appSettings.DefaultGroupField;
+            SetPrimaryPanelPresentationState(
+                GetPanelViewMode(WorkspacePanelId.Primary),
+                _appSettings.DefaultSortField,
+                GetDefaultSortDirection(_appSettings.DefaultSortField),
+                _appSettings.DefaultGroupField);
         }
 
         private SortDirection GetDefaultSortDirection(EntrySortField field)
@@ -161,7 +163,7 @@ namespace FileExplorerUI
 
             if (settingsDiff.FilteringChanged)
             {
-                await LoadFirstPageAsync();
+            await LoadPanelDataAsync(WorkspacePanelId.Primary);
             }
         }
 

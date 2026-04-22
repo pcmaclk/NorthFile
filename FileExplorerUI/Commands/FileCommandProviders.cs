@@ -87,6 +87,7 @@ public sealed class DirectoryMenuCommandProvider : IFileCommandProvider
 
         return new[]
         {
+            new FileCommandDescriptor(FileCommandIds.OpenInNewTab, LocalizedStrings.Instance.Get("CommonOpenInNewTab"), FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.OpenInNewWindow, LocalizedStrings.Instance.Get("CommonOpenInNewWindow"), FileCommandCapabilities.None),
             new FileCommandDescriptor(pinCommandId, pinText, FileCommandCapabilities.None),
             new FileCommandDescriptor(FileCommandIds.Share, LocalizedStrings.Instance.Get("CommonShare"), FileCommandCapabilities.None),

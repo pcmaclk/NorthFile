@@ -1,5 +1,6 @@
 using FileExplorerUI.Commands;
 using FileExplorerUI.Services;
+using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
@@ -49,11 +50,14 @@ namespace FileExplorerUI
 
         private async Task ExecuteEntriesContextCommandAsync(string commandId, FileCommandTarget target, EntriesContextOrigin origin)
         {
+            SyncSelectionSurfaceForEntriesContextOrigin(origin);
             bool isSidebarTreeContext = origin == EntriesContextOrigin.SidebarTree;
+            bool isSecondaryEntriesContext = origin == EntriesContextOrigin.SecondaryEntriesList;
+            WorkspacePanelId contextPanelId = ResolvePanelIdForEntriesContextOrigin(origin);
             switch (commandId)
             {
                 case FileCommandIds.Open:
-                    await ExecuteOpenEntriesContextTargetAsync(target);
+                    await ExecuteOpenEntriesContextTargetAsync(target, origin);
                     break;
                 case FileCommandIds.Copy:
                     if (isSidebarTreeContext)
@@ -62,7 +66,7 @@ namespace FileExplorerUI
                     }
                     else
                     {
-                        ExecuteCopy();
+                        _paneFileCommandController.ExecuteCopy(contextPanelId);
                     }
                     break;
                 case FileCommandIds.Cut:
@@ -72,11 +76,11 @@ namespace FileExplorerUI
                     }
                     else
                     {
-                        ExecuteCut();
+                        _paneFileCommandController.ExecuteCut(contextPanelId);
                     }
                     break;
                 case FileCommandIds.Paste:
-                    await ExecutePasteForTargetAsync(target);
+                    await _paneFileCommandController.ExecutePasteTargetAsync(contextPanelId, target);
                     break;
                 case FileCommandIds.Rename:
                     if (isSidebarTreeContext)
@@ -85,7 +89,7 @@ namespace FileExplorerUI
                     }
                     else
                     {
-                        await ExecuteRenameSelectedAsync();
+                        await _paneFileCommandController.ExecuteRenameTargetAsync(contextPanelId, target);
                     }
                     break;
                 case FileCommandIds.Delete:
@@ -95,17 +99,17 @@ namespace FileExplorerUI
                     }
                     else
                     {
-                        await ExecuteDeleteSelectedAsync();
+                        await _paneFileCommandController.ExecuteDeleteTargetAsync(contextPanelId, target);
                     }
                     break;
                 case FileCommandIds.NewFile:
-                    await ExecuteNewFileAsync();
+                    await _paneFileCommandController.ExecuteNewFileAsync(contextPanelId);
                     break;
                 case FileCommandIds.NewFolder:
-                    await ExecuteNewFolderAsync();
+                    await _paneFileCommandController.ExecuteNewFolderAsync(contextPanelId);
                     break;
                 case FileCommandIds.Refresh:
-                    await RefreshCurrentDirectoryInBackgroundAsync();
+                    await _paneFileCommandController.ExecuteRefreshAsync(contextPanelId);
                     break;
                 case FileCommandIds.CopyPath:
                     ExecuteCopyPathCommand(target);
@@ -114,31 +118,34 @@ namespace FileExplorerUI
                     ExecuteShareCommand(target);
                     break;
                 case FileCommandIds.CreateShortcut:
-                    await ExecuteCreateShortcutCommandAsync(target);
+                    await _paneFileCommandController.ExecuteCreateShortcutAsync(contextPanelId, target);
                     break;
                 case FileCommandIds.CompressZip:
-                    await ExecuteCompressZipCommandAsync(target);
+                    await _paneFileCommandController.ExecuteCompressZipAsync(contextPanelId, target);
                     break;
                 case FileCommandIds.ExtractSmart:
-                    await ExecuteExtractZipSmartCommandAsync(target);
+                    await _paneFileCommandController.ExecuteExtractZipSmartAsync(contextPanelId, target);
                     break;
                 case FileCommandIds.ExtractHere:
-                    await ExecuteExtractZipHereCommandAsync(target);
+                    await _paneFileCommandController.ExecuteExtractZipHereAsync(contextPanelId, target);
                     break;
                 case FileCommandIds.ExtractToFolder:
-                    await ExecuteExtractZipToFolderCommandAsync(target);
+                    await _paneFileCommandController.ExecuteExtractZipToFolderAsync(contextPanelId, target);
                     break;
                 case FileCommandIds.OpenWith:
                     ExecuteOpenWithCommand(target);
                     break;
                 case FileCommandIds.OpenTarget:
-                    await ExecuteOpenTargetCommandAsync(target);
+                    await _paneFileCommandController.ExecuteOpenTargetAsync(contextPanelId, target);
                     break;
                 case FileCommandIds.RunAsAdministrator:
                     ExecuteRunAsAdministratorCommand(target);
                     break;
                 case FileCommandIds.OpenInNewWindow:
                     ExecuteOpenInNewWindowCommand(target);
+                    break;
+                case FileCommandIds.OpenInNewTab:
+                    await ExecuteOpenInNewTabCommandAsync(target);
                     break;
                 case FileCommandIds.PinToSidebar:
                 case FileCommandIds.UnpinFromSidebar:
@@ -149,6 +156,23 @@ namespace FileExplorerUI
                     break;
                 case FileCommandIds.Properties:
                     ExecuteShowPropertiesCommand(target);
+                    break;
+            }
+        }
+
+        private void SyncSelectionSurfaceForEntriesContextOrigin(EntriesContextOrigin origin)
+        {
+            switch (origin)
+            {
+                case EntriesContextOrigin.SecondaryEntriesList:
+                    SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
+                    break;
+                case EntriesContextOrigin.SidebarPinned:
+                case EntriesContextOrigin.SidebarTree:
+                    SetActiveSelectionSurface(SelectionSurfaceId.Sidebar);
+                    break;
+                default:
+                    SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
                     break;
             }
         }
@@ -170,58 +194,51 @@ namespace FileExplorerUI
             }
 
             bool isSidebarContext = _entriesContextRequest?.Origin is EntriesContextOrigin.SidebarPinned or EntriesContextOrigin.SidebarTree;
+            WorkspacePanelId contextPanelId = ResolvePanelIdForEntriesContextOrigin(_entriesContextRequest?.Origin ?? EntriesContextOrigin.EntriesList);
             return commandId switch
             {
                 FileCommandIds.Open => !string.IsNullOrWhiteSpace(target.Path),
                 FileCommandIds.Copy => isSidebarContext
-                    ? !string.IsNullOrWhiteSpace(target.Path) && _explorerService.PathExists(target.Path)
-                    : CanCopySelectedEntry() && IsEntriesContextSelectionAligned(target),
+                    ? _paneFileCommandController.CanCopyTarget(contextPanelId, target)
+                    : IsPrimaryEntriesContextOrigin(_entriesContextRequest?.Origin)
+                        ? CanCopySelectedEntry() && IsEntriesContextSelectionAligned(target)
+                        : _paneFileCommandController.CanCopyTarget(contextPanelId, target),
                 FileCommandIds.Cut => isSidebarContext
-                    ? !string.IsNullOrWhiteSpace(target.Path) &&
-                        !IsDriveRoot(target.Path) &&
-                        _explorerService.PathExists(target.Path)
-                    : CanCutSelectedEntry() && IsEntriesContextSelectionAligned(target),
-                FileCommandIds.Paste => !string.IsNullOrWhiteSpace(target.Path) &&
-                    !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
-                    _fileManagementCoordinator.HasAvailablePasteItems(),
+                    ? _paneFileCommandController.CanCutTarget(contextPanelId, target)
+                    : IsPrimaryEntriesContextOrigin(_entriesContextRequest?.Origin)
+                        ? CanCutSelectedEntry() && IsEntriesContextSelectionAligned(target)
+                        : _paneFileCommandController.CanCutTarget(contextPanelId, target),
+                FileCommandIds.Paste => _paneFileCommandController.CanPasteTarget(contextPanelId, target),
                 FileCommandIds.Rename => isSidebarContext
                     ? !string.IsNullOrWhiteSpace(target.Path) &&
                         !IsDriveRoot(target.Path) &&
                         _explorerService.PathExists(target.Path)
-                    : CanRenameSelectedEntry() && IsEntriesContextSelectionAligned(target),
+                    : _paneFileCommandController.CanRenameTarget(contextPanelId, target) &&
+                        (!IsPrimaryEntriesContextOrigin(_entriesContextRequest?.Origin) || IsEntriesContextSelectionAligned(target)),
                 FileCommandIds.Delete => isSidebarContext
                     ? !string.IsNullOrWhiteSpace(target.Path) &&
                         !IsDriveRoot(target.Path) &&
                         _explorerService.PathExists(target.Path)
-                    : CanDeleteSelectedEntry() && IsEntriesContextSelectionAligned(target),
+                    : _paneFileCommandController.CanDeleteTarget(contextPanelId, target) &&
+                        (!IsPrimaryEntriesContextOrigin(_entriesContextRequest?.Origin) || IsEntriesContextSelectionAligned(target)),
                 FileCommandIds.NewFile or FileCommandIds.NewFolder =>
-                    !string.IsNullOrWhiteSpace(target.Path) &&
-                    string.Equals(target.Path, _currentPath, StringComparison.OrdinalIgnoreCase) &&
-                    CanCreateInCurrentDirectory(),
-                FileCommandIds.Refresh =>
-                    string.Equals(target.Path, _currentPath, StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
+                    _paneFileCommandController.CanCreateTarget(contextPanelId, target),
+                FileCommandIds.Refresh => _paneFileCommandController.CanRefreshTarget(contextPanelId, target),
                 FileCommandIds.CopyPath => !string.IsNullOrWhiteSpace(target.Path),
                 FileCommandIds.Share => !string.IsNullOrWhiteSpace(target.Path) &&
                     target.Kind is FileCommandTargetKind.FileEntry or FileCommandTargetKind.DirectoryEntry,
-                FileCommandIds.CreateShortcut => !string.IsNullOrWhiteSpace(target.Path) &&
-                    !string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) &&
-                    _explorerService.DirectoryExists(_currentPath),
-                FileCommandIds.CompressZip => !string.IsNullOrWhiteSpace(target.Path) &&
-                    target.Kind is FileCommandTargetKind.FileEntry or FileCommandTargetKind.DirectoryEntry &&
-                    _explorerService.PathExists(target.Path),
+                FileCommandIds.CreateShortcut => _paneFileCommandController.CanCreateShortcutTarget(contextPanelId, target),
+                FileCommandIds.CompressZip => _paneFileCommandController.CanCompressZipTarget(contextPanelId, target),
                 FileCommandIds.ExtractSmart or FileCommandIds.ExtractHere or FileCommandIds.ExtractToFolder =>
-                    !string.IsNullOrWhiteSpace(target.Path) &&
-                    target.Kind == FileCommandTargetKind.FileEntry &&
-                    string.Equals(Path.GetExtension(target.Path), ".zip", StringComparison.OrdinalIgnoreCase) &&
-                    _explorerService.PathExists(target.Path),
+                    _paneFileCommandController.CanExtractZipTarget(contextPanelId, target),
                 FileCommandIds.OpenWith => !string.IsNullOrWhiteSpace(target.Path) &&
                     !target.IsDirectory,
-                FileCommandIds.OpenTarget => !string.IsNullOrWhiteSpace(target.Path) &&
-                    !target.IsDirectory,
+                FileCommandIds.OpenTarget => _paneFileCommandController.CanOpenTarget(contextPanelId, target),
                 FileCommandIds.RunAsAdministrator => !string.IsNullOrWhiteSpace(target.Path) &&
                     !target.IsDirectory,
                 FileCommandIds.OpenInNewWindow => !string.IsNullOrWhiteSpace(target.Path) &&
+                    target.IsDirectory,
+                FileCommandIds.OpenInNewTab => !string.IsNullOrWhiteSpace(target.Path) &&
                     target.IsDirectory,
                 FileCommandIds.PinToSidebar or FileCommandIds.UnpinFromSidebar => !string.IsNullOrWhiteSpace(target.Path) &&
                     target.IsDirectory,
@@ -231,6 +248,11 @@ namespace FileExplorerUI
                     !string.Equals(target.Path, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase),
                 _ => false
             };
+        }
+
+        private static bool IsPrimaryEntriesContextOrigin(EntriesContextOrigin? origin)
+        {
+            return origin is null or EntriesContextOrigin.EntriesList;
         }
 
         private bool IsEntriesContextSelectionAligned(FileCommandTarget target)
@@ -333,7 +355,7 @@ namespace FileExplorerUI
                     parentNode.Children.Remove(node);
                 }
 
-                if (IsPathWithin(_currentPath, target.Path))
+                if (IsPathWithin(GetPanelCurrentPath(WorkspacePanelId.Primary), target.Path))
                 {
                     string? parentPath = Path.GetDirectoryName(target.Path.TrimEnd('\\'));
                     if (string.IsNullOrWhiteSpace(parentPath))
@@ -346,7 +368,11 @@ namespace FileExplorerUI
                         parentPath = ShellMyComputerPath;
                     }
 
-                    await NavigateToPathAsync(parentPath, pushHistory: true, focusEntriesAfterNavigation: false);
+                await NavigatePanelToPathAsync(
+                    WorkspacePanelId.Primary,
+                    parentPath,
+                    pushHistory: true,
+                    focusEntriesAfterNavigation: false);
                 }
 
                 UpdateStatusKey("StatusDeleteSuccess", target.DisplayName, recursive);
@@ -354,11 +380,21 @@ namespace FileExplorerUI
             }
         }
 
-        private async Task ExecuteOpenEntriesContextTargetAsync(FileCommandTarget target)
+        private async Task ExecuteOpenEntriesContextTargetAsync(FileCommandTarget target, EntriesContextOrigin origin)
         {
             if (target.IsDirectory)
             {
-                await NavigateToPathAsync(target.Path ?? ShellMyComputerPath, pushHistory: true);
+                if (origin == EntriesContextOrigin.SecondaryEntriesList)
+                {
+                    await NavigatePanelToPathAsync(WorkspacePanelId.Secondary, target.Path ?? ShellMyComputerPath, pushHistory: true);
+                }
+                else
+                {
+                await NavigatePanelToPathAsync(
+                    WorkspacePanelId.Primary,
+                    target.Path ?? ShellMyComputerPath,
+                    pushHistory: true);
+                }
                 return;
             }
 

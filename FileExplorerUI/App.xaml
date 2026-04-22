@@ -13,14 +13,39 @@
             </ResourceDictionary.MergedDictionaries>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="AddressSearchChromeBorderBrush" Color="#10000000" />
-                    <LinearGradientBrush x:Key="ExplorerShellPanelBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
+                    <StaticResource x:Key="TitleBarActiveTabPillBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
+                    <LinearGradientBrush x:Key="ActivePaneBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
                         <GradientStop Color="#08000000" Offset="0" />
                         <GradientStop Color="#08000000" Offset="1" />
                     </LinearGradientBrush>
+                    <StaticResource x:Key="ActivePaneSurfaceBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
+                    <StaticResource x:Key="InactivePaneSurfaceBackgroundBrush" ResourceKey="LayerOnMicaBaseAltFillColorSecondaryBrush" />
+                    <StaticResource x:Key="AddressSearchChromeBorderBrush" ResourceKey="ControlStrokeColorOnAccentDisabledBrush" />
+                    <StaticResource x:Key="InactivePaneBorderBrush" ResourceKey="ControlStrokeColorOnAccentDisabledBrush" />
+                    <StaticResource x:Key="ActivePaneInputBackgroundBrush" ResourceKey="TextControlBackground" />
+                    <StaticResource x:Key="InactivePaneInputBackgroundBrush" ResourceKey="ControlFillColorSecondaryBrush" />
+                    <StaticResource x:Key="ActivePaneForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
+                    <StaticResource x:Key="InactivePaneForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+                    <StaticResource x:Key="DetailsHeaderSecondaryForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+                    <SolidColorBrush x:Key="SidebarGroupSeparatorBrush" Color="#22000000" />
+                    <LinearGradientBrush x:Key="ExplorerShellPanelBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
+                        <GradientStop Color="#10000000" Offset="0" />
+                        <GradientStop Color="#10000000" Offset="1" />
+                    </LinearGradientBrush>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="AddressSearchChromeBorderBrush" Color="#10FFFFFF" />
+                    <StaticResource x:Key="TitleBarActiveTabPillBackgroundBrush" ResourceKey="ActivePaneInputBackgroundBrush" />
+                    <SolidColorBrush x:Key="ActivePaneBorderBrush" Color="Transparent" />
+                    <StaticResource x:Key="ActivePaneSurfaceBackgroundBrush" ResourceKey="LayerOnMicaBaseAltFillColorDefaultBrush" />
+                    <StaticResource x:Key="InactivePaneSurfaceBackgroundBrush" ResourceKey="LayerOnMicaBaseAltFillColorTransparentBrush" />
+                    <StaticResource x:Key="AddressSearchChromeBorderBrush" ResourceKey="ControlStrokeColorSecondaryBrush" />
+                    <StaticResource x:Key="InactivePaneBorderBrush" ResourceKey="ControlStrokeColorSecondaryBrush" />
+                    <StaticResource x:Key="ActivePaneInputBackgroundBrush" ResourceKey="TextControlBackground" />
+                    <SolidColorBrush x:Key="InactivePaneInputBackgroundBrush" Color="Transparent" />
+                    <StaticResource x:Key="ActivePaneForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
+                    <StaticResource x:Key="InactivePaneForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
+                    <StaticResource x:Key="DetailsHeaderSecondaryForegroundBrush" ResourceKey="TextFillColorTertiaryBrush" />
+                    <SolidColorBrush x:Key="SidebarGroupSeparatorBrush" Color="#24FFFFFF" />
                     <LinearGradientBrush x:Key="ExplorerShellPanelBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
                         <GradientStop Color="#10FFFFFF" Offset="0" />
                         <GradientStop Color="#10FFFFFF" Offset="1" />

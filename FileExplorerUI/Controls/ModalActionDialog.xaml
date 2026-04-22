@@ -7,8 +7,8 @@
     <Grid x:Name="OverlayRoot" Background="{ThemeResource ContentDialogSmokeFill}">
         <Border
             x:Name="DialogHost"
+            Width="{ThemeResource ContentDialogMaxWidth}"
             MinWidth="{ThemeResource ContentDialogMinWidth}"
-            MaxWidth="{ThemeResource ContentDialogMaxWidth}"
             MinHeight="{ThemeResource ContentDialogMinHeight}"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
@@ -57,9 +57,18 @@
                             UseSystemFocusVisuals="False"
                             Click="PrimaryButton_Click" />
                         <Button
+                            x:Name="TertiaryButton"
+                            Height="36"
+                            HorizontalAlignment="Stretch"
+                            Visibility="{x:Bind TertiaryButtonVisibility, Mode=OneWay}"
+                            Content="{x:Bind TertiaryText, Mode=OneWay}"
+                            UseSystemFocusVisuals="False"
+                            Click="TertiaryButton_Click" />
+                        <Button
                             x:Name="SecondaryButton"
                             Height="36"
                             HorizontalAlignment="Stretch"
+                            Visibility="{x:Bind SecondaryButtonVisibility, Mode=OneWay}"
                             Content="{x:Bind SecondaryText, Mode=OneWay}"
                             UseSystemFocusVisuals="False"
                             Click="SecondaryButton_Click" />

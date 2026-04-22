@@ -34,6 +34,7 @@ namespace FileExplorerUI
         private readonly List<TextBlock> _labelBlocks = new();
         private readonly List<TextBlock> _headerBlocks = new();
         private readonly List<FrameworkElement> _compactGroupHeaders = new();
+        private readonly List<FrameworkElement> _groupSeparators = new();
         private readonly List<Panel> _fullGroupPanels = new();
         private readonly List<FrameworkElement> _fullOnlySections = new();
         private readonly List<FontIcon> _groupChevrons = new();
@@ -82,6 +83,7 @@ namespace FileExplorerUI
             _headerBlocks.Add(NetworkHeaderTextBlock);
             _headerBlocks.Add(TagsHeaderTextBlock);
             _compactGroupHeaders.AddRange(new FrameworkElement[] { PinnedGroupBorder, TreeCompactBorder, CloudGroupBorder, NetworkGroupBorder, TagsGroupBorder });
+            _groupSeparators.AddRange(new FrameworkElement[] { PinnedTreeSeparator, TreeCloudSeparator, CloudNetworkSeparator, NetworkTagsSeparator });
             _fullGroupPanels.AddRange(new Panel[] { PinnedSectionPanel, TreeSectionPanel, CloudSectionPanel, NetworkSectionPanel, TagsSectionPanel });
             _fullOnlySections.AddRange(new FrameworkElement[] { PinnedSectionPanel, TreeSectionPanel, CloudSectionPanel, NetworkSectionPanel, TagsSectionPanel, TreeHostBorder });
             _groupChevrons.AddRange(new[] { PinnedChevron, CloudChevron, NetworkChevron, TagsChevron });
@@ -280,6 +282,7 @@ namespace FileExplorerUI
             UpdateSettingsButtonLayout(compact);
             CompactButtonsPanel.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             SetVisibility(_fullOnlySections, compact ? Visibility.Collapsed : Visibility.Visible);
+            SetVisibility(_groupSeparators, compact ? Visibility.Collapsed : Visibility.Visible);
             TreeCompactBorder.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
             PinnedGroupBorder.Visibility = _showFavoritesSection ? (compact ? Visibility.Visible : Visibility.Visible) : Visibility.Collapsed;
             PinnedSectionPanel.Visibility = _showFavoritesSection && !compact ? Visibility.Visible : Visibility.Collapsed;
@@ -676,8 +679,6 @@ namespace FileExplorerUI
             if (properties.IsRightButtonPressed)
             {
                 CancelPinnedDrag();
-                RaisePinnedContextRequested(element, item, e.GetCurrentPoint(element).Position);
-                e.Handled = true;
                 return;
             }
 
@@ -835,10 +836,11 @@ namespace FileExplorerUI
                 return;
             }
 
-            KeyValuePair<SidebarNavItemModel, FrameworkElement>? match = _pinnedItemHosts.FirstOrDefault(pair => ReferenceEquals(pair.Value, element));
-            if (match.HasValue)
+            KeyValuePair<SidebarNavItemModel, FrameworkElement> match =
+                _pinnedItemHosts.FirstOrDefault(pair => ReferenceEquals(pair.Value, element));
+            if (match.Key is not null)
             {
-                _pinnedItemHosts.Remove(match.Value.Key);
+                _pinnedItemHosts.Remove(match.Key);
             }
         }
 

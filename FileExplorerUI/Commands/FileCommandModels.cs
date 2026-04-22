@@ -73,6 +73,7 @@ public static class FileCommandIds
     public const string CreateShortcut = "create-shortcut";
     public const string CopyPath = "copy-path";
     public const string SetTag = "set-tag";
+    public const string OpenInNewTab = "open-in-new-tab";
     public const string OpenInNewWindow = "open-in-new-window";
     public const string PinToSidebar = "pin-to-sidebar";
     public const string UnpinFromSidebar = "unpin-from-sidebar";

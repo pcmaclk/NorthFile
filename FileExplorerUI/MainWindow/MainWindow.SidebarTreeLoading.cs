@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Markup;
+using FileExplorerUI.Workspace;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -63,7 +64,7 @@ namespace FileExplorerUI
                 computerNode.Children.Add(CreateSidebarTreeNode(rootEntry, hasUnrealizedChildren: _explorerService.DirectoryHasChildDirectories(root)));
             }
 
-            await SelectSidebarTreePathAsync(_currentPath);
+            await SelectSidebarTreePathAsync(GetPanelCurrentPath(WorkspacePanelId.Primary));
         }
 
         private async Task SelectSidebarTreePathAsync(string path)

@@ -100,6 +100,41 @@ public sealed class ExplorerService
         return candidate;
     }
 
+    public string GenerateUniqueCopyTargetPath(string directoryPath, string sourcePath)
+    {
+        string normalizedSourcePath = sourcePath.TrimEnd('\\');
+        bool isDirectory = Directory.Exists(sourcePath);
+        string baseName;
+        string extension;
+
+        if (isDirectory)
+        {
+            baseName = Path.GetFileName(normalizedSourcePath);
+            extension = string.Empty;
+        }
+        else
+        {
+            baseName = Path.GetFileNameWithoutExtension(normalizedSourcePath);
+            extension = Path.GetExtension(normalizedSourcePath);
+        }
+
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+            baseName = normalizedSourcePath;
+        }
+
+        string candidate = $"{baseName} (2){extension}";
+        int suffix = 3;
+
+        while (PathExists(Path.Combine(directoryPath, candidate)))
+        {
+            candidate = $"{baseName} ({suffix}){extension}";
+            suffix++;
+        }
+
+        return Path.Combine(directoryPath, candidate);
+    }
+
     public string GetDefaultZipExtractionFolderName(string archivePath)
     {
         string baseName = Path.GetFileNameWithoutExtension(archivePath.TrimEnd('\\'));
@@ -301,8 +336,16 @@ public sealed class ExplorerService
 
     public Task DeletePathAsync(string path, bool recursive)
     {
+        return DeletePathAsync(path, recursive, tracker: null, CancellationToken.None);
+    }
+
+    public Task DeletePathAsync(string path, bool recursive, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
         return Task.Run(() =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(path);
+
             if (Directory.Exists(path))
             {
                 FileSystem.DeleteDirectory(
@@ -310,6 +353,7 @@ public sealed class ExplorerService
                     UIOption.OnlyErrorDialogs,
                     RecycleOption.SendToRecycleBin,
                     UICancelOption.ThrowException);
+                tracker?.ReportCompleted(path);
                 return;
             }
 
@@ -318,13 +362,22 @@ public sealed class ExplorerService
                 UIOption.OnlyErrorDialogs,
                 RecycleOption.SendToRecycleBin,
                 UICancelOption.ThrowException);
+            tracker?.ReportCompleted(path);
         });
     }
 
     public Task<Exception?> TryDeletePathAsync(string path, bool recursive)
     {
+        return TryDeletePathAsync(path, recursive, tracker: null, CancellationToken.None);
+    }
+
+    public Task<Exception?> TryDeletePathAsync(string path, bool recursive, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
         return Task.Run(() =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(path);
+
             if (Directory.Exists(path))
             {
                 try
@@ -334,6 +387,7 @@ public sealed class ExplorerService
                         UIOption.OnlyErrorDialogs,
                         RecycleOption.SendToRecycleBin,
                         UICancelOption.ThrowException);
+                    tracker?.ReportCompleted(path);
                     return (Exception?)null;
                 }
                 catch (Exception ex)
@@ -349,6 +403,7 @@ public sealed class ExplorerService
                     UIOption.OnlyErrorDialogs,
                     RecycleOption.SendToRecycleBin,
                     UICancelOption.ThrowException);
+                tracker?.ReportCompleted(path);
                 return (Exception?)null;
             }
             catch (Exception ex)
@@ -360,22 +415,34 @@ public sealed class ExplorerService
 
     public Task CopyPathAsync(string sourcePath, string targetPath)
     {
-        return Task.Run(() =>
+        return CopyPathAsync(sourcePath, targetPath, tracker: null, CancellationToken.None);
+    }
+
+    public Task CopyPathAsync(string sourcePath, string targetPath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
+        return Task.Run(() => CopyPath(sourcePath, targetPath, tracker, cancellationToken));
+    }
+
+    public void CopyPath(string sourcePath, string targetPath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        tracker?.ReportCurrent(sourcePath);
+
+        if (Directory.Exists(sourcePath))
         {
-            if (Directory.Exists(sourcePath))
-            {
-                CopyDirectory(sourcePath, targetPath);
-                return;
-            }
+            ValidateDirectoryTargetIsNotSelfOrDescendant(sourcePath, targetPath);
+            CopyDirectory(sourcePath, targetPath, tracker, cancellationToken);
+            return;
+        }
 
-            string? targetDirectory = Path.GetDirectoryName(targetPath);
-            if (!string.IsNullOrWhiteSpace(targetDirectory))
-            {
-                Directory.CreateDirectory(targetDirectory);
-            }
+        string? targetDirectory = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrWhiteSpace(targetDirectory))
+        {
+            Directory.CreateDirectory(targetDirectory);
+        }
 
-            File.Copy(sourcePath, targetPath, overwrite: false);
-        });
+        CopyFileWithProgress(sourcePath, targetPath, overwrite: false, tracker, cancellationToken);
+        tracker?.ReportCompleted(sourcePath);
     }
 
     public Task DeleteExistingPathForReplaceAsync(string path)
@@ -397,22 +464,34 @@ public sealed class ExplorerService
 
     public Task MovePathAsync(string sourcePath, string targetPath)
     {
-        return Task.Run(() =>
+        return MovePathAsync(sourcePath, targetPath, tracker: null, CancellationToken.None);
+    }
+
+    public Task MovePathAsync(string sourcePath, string targetPath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
+        return Task.Run(() => MovePath(sourcePath, targetPath, tracker, cancellationToken), cancellationToken);
+    }
+
+    public void MovePath(string sourcePath, string targetPath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        tracker?.ReportCurrent(sourcePath);
+
+        if (Directory.Exists(sourcePath))
         {
-            if (Directory.Exists(sourcePath))
-            {
-                MoveDirectory(sourcePath, targetPath);
-                return;
-            }
+            ValidateDirectoryTargetIsNotSelfOrDescendant(sourcePath, targetPath);
+            MoveDirectory(sourcePath, targetPath, tracker, cancellationToken);
+            return;
+        }
 
-            string? targetDirectory = Path.GetDirectoryName(targetPath);
-            if (!string.IsNullOrWhiteSpace(targetDirectory))
-            {
-                Directory.CreateDirectory(targetDirectory);
-            }
+        string? targetDirectory = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrWhiteSpace(targetDirectory))
+        {
+            Directory.CreateDirectory(targetDirectory);
+        }
 
-            File.Move(sourcePath, targetPath);
-        });
+        File.Move(sourcePath, targetPath);
+        tracker?.ReportCompleted(sourcePath);
     }
 
     public void OpenPathInTerminal(string path)
@@ -710,9 +789,15 @@ public sealed class ExplorerService
 
     public Task CreateZipArchiveAsync(string sourcePath, string archivePath)
     {
+        return CreateZipArchiveAsync(sourcePath, archivePath, tracker: null, CancellationToken.None);
+    }
+
+    public Task CreateZipArchiveAsync(string sourcePath, string archivePath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
         return Task.Run(
             () =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string? archiveDirectory = Path.GetDirectoryName(archivePath);
                 if (!string.IsNullOrWhiteSpace(archiveDirectory))
                 {
@@ -721,13 +806,13 @@ public sealed class ExplorerService
 
                 if (Directory.Exists(sourcePath))
                 {
-                    CreateZipArchiveFromDirectory(sourcePath, archivePath);
+                    CreateZipArchiveFromDirectory(sourcePath, archivePath, tracker, cancellationToken);
                     return;
                 }
 
                 if (File.Exists(sourcePath))
                 {
-                    CreateZipArchiveFromFile(sourcePath, archivePath);
+                    CreateZipArchiveFromFile(sourcePath, archivePath, tracker, cancellationToken);
                     return;
                 }
 
@@ -737,31 +822,132 @@ public sealed class ExplorerService
 
     public Task<ZipExtractionPlan> ExtractZipHereAsync(string archivePath, string destinationDirectory)
     {
-        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.Here));
+        return ExtractZipHereAsync(archivePath, destinationDirectory, tracker: null, CancellationToken.None);
+    }
+
+    public Task<ZipExtractionPlan> ExtractZipHereAsync(string archivePath, string destinationDirectory, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
+        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.Here, tracker, cancellationToken));
     }
 
     public Task<ZipExtractionPlan> ExtractZipToFolderAsync(string archivePath, string destinationDirectory)
     {
-        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.ToFolder));
+        return ExtractZipToFolderAsync(archivePath, destinationDirectory, tracker: null, CancellationToken.None);
+    }
+
+    public Task<ZipExtractionPlan> ExtractZipToFolderAsync(string archivePath, string destinationDirectory, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
+        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.ToFolder, tracker, cancellationToken));
     }
 
     public Task<ZipExtractionPlan> ExtractZipSmartAsync(string archivePath, string destinationDirectory)
     {
-        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.Smart));
+        return ExtractZipSmartAsync(archivePath, destinationDirectory, tracker: null, CancellationToken.None);
     }
 
-    private static void CopyDirectory(string sourcePath, string targetPath)
+    public Task<ZipExtractionPlan> ExtractZipSmartAsync(string archivePath, string destinationDirectory, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
+    {
+        return Task.Run(() => ExtractZipCore(archivePath, destinationDirectory, ZipExtractionMode.Smart, tracker, cancellationToken));
+    }
+
+    public int CountFileOperationItems(string path)
+    {
+        if (File.Exists(path))
+        {
+            return 1;
+        }
+
+        if (!Directory.Exists(path))
+        {
+            return 1;
+        }
+
+        int count = 0;
+        foreach (string _ in Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories))
+        {
+            count++;
+        }
+
+        foreach (string _ in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        {
+            count++;
+        }
+
+        return Math.Max(1, count);
+    }
+
+    public long CountFileOperationBytes(string path)
+    {
+        if (File.Exists(path))
+        {
+            return new FileInfo(path).Length;
+        }
+
+        if (!Directory.Exists(path))
+        {
+            return 0;
+        }
+
+        long count = 0;
+        foreach (string file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        {
+            count += new FileInfo(file).Length;
+        }
+
+        return count;
+    }
+
+    public int CountZipExtractionItems(string archivePath)
+    {
+        using FileStream stream = new(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        int count = 0;
+
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            if (!string.IsNullOrEmpty(NormalizeArchiveEntryPath(entry.FullName)))
+            {
+                count++;
+            }
+        }
+
+        return Math.Max(1, count);
+    }
+
+    public long CountZipExtractionBytes(string archivePath)
+    {
+        using FileStream stream = new(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        long count = 0;
+
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            if (!string.IsNullOrEmpty(NormalizeArchiveEntryPath(entry.FullName)))
+            {
+                count += entry.Length;
+            }
+        }
+
+        return count;
+    }
+
+    private static void CopyDirectory(string sourcePath, string targetPath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(targetPath);
 
         foreach (string directory in Directory.EnumerateDirectories(sourcePath, "*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(directory);
             string relativePath = Path.GetRelativePath(sourcePath, directory);
             Directory.CreateDirectory(Path.Combine(targetPath, relativePath));
+            tracker?.ReportCompleted(directory);
         }
 
         foreach (string file in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(file);
             string relativePath = Path.GetRelativePath(sourcePath, file);
             string destinationPath = Path.Combine(targetPath, relativePath);
             string? destinationDirectory = Path.GetDirectoryName(destinationPath);
@@ -770,24 +956,89 @@ public sealed class ExplorerService
                 Directory.CreateDirectory(destinationDirectory);
             }
 
-            File.Copy(file, destinationPath, overwrite: false);
+            CopyFileWithProgress(file, destinationPath, overwrite: false, tracker, cancellationToken);
+            tracker?.ReportCompleted(file);
+        }
+
+        if (tracker is not null && tracker.CompletedItems == 0)
+        {
+            tracker.ReportCompleted(sourcePath);
         }
     }
 
-    private static void MoveDirectory(string sourcePath, string targetPath)
+    public void ValidateDirectoryTargetIsNotSelfOrDescendant(string sourcePath, string targetPath)
+    {
+        if (IsDirectoryTargetSelfOrDescendant(sourcePath, targetPath))
+        {
+            throw new DirectoryTargetIsSourceDescendantException();
+        }
+    }
+
+    public bool IsDirectoryTargetSelfOrDescendant(string sourcePath, string targetPath)
+    {
+        string normalizedSource = Path.GetFullPath(sourcePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string normalizedTarget = Path.GetFullPath(targetPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        return string.Equals(normalizedSource, normalizedTarget, StringComparison.OrdinalIgnoreCase) ||
+            normalizedTarget.StartsWith(normalizedSource + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+            normalizedTarget.StartsWith(normalizedSource + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void MoveDirectory(string sourcePath, string targetPath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
     {
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(sourcePath);
             Directory.Move(sourcePath, targetPath);
+            tracker?.ReportCompleted(sourcePath);
         }
         catch (IOException)
         {
-            CopyDirectory(sourcePath, targetPath);
+            CopyDirectory(sourcePath, targetPath, tracker, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             Directory.Delete(sourcePath, recursive: true);
         }
     }
 
-    private static void CreateZipArchiveFromDirectory(string sourcePath, string archivePath)
+    private static void CopyFileWithProgress(
+        string sourcePath,
+        string targetPath,
+        bool overwrite,
+        FileOperationProgressTracker? tracker,
+        CancellationToken cancellationToken)
+    {
+        using FileStream sourceStream = new(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using FileStream targetStream = new(
+            targetPath,
+            overwrite ? FileMode.Create : FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None);
+        CopyStreamWithProgress(sourceStream, targetStream, tracker, cancellationToken);
+    }
+
+    private static void CopyStreamWithProgress(
+        Stream sourceStream,
+        Stream targetStream,
+        FileOperationProgressTracker? tracker,
+        CancellationToken cancellationToken)
+    {
+        byte[] buffer = new byte[64 * 1024];
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int read = sourceStream.Read(buffer, 0, buffer.Length);
+            if (read <= 0)
+            {
+                return;
+            }
+
+            targetStream.Write(buffer, 0, read);
+            tracker?.ReportBytes(read);
+        }
+    }
+
+    private static void CreateZipArchiveFromDirectory(string sourcePath, string archivePath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
     {
         string rootName = Path.GetFileName(sourcePath.TrimEnd('\\'));
         if (string.IsNullOrWhiteSpace(rootName))
@@ -801,33 +1052,59 @@ public sealed class ExplorerService
         bool hasEntries = false;
         foreach (string directory in Directory.EnumerateDirectories(sourcePath, "*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(directory);
             string relativePath = Path.GetRelativePath(sourcePath, directory).Replace('\\', '/');
             archive.CreateEntry($"{rootName}/{relativePath}/");
             hasEntries = true;
+            tracker?.ReportCompleted(directory);
         }
 
         foreach (string file in Directory.EnumerateFiles(sourcePath, "*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(file);
             string relativePath = Path.GetRelativePath(sourcePath, file).Replace('\\', '/');
-            archive.CreateEntryFromFile(file, $"{rootName}/{relativePath}", CompressionLevel.Optimal);
+            ZipArchiveEntry entry = archive.CreateEntry($"{rootName}/{relativePath}", CompressionLevel.Optimal);
+            using (Stream entryStream = entry.Open())
+            using (FileStream sourceStream = new(file, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                CopyStreamWithProgress(sourceStream, entryStream, tracker, cancellationToken);
+            }
             hasEntries = true;
+            tracker?.ReportCompleted(file);
         }
 
         if (!hasEntries)
         {
             archive.CreateEntry($"{rootName}/");
+            tracker?.ReportCompleted(sourcePath);
         }
     }
 
-    private static void CreateZipArchiveFromFile(string sourcePath, string archivePath)
+    private static void CreateZipArchiveFromFile(string sourcePath, string archivePath, FileOperationProgressTracker? tracker, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        tracker?.ReportCurrent(sourcePath);
         using FileStream stream = new(archivePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
-        archive.CreateEntryFromFile(sourcePath, Path.GetFileName(sourcePath), CompressionLevel.Optimal);
+        ZipArchiveEntry entry = archive.CreateEntry(Path.GetFileName(sourcePath), CompressionLevel.Optimal);
+        using (Stream entryStream = entry.Open())
+        using (FileStream sourceStream = new(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            CopyStreamWithProgress(sourceStream, entryStream, tracker, cancellationToken);
+        }
+        tracker?.ReportCompleted(sourcePath);
     }
 
-    private ZipExtractionPlan ExtractZipCore(string archivePath, string destinationDirectory, ZipExtractionMode mode)
+    private ZipExtractionPlan ExtractZipCore(
+        string archivePath,
+        string destinationDirectory,
+        ZipExtractionMode mode,
+        FileOperationProgressTracker? tracker,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!File.Exists(archivePath))
         {
             throw new FileNotFoundException("Archive path does not exist.", archivePath);
@@ -865,6 +1142,7 @@ public sealed class ExplorerService
 
         foreach (ZipArchiveEntry entry in archive.Entries)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string relativePath = NormalizeArchiveEntryPath(entry.FullName);
             if (string.IsNullOrEmpty(relativePath))
             {
@@ -916,11 +1194,16 @@ public sealed class ExplorerService
 
         foreach (string directoryPath in SortPathsByLength(impliedDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(directoryPath);
             Directory.CreateDirectory(directoryPath);
+            tracker?.ReportCompleted(directoryPath);
         }
 
         foreach ((ZipArchiveEntry entry, string destinationPath) in filesToExtract)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            tracker?.ReportCurrent(destinationPath);
             string? parentDirectory = Path.GetDirectoryName(destinationPath);
             if (!string.IsNullOrWhiteSpace(parentDirectory))
             {
@@ -929,8 +1212,14 @@ public sealed class ExplorerService
 
             using Stream entryStream = entry.Open();
             using FileStream fileStream = new(destinationPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            entryStream.CopyTo(fileStream);
+            CopyStreamWithProgress(entryStream, fileStream, tracker, cancellationToken);
             File.SetLastWriteTime(destinationPath, entry.LastWriteTime.LocalDateTime);
+            tracker?.ReportCompleted(destinationPath);
+        }
+
+        if (tracker is not null && tracker.CompletedItems == 0)
+        {
+            tracker.ReportCompleted(archivePath);
         }
 
         string? primarySelectionPath = extractToNamedFolder

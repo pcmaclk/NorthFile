@@ -13,18 +13,28 @@
         <Thickness x:Key="SidebarExpandedScrollPadding">0,0,12,8</Thickness>
         <Thickness x:Key="SidebarFooterMarginExpanded">0</Thickness>
         <Thickness x:Key="SidebarItemContentInsetLeftMargin">8,0,0,0</Thickness>
+        <Thickness x:Key="SidebarGroupHeaderOuterPadding">4,4</Thickness>
+        <Thickness x:Key="SidebarGroupHeaderInnerPadding">4,0,0,0</Thickness>
+        <Thickness x:Key="SidebarGroupSelectionIndicatorMargin">14,0,0,0</Thickness>
+        <Thickness x:Key="SidebarLabelSpacingMargin">14,0,0,0</Thickness>
         <x:Double x:Key="SidebarItemHeight">32</x:Double>
         <x:Double x:Key="SidebarItemGlyphSize">12</x:Double>
         <x:Double x:Key="SidebarItemContentInsetLeft">8</x:Double>
         <x:Double x:Key="SidebarDragOverlaySize">44</x:Double>
         <x:Double x:Key="SidebarDragOverlayGlyphSize">18</x:Double>
         <Thickness x:Key="TreeViewItemBorderThemeThickness">0</Thickness>
-        <Thickness x:Key="TreeViewItemPresenterMargin">0</Thickness>
+        <Thickness x:Key="TreeViewItemPresenterMargin">0,1</Thickness>
         <Thickness x:Key="TreeViewItemPresenterPadding">0</Thickness>
         <Thickness x:Key="TreeViewItemMultiSelectSelectedItemBorderMargin">0</Thickness>
         <x:Double x:Key="TreeViewItemMinHeight">32</x:Double>
         <x:Double x:Key="TreeViewItemMultiSelectCheckBoxMinHeight">32</x:Double>
         <x:Double x:Key="TreeViewItemContentHeight">32</x:Double>
+        <Style x:Key="SidebarGroupSeparatorStyle" TargetType="Border">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Margin" Value="16,6,12,6" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="{ThemeResource SidebarGroupSeparatorBrush}" />
+        </Style>
         <DataTemplate x:Key="SidebarPinnedItemTemplate" x:DataType="local:SidebarNavItemModel">
             <Grid>
                 <Border
@@ -71,7 +81,7 @@
                             Glyph="{x:Bind Glyph}" />
                         <TextBlock
                             Grid.Column="2"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarLabelSpacingMargin}"
                             VerticalAlignment="Center"
                             Text="{x:Bind Label}"
                             TextTrimming="CharacterEllipsis" />
@@ -112,7 +122,7 @@
                             Glyph="{x:Bind Glyph}" />
                         <TextBlock
                             Grid.Column="2"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarLabelSpacingMargin}"
                             VerticalAlignment="Center"
                             Text="{x:Bind Label}"
                             TextTrimming="CharacterEllipsis" />
@@ -131,16 +141,17 @@
                 <Border
                     x:Name="PinnedGroupBorder"
                     Margin="0"
+                    Padding="{StaticResource SidebarGroupHeaderOuterPadding}"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="PinnedGroup_Click"
                     >
                     <Grid x:Name="PinnedGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0"
-                          Padding="4, 0, 0, 0">
+                          Padding="{StaticResource SidebarGroupHeaderInnerPadding}">
                         <Border
                             x:Name="PinnedGroupSelectionIndicator"
                             Width="3"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarGroupSelectionIndicatorMargin}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
                             Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
@@ -158,7 +169,7 @@
                             x:Name="PinnedGroupTextBlock"
                             x:Uid="PinnedGroupTextBlock"
                             Grid.Column="2"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarLabelSpacingMargin}"
                             VerticalAlignment="Center" />
                         <FontIcon
                             x:Name="PinnedChevron"
@@ -180,11 +191,13 @@
                     Visibility="Visible" />
             </StackPanel>
 
+            <Border x:Name="PinnedTreeSeparator" Style="{StaticResource SidebarGroupSeparatorStyle}" />
+
             <StackPanel x:Name="TreeSectionPanel" Margin="0" Spacing="2">
                 <Border
                     x:Name="TreeCompactBorder"
                     Margin="0"
-                    Padding="4,4"
+                    Padding="{StaticResource SidebarGroupHeaderOuterPadding}"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="TreeCompactBorder_PointerPressed"
@@ -193,7 +206,7 @@
                         <Border
                             x:Name="TreeCompactSelectionIndicator"
                             Width="3"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarGroupSelectionIndicatorMargin}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
                             Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
@@ -218,20 +231,22 @@
                 </Border>
             </StackPanel>
 
+            <Border x:Name="TreeCloudSeparator" Style="{StaticResource SidebarGroupSeparatorStyle}" />
+
             <StackPanel x:Name="CloudSectionPanel" Margin="0" Spacing="2">
                 <Border
                     x:Name="CloudGroupBorder"
                     Margin="0"
-                    Padding="4,4"
+                    Padding="{StaticResource SidebarGroupHeaderOuterPadding}"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="CloudGroup_Click">
                     <Grid x:Name="CloudGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0"
-                          Padding="4, 0, 0, 0">
+                          Padding="{StaticResource SidebarGroupHeaderInnerPadding}">
                         <Border
                             x:Name="CloudGroupSelectionIndicator"
                             Width="3"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarGroupSelectionIndicatorMargin}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Stretch"
                             Background="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
@@ -249,7 +264,7 @@
                             x:Name="CloudHeaderTextBlock"
                             x:Uid="CloudHeaderTextBlock"
                             Grid.Column="2"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarLabelSpacingMargin}"
                             VerticalAlignment="Center" />
                         <FontIcon
                             x:Name="CloudChevron"
@@ -270,16 +285,18 @@
                     ItemsSource="{x:Bind CloudItems, Mode=OneWay}" />
             </StackPanel>
 
+            <Border x:Name="CloudNetworkSeparator" Style="{StaticResource SidebarGroupSeparatorStyle}" />
+
             <StackPanel x:Name="NetworkSectionPanel" Margin="0" Spacing="2">
                 <Border
                     x:Name="NetworkGroupBorder"
                     Margin="0"
-                    Padding="4,4"
+                    Padding="{StaticResource SidebarGroupHeaderOuterPadding}"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="NetworkGroup_Click">
                     <Grid x:Name="NetworkGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0"
-                          Padding="4, 0, 0, 0">
+                          Padding="{StaticResource SidebarGroupHeaderInnerPadding}">
                         <Border
                             x:Name="NetworkGroupSelectionIndicator"
                             Width="3"
@@ -301,7 +318,7 @@
                             x:Name="NetworkHeaderTextBlock"
                             x:Uid="NetworkHeaderTextBlock"
                             Grid.Column="2"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarLabelSpacingMargin}"
                             VerticalAlignment="Center" />
                         <FontIcon
                             x:Name="NetworkChevron"
@@ -323,16 +340,18 @@
                     Visibility="Collapsed" />
             </StackPanel>
 
+            <Border x:Name="NetworkTagsSeparator" Style="{StaticResource SidebarGroupSeparatorStyle}" />
+
             <StackPanel x:Name="TagsSectionPanel" Margin="0" Spacing="2">
                 <Border
                     x:Name="TagsGroupBorder"
                     Margin="0"
-                    Padding="4,4"
+                    Padding="{StaticResource SidebarGroupHeaderOuterPadding}"
                     Background="Transparent"
                     CornerRadius="{ThemeResource ListViewItemCornerRadius}"
                     PointerPressed="TagsGroup_Click">
                     <Grid x:Name="TagsGroupGrid" ColumnDefinitions="14,12,*,26" ColumnSpacing="0"
-                          Padding="4, 0, 0, 0">
+                          Padding="{StaticResource SidebarGroupHeaderInnerPadding}">
                         <Border
                             x:Name="TagsGroupSelectionIndicator"
                             Width="3"
@@ -354,7 +373,7 @@
                             x:Name="TagsHeaderTextBlock"
                             x:Uid="TagsHeaderTextBlock"
                             Grid.Column="2"
-                            Margin="14,0,0,0"
+                            Margin="{StaticResource SidebarLabelSpacingMargin}"
                             VerticalAlignment="Center" />
                         <FontIcon
                             x:Name="TagsChevron"

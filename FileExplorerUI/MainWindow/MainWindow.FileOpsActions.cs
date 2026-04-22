@@ -1,4 +1,6 @@
 using FileExplorerUI.Services;
+using FileExplorerUI.Workspace;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
@@ -13,19 +15,21 @@ namespace FileExplorerUI
         private enum PasteConflictDialogDecision
         {
             Replace,
+            ReplaceAll,
             Skip
         }
 
         private async Task RenameEntryAsync(EntryViewModel entry, int selectedIndex, string newName)
         {
-            string src = Path.Combine(_currentPath, entry.Name);
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            string src = Path.Combine(currentPath, entry.Name);
             string oldName = entry.Name;
             TreeViewNode? renamedTreeNode = entry.IsDirectory ? FindSidebarTreeNodeByPath(src) : null;
             while (true)
             {
                 try
                 {
-                    FileOperationResult<RenamedEntryInfo> renameResult = await _fileManagementCoordinator.TryRenameEntryAsync(_currentPath, entry.Name, newName);
+                    FileOperationResult<RenamedEntryInfo> renameResult = await _fileManagementCoordinator.TryRenameEntryAsync(currentPath, entry.Name, newName);
                     FileOperationsController.RenameDecision renameDecision = _fileOperationsController.AnalyzeRenameResult(
                         renameResult,
                         S("ErrorFileOperationUnknown"));
@@ -50,7 +54,7 @@ namespace FileExplorerUI
                     _selectedEntryPath = renamed.TargetPath;
                     if (!renamed.ChangeNotified)
                     {
-                        EnsurePersistentRefreshFallbackInvalidation(_currentPath, "rename");
+                        EnsurePersistentRefreshFallbackInvalidation(currentPath, "rename");
                     }
                     if (entry.IsDirectory)
                     {
@@ -58,9 +62,9 @@ namespace FileExplorerUI
                         {
                             UpdateSidebarTreeNodePath(renamedTreeNode, renamed.SourcePath, renamed.TargetPath, newName);
                         }
-                        else if (FindSidebarTreeNodeByPath(_currentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
+                        else if (FindSidebarTreeNodeByPath(currentPath) is TreeViewNode parentNode && parentNode.IsExpanded)
                         {
-                            await PopulateSidebarTreeChildrenAsync(parentNode, _currentPath, CancellationToken.None, expandAfterLoad: true);
+                            await PopulateSidebarTreeChildrenAsync(parentNode, currentPath, CancellationToken.None, expandAfterLoad: true);
                         }
                     }
 
@@ -141,10 +145,7 @@ namespace FileExplorerUI
                 DefaultButton = ContentDialogButton.Primary
             };
 
-            if (Content is FrameworkElement root)
-            {
-                dialog.XamlRoot = root.XamlRoot;
-            }
+            PrepareWindowDialog(dialog);
 
             return await dialog.ShowAsync() == ContentDialogResult.Primary;
         }
@@ -160,7 +161,11 @@ namespace FileExplorerUI
                         return;
                     }
 
-                    FileOperationResult<bool> deleteResult = await _fileManagementCoordinator.TryDeleteEntryAsync(targetPath, recursive);
+                    FileOperationResult<bool> deleteResult = await RunFileOperationWithProgressAsync(
+                        "OperationProgressDeleteTitle",
+                        "OperationProgressDeleteMessage",
+                        (progress, cancellationToken) =>
+                            _fileManagementCoordinator.TryDeleteEntryAsync(targetPath, recursive, progress, cancellationToken));
                     FileOperationsController.DeleteDecision deleteDecision = _fileOperationsController.AnalyzeDeleteResult(
                         deleteResult,
                         S("ErrorFileOperationUnknown"));
@@ -185,13 +190,14 @@ namespace FileExplorerUI
                     bool changeNotified = deleteDecision.ChangeNotified;
                     if (!changeNotified)
                     {
-                        string parentPath = _fileOperationsController.ResolveDeleteFallbackParentPath(targetPath, _currentPath);
+                        string parentPath = _fileOperationsController.ResolveDeleteFallbackParentPath(
+                            targetPath,
+                            GetPanelCurrentPath(WorkspacePanelId.Primary));
                         EnsurePersistentRefreshFallbackInvalidation(parentPath, "delete");
                     }
 
                     TryRemoveFavoritesForDeletedPath(targetPath);
                     ApplyLocalDelete(selectedIndex);
-                    _ = RefreshCurrentDirectoryInBackgroundAsync(preserveViewport: true);
                     UpdateStatusKey("StatusDeleteSuccess", entry.Name, recursive);
                     return;
                 }
@@ -256,10 +262,7 @@ namespace FileExplorerUI
                 DefaultButton = ContentDialogButton.Primary
             };
 
-            if (Content is FrameworkElement root)
-            {
-                dialog.XamlRoot = root.XamlRoot;
-            }
+            PrepareWindowDialog(dialog);
 
             return await dialog.ShowAsync() == ContentDialogResult.Primary;
         }
@@ -315,53 +318,55 @@ namespace FileExplorerUI
                 DefaultButton = ContentDialogButton.Primary
             };
 
-            if (Content is FrameworkElement root)
-            {
-                dialog.XamlRoot = root.XamlRoot;
-            }
+            PrepareWindowDialog(dialog);
 
             return await dialog.ShowAsync() == ContentDialogResult.Primary;
         }
 
         private async Task<bool> ShowOperationFailureDialogAsync(string titleKey, string message, bool allowRetry = false)
         {
-            var body = new StackPanel
+            EnsureOperationFeedbackOverlay();
+            if (_operationFeedbackDialog is null)
             {
-                Spacing = 12
-            };
-            body.Children.Add(new TextBlock
-            {
-                Text = message,
-                TextWrapping = TextWrapping.Wrap
-            });
-
-            var dialog = new ContentDialog
-            {
-                Title = S(titleKey),
-                Content = body,
-                CloseButtonText = S("DialogCloseButton"),
-                DefaultButton = ContentDialogButton.Close
-            };
-
-            if (allowRetry)
-            {
-                dialog.PrimaryButtonText = S("DialogRetryButton");
-                dialog.DefaultButton = ContentDialogButton.Primary;
+                return false;
             }
 
-            if (Content is FrameworkElement root)
+            Controls.ModalActionDialogResult result = await _operationFeedbackDialog.ShowAsync(
+                S(titleKey),
+                message,
+                allowRetry ? S("DialogRetryButton") : S("DialogCloseButton"),
+                allowRetry ? S("DialogCloseButton") : string.Empty);
+            return allowRetry && result == Controls.ModalActionDialogResult.Primary;
+        }
+
+        private async Task<bool> ShowPasteTargetIsSourceDescendantDialogAsync(string? itemName)
+        {
+            EnsureOperationFeedbackOverlay();
+            if (_operationFeedbackDialog is null)
             {
-                dialog.XamlRoot = root.XamlRoot;
+                return false;
             }
 
-            return await dialog.ShowAsync() == ContentDialogResult.Primary;
+            string message = string.IsNullOrWhiteSpace(itemName)
+                ? S("PasteTargetIsSourceDescendantDialogMessage")
+                : SF("PasteTargetIsSourceDescendantDialogMessageWithItem", itemName);
+
+            Controls.ModalActionDialogResult result = await _operationFeedbackDialog.ShowAsync(
+                S("PasteInterruptedDialogTitle"),
+                message,
+                S("DialogSkipButton"),
+                S("DialogCancelButton"));
+            return result == Controls.ModalActionDialogResult.Primary;
         }
 
         private async Task<PasteConflictDialogDecision> ShowPasteConflictDialogAsync(string? itemName, bool isDirectory, int conflictCount)
         {
-            string primaryMessage = conflictCount == 1 && !string.IsNullOrWhiteSpace(itemName)
-                ? SF(isDirectory ? "PasteConflictDialogPrimarySingleFolder" : "PasteConflictDialogPrimarySingleFile", itemName)
-                : SF("PasteConflictDialogPrimaryMultiple", conflictCount);
+            string primaryMessage = conflictCount switch
+            {
+                1 when !string.IsNullOrWhiteSpace(itemName) => SF(isDirectory ? "PasteConflictDialogPrimarySingleFolder" : "PasteConflictDialogPrimarySingleFile", itemName),
+                > 1 when !string.IsNullOrWhiteSpace(itemName) => SF("PasteConflictDialogPrimaryMultipleWithCurrent", conflictCount, itemName),
+                _ => SF("PasteConflictDialogPrimaryMultiple", conflictCount)
+            };
 
             EnsurePasteConflictOverlay();
             if (_pasteConflictDialog is null)
@@ -377,10 +382,17 @@ namespace FileExplorerUI
                     : S("PasteConflictDialogReplaceMultipleButton"),
                 conflictCount == 1
                     ? S("PasteConflictDialogSkipSingleButton")
-                    : S("PasteConflictDialogSkipMultipleButton"));
-            return result == Controls.ModalActionDialogResult.Primary
-                ? PasteConflictDialogDecision.Replace
-                : PasteConflictDialogDecision.Skip;
+                    : S("PasteConflictDialogSkipMultipleButton"),
+                conflictCount == 1
+                    ? string.Empty
+                    : S("PasteConflictDialogReplaceAllButton"));
+
+            return result switch
+            {
+                Controls.ModalActionDialogResult.Primary => PasteConflictDialogDecision.Replace,
+                Controls.ModalActionDialogResult.Tertiary => PasteConflictDialogDecision.ReplaceAll,
+                _ => PasteConflictDialogDecision.Skip
+            };
         }
 
         private void EnsurePasteConflictOverlay()
@@ -390,15 +402,89 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (Content is not Grid rootGrid)
+            _pasteConflictDialog = new Controls.ModalActionDialog();
+            AttachWindowOverlay(_pasteConflictDialog);
+        }
+
+        private void EnsureOperationFeedbackOverlay()
+        {
+            if (_operationFeedbackDialog is not null)
             {
                 return;
             }
 
-            _pasteConflictDialog = new Controls.ModalActionDialog();
-            Grid.SetRowSpan(_pasteConflictDialog, 3);
-            Canvas.SetZIndex(_pasteConflictDialog, 200);
-            rootGrid.Children.Add(_pasteConflictDialog);
+            _operationFeedbackDialog = new Controls.ModalActionDialog();
+            AttachWindowOverlay(_operationFeedbackDialog);
+        }
+
+        private async Task<T> RunFileOperationWithProgressAsync<T>(
+            string titleKey,
+            string messageKey,
+            Func<FileOperationProgressStore, CancellationToken, Task<T>> operation,
+            string operationName = "file-operation",
+            long totalItems = 1,
+            long totalBytes = 0)
+        {
+            EnsureFileOperationProgressOverlay();
+            using var cancellation = new CancellationTokenSource();
+            var progressStore = new FileOperationProgressStore(operationName, totalItems, totalBytes);
+
+            _fileOperationProgressOverlay?.Show(
+                S(titleKey),
+                S(messageKey),
+                S("DialogCancelButton"),
+                () =>
+                {
+                    _fileOperationProgressOverlay?.MarkCanceling(S("OperationProgressCanceling"));
+                    progressStore.MarkCanceled();
+                    cancellation.Cancel();
+                });
+
+            Task<T> completion = Task.Run(async () => await operation(progressStore, cancellation.Token));
+            var job = new FileOperationJob<T>(progressStore, completion, cancellation);
+
+            try
+            {
+                T result = await PollFileOperationJobAsync(job);
+                progressStore.MarkCompleted();
+                _fileOperationProgressOverlay?.Update(progressStore.Snapshot, S("OperationProgressCountFormat"));
+                return result;
+            }
+            finally
+            {
+                _fileOperationProgressOverlay?.Close();
+            }
+        }
+
+        private async Task<T> PollFileOperationJobAsync<T>(FileOperationJob<T> job)
+        {
+            FileOperationProgress lastSnapshot = job.ProgressStore.Snapshot;
+            _fileOperationProgressOverlay?.Update(lastSnapshot, S("OperationProgressCountFormat"));
+
+            while (!job.Completion.IsCompleted)
+            {
+                await Task.WhenAny(job.Completion, Task.Delay(16));
+
+                FileOperationProgress snapshot = job.ProgressStore.Snapshot;
+                if (!snapshot.Equals(lastSnapshot))
+                {
+                    _fileOperationProgressOverlay?.Update(snapshot, S("OperationProgressCountFormat"));
+                    lastSnapshot = snapshot;
+                }
+            }
+
+            return await job.Completion;
+        }
+
+        private void EnsureFileOperationProgressOverlay()
+        {
+            if (_fileOperationProgressOverlay is not null)
+            {
+                return;
+            }
+
+            _fileOperationProgressOverlay = new Controls.FileOperationProgressOverlay();
+            AttachWindowOverlay(_fileOperationProgressOverlay, zIndex: 210);
         }
     }
 }

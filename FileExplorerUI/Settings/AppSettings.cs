@@ -52,6 +52,8 @@ public sealed class AppSettings
 
     public string LastOpenedPath { get; set; } = "shell:mycomputer";
 
+    public string LastWorkspaceSessionJson { get; set; } = string.Empty;
+
     public EntrySortField DefaultSortField { get; set; } = EntrySortField.Name;
 
     public EntryGroupField DefaultGroupField { get; set; } = EntryGroupField.None;
@@ -65,6 +67,12 @@ public sealed class AppSettings
     public int WindowWidth { get; set; } = 0;
 
     public int WindowHeight { get; set; } = 0;
+
+    public int WindowPosX { get; set; } = int.MinValue;
+
+    public int WindowPosY { get; set; } = int.MinValue;
+
+    public bool WindowMaximized { get; set; } = false;
 
     public bool FavoritesInitialized { get; set; } = false;
 

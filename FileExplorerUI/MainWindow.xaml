@@ -35,6 +35,10 @@
             <Grid
                 Height="{x:Bind ShellTitleBarHeight, Mode=OneWay}"
                 Visibility="{x:Bind SidebarTopChromeVisibility, Mode=OneWay}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
                 <StackPanel
                     Orientation="Horizontal"
                     Padding="4, 0, 0, 0"
@@ -83,7 +87,7 @@
                         Click="LanguageToggleButton_Click"
                         UseSystemFocusVisuals="False">
                         <ToolTipService.ToolTip>
-                            <ToolTip x:Uid="LanguageToggleButtonToolTip" />
+                            <ToolTip Content="{Binding Source={StaticResource Strings}, Path=[ToolTipToggleTheme]}" />
                         </ToolTipService.ToolTip>
                         <FontIcon
                             FontFamily="Segoe Fluent Icons"
@@ -91,12 +95,18 @@
                             Glyph="{x:Bind ThemeToggleGlyph, Mode=OneWay}" />
                     </Button>
                 </StackPanel>
+                <Grid
+                    x:Name="LeftTitleBarDragRegion"
+                    Grid.Column="1"
+                    Background="Transparent"
+                    Loaded="TitleBarDragRegion_Loaded"
+                    SizeChanged="TitleBarDragRegion_SizeChanged" />
             </Grid>
 
             <!-- Explorer sidebar host occupies the left shell column. -->
             <Grid
                 Grid.Row="1"
-                Padding="0, 4, 0, 0"
+                Padding="{x:Bind SidebarContentPadding, Mode=OneWay}"
                 HorizontalAlignment="Stretch"
                 Background="Transparent"
                 Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}">
@@ -110,6 +120,24 @@
             Grid.RowSpan="3"
             HorizontalAlignment="Stretch"
             RowDefinitions="Auto,Auto,*">
+            <Grid.Resources>
+                <Style x:Key="DetailsHeaderHitTargetStyle" TargetType="Border">
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="CornerRadius" Value="4" />
+                    <Setter Property="Padding" Value="0,0,10,0" />
+                </Style>
+
+                <Style x:Key="DetailsHeaderTextStyle" TargetType="TextBlock">
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Style>
+
+                <Style x:Key="DetailsHeaderSortGlyphStyle" TargetType="TextBlock">
+                    <Setter Property="FontSize" Value="11" />
+                    <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Style>
+            </Grid.Resources>
         <!-- Right-side title bar shell: tab strip stays aligned to the content column. -->
         <TabView
             x:Name="SingleTabTitleBarView"
@@ -121,6 +149,7 @@
             CanDragTabs="False"
             IsAddTabButtonVisible="False"
             IsTabStop="False"
+            SelectionChanged="SingleTabTitleBarView_SelectionChanged"
             TabWidthMode="Equal">
             <TabView.Resources>
                 <ResourceDictionary>
@@ -148,7 +177,7 @@
                         <Setter Property="Background" Value="Transparent" />
                         <Setter Property="BorderBrush" Value="Transparent" />
                         <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                         <Setter Property="UseSystemFocusVisuals" Value="False" />
                         <Setter Property="Template">
@@ -174,20 +203,14 @@
                                         <Border
                                             x:Name="HoverBorder"
                                             Height="32"
-                                            Margin="0,0,1,0"
+                                            Margin="3,0,1,0"
                                             Background="Transparent"
                                             CornerRadius="8"
                                             VerticalAlignment="Top" />
                                         <ContentPresenter
-                                            HorizontalAlignment="Center"
+                                            HorizontalAlignment="Stretch"
                                             VerticalAlignment="Center"
                                             Content="{TemplateBinding Header}" />
-                                        <Border
-                                            Width="1"
-                                            Margin="0,8,0,8"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Stretch"
-                                            Background="{ThemeResource TabViewItemSeparator}" />
                                     </Grid>
                                 </ControlTemplate>
                             </Setter.Value>
@@ -201,11 +224,13 @@
                             <SolidColorBrush x:Key="TabViewItemHeaderDragBackground" Color="Transparent" />
                             <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="Transparent" />
                             <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="Transparent" />
+                            <StaticResource x:Key="TitleBarActiveTabForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
+                            <StaticResource x:Key="TitleBarInactiveTabForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
                             <StaticResource x:Key="TabViewItemHeaderForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
                             <StaticResource x:Key="TabViewItemIconForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
                             <StaticResource x:Key="TabViewItemHeaderForegroundPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
                             <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="Transparent" />
-                            <StaticResource x:Key="TitleBarActiveTabPillBackgroundBrush" ResourceKey="SolidBackgroundFillColorTertiaryBrush" />
+                            <StaticResource x:Key="TitleBarActiveTabPillBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
                             <LinearGradientBrush x:Key="TitleBarActiveTabPillBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
                                 <GradientStop Color="#08000000" Offset="0" />
                                 <GradientStop Color="#08000000" Offset="1" />
@@ -217,11 +242,13 @@
                             <SolidColorBrush x:Key="TabViewItemHeaderDragBackground" Color="Transparent" />
                             <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="Transparent" />
                             <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="Transparent" />
+                            <StaticResource x:Key="TitleBarActiveTabForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
+                            <StaticResource x:Key="TitleBarInactiveTabForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
                             <StaticResource x:Key="TabViewItemHeaderForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
                             <StaticResource x:Key="TabViewItemIconForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
                             <StaticResource x:Key="TabViewItemHeaderForegroundPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
                             <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="Transparent" />
-                            <StaticResource x:Key="TitleBarActiveTabPillBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
+                            <StaticResource x:Key="TitleBarActiveTabPillBackgroundBrush" ResourceKey="ActivePaneInputBackgroundBrush" />
                             <LinearGradientBrush x:Key="TitleBarActiveTabPillBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
                                 <GradientStop Color="#10FFFFFF" Offset="0" />
                                 <GradientStop Color="#10FFFFFF" Offset="1" />
@@ -258,68 +285,35 @@
                 </Grid>
             </TabView.TabStripHeader>
             <TabView.TabStripFooter>
-                <Grid x:Name="WindowTabDragRegion" Background="Transparent" />
-            </TabView.TabStripFooter>
-            <TabViewItem
-                Style="{StaticResource TitleBarSingleTabItemStyle}"
-                IsClosable="False"
-                Margin="0,0,0,0"
-                Background="Transparent"
-                BorderBrush="Transparent"
-                BorderThickness="0"
-                Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}"
-                IsSelected="True">
-                <TabViewItem.Header>
-                    <Border
-                        Height="32"
-                        Padding="16,0,14,0"
-                        Background="{ThemeResource TitleBarActiveTabPillBackgroundBrush}"
-                        BorderBrush="{ThemeResource TitleBarActiveTabPillBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Translation="0,0,6"
+                <Grid ColumnDefinitions="Auto,*">
+                    <Button
+                        x:Name="AddWorkspaceTabButton"
+                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Padding="0"
+                        Margin="{x:Bind AddWorkspaceTabButtonMargin, Mode=OneWay}"
                         VerticalAlignment="Top"
-                        HorizontalAlignment="Stretch">
-                        <Border.Shadow>
-                            <ThemeShadow />
-                        </Border.Shadow>
-                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                            <FontIcon
-                                FontFamily="Segoe Fluent Icons"
-                                FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
-                                Glyph="{x:Bind TitleBarTabGlyph, Mode=OneWay}" />
-                            <TextBlock
-                                Text="{x:Bind CurrentTabTitleText, Mode=OneWay}"
-                                TextTrimming="CharacterEllipsis"
-                                VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-                </TabViewItem.Header>
-            </TabViewItem>
-            <TabViewItem
-                Style="{StaticResource TitleBarInactiveTabItemStyle}"
-                IsClosable="False"
-                Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}">
-                <TabViewItem.Header>
-                    <TextBlock Text="下载" />
-                </TabViewItem.Header>
-            </TabViewItem>
-            <TabViewItem
-                Style="{StaticResource TitleBarInactiveTabItemStyle}"
-                IsClosable="False"
-                Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}">
-                <TabViewItem.Header>
-                    <TextBlock Text="项目" />
-                </TabViewItem.Header>
-            </TabViewItem>
-            <TabViewItem
-                Style="{StaticResource TitleBarInactiveTabItemStyle}"
-                IsClosable="False"
-                Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}">
-                <TabViewItem.Header>
-                    <TextBlock Text="临时" />
-                </TabViewItem.Header>
-            </TabViewItem>
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}"
+                        Click="AddWorkspaceTabButton_Click">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="新建标签页" />
+                        </ToolTipService.ToolTip>
+                        <FontIcon
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                            Glyph="&#xE710;" />
+                    </Button>
+                    <Grid
+                        x:Name="WindowTabDragRegion"
+                        Grid.Column="1"
+                        MinWidth="188"
+                        HorizontalAlignment="Stretch"
+                        Background="Transparent"
+                        Loaded="TitleBarDragRegion_Loaded"
+                        SizeChanged="TitleBarDragRegion_SizeChanged" />
+                </Grid>
+            </TabView.TabStripFooter>
         </TabView>
 
         <!-- Explorer toolbar stays separate from pane bodies to keep startup stable while dual-pane stays shell-only. -->
@@ -335,18 +329,17 @@
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0">
-                <controls:ExplorerPaneToolbarChrome
+                <controls:ExplorerPaneNavigationBar
                     x:Name="PrimaryToolbarPaneHost"
                     PointerPressed="PrimaryPaneSurface_PointerPressed"
                     ChromePadding="{x:Bind ShellToolbarPadding, Mode=OneWay}"
                     ChromeBackground="{x:Bind PrimaryPaneToolbarBackground, Mode=OneWay}"
-                    ChromeBorderBrush="{x:Bind PrimaryPaneBorderBrush, Mode=OneWay}"
-                    ChromeBorderThickness="1">
-                    <controls:ExplorerPaneToolbarChrome.ToolbarContent>
-                            <controls:ExplorerPaneToolbarLayout
-                                LayoutHeight="{x:Bind ShellControlSize, Mode=OneWay}"
-                                ColumnSpacing="8">
-                            <controls:ExplorerPaneToolbarLayout.LeadingContent>
+                    ChromeBorderBrush="{x:Bind PrimaryPaneToolbarBorderBrush, Mode=OneWay}"
+                    ChromeBorderThickness="{x:Bind PrimaryPaneToolbarBorderThickness, Mode=OneWay}"
+                    ChromeTranslation="{x:Bind PrimaryPaneToolbarTranslation, Mode=OneWay}"
+                    LayoutHeight="{x:Bind ShellControlSize, Mode=OneWay}"
+                    ColumnSpacing="8">
+                    <controls:ExplorerPaneNavigationBar.LeadingContent>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button
                                         x:Name="BackButton"
@@ -425,21 +418,38 @@
                                             Glyph="&#xE711;" />
                                     </Button>
                                 </StackPanel>
-                            </controls:ExplorerPaneToolbarLayout.LeadingContent>
-                            <controls:ExplorerPaneToolbarLayout.CenterContent>
+                    </controls:ExplorerPaneNavigationBar.LeadingContent>
+                    <controls:ExplorerPaneNavigationBar.AddressContent>
                                 <Grid>
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="PrimaryAddressChromeStates">
+                                            <VisualState x:Name="PrimaryAddressChromeInactive" />
+                                            <VisualState x:Name="PrimaryAddressChromeActive">
+                                                <VisualState.StateTriggers>
+                                                    <controls:BoolStateTrigger Value="{x:Bind IsPrimaryWorkspacePanelActive, Mode=OneWay}" />
+                                                </VisualState.StateTriggers>
+                                                <VisualState.Setters>
+                                                    <Setter Target="AddressBreadcrumbBorder.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="AddressBreadcrumbBorder.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="PathTextBox.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="PathTextBox.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="PathTextBox.Foreground" Value="{ThemeResource ActivePaneForegroundBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
                                     <Border
                                         x:Name="AddressBreadcrumbBorder"
                                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
                                         Padding="12,0,12,0"
-                                        Background="{x:Bind PrimaryPaneInputBackground, Mode=OneWay}"
+                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
                                         BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="{StaticResource ControlCornerRadius}"
                                         SizeChanged="AddressBreadcrumbBorder_SizeChanged"
                                         Tapped="AddressBreadcrumbBorder_Tapped">
                                         <Grid
-                                            ColumnDefinitions="Auto,*"
+                                            ColumnDefinitions="Auto,*,40"
                                             VerticalAlignment="Center">
                                             <Button
                                                 x:Name="OverflowBreadcrumbButton"
@@ -578,19 +588,25 @@
                                                 Visibility="{x:Bind AddressTextFallbackVisibility, Mode=OneWay}"
                                                 Text="{x:Bind DisplayAddressText, Mode=OneWay}"
                                                 TextTrimming="CharacterEllipsis" />
+                                            <Grid
+                                                x:Name="PrimaryAddressEditHitTarget"
+                                                Grid.Column="2"
+                                                Background="Transparent" />
                                         </Grid>
                                     </Border>
                                     <TextBox
                                         x:Name="PathTextBox"
                                         x:Uid="PathTextBox"
-                                        Padding="12,7,36,6"
-                                        Background="{x:Bind PrimaryPaneInputBackground, Mode=OneWay}"
+                                        Padding="12,6,36,0"
+                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
                                         BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
+                                        Foreground="{ThemeResource InactivePaneForegroundBrush}"
+                                        GotFocus="PrimaryPaneInput_GotFocus"
+                                        PointerPressed="PrimaryPaneInput_PointerPressed"
                                         TextChanging="PathTextBox_TextChanging"
                                         Text="C:\"
                                         Visibility="Collapsed"
-                                        KeyDown="PathTextBox_KeyDown"
-                                        LostFocus="PathTextBox_LostFocus" />
+                                        KeyDown="PathTextBox_KeyDown" />
                                     <TeachingTip
                                         x:Name="AddressInputTeachingTip"
                                         IsLightDismissEnabled="False"
@@ -598,21 +614,41 @@
                                         PlacementMargin="8"
                                         PreferredPlacement="Bottom" />
                                 </Grid>
-                            </controls:ExplorerPaneToolbarLayout.CenterContent>
-                            <controls:ExplorerPaneToolbarLayout.TrailingContent>
-                                <TextBox
-                                    x:Name="SearchTextBox"
-                                    x:Uid="SearchTextBox"
-                                    Height="{x:Bind ShellControlSize, Mode=OneWay}"
-                                    Visibility="{x:Bind PrimaryPaneSearchVisibility, Mode=OneWay}"
-                                    Background="{x:Bind PrimaryPaneInputBackground, Mode=OneWay}"
-                                    HorizontalAlignment="Stretch"
-                                    BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
-                                    KeyDown="SearchTextBox_KeyDown" />
-                            </controls:ExplorerPaneToolbarLayout.TrailingContent>
-                        </controls:ExplorerPaneToolbarLayout>
-                    </controls:ExplorerPaneToolbarChrome.ToolbarContent>
-                </controls:ExplorerPaneToolbarChrome>
+                    </controls:ExplorerPaneNavigationBar.AddressContent>
+                    <controls:ExplorerPaneNavigationBar.SearchContent>
+                                <Grid>
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="PrimarySearchChromeStates">
+                                            <VisualState x:Name="PrimarySearchChromeInactive" />
+                                            <VisualState x:Name="PrimarySearchChromeActive">
+                                                <VisualState.StateTriggers>
+                                                    <controls:BoolStateTrigger Value="{x:Bind IsPrimaryWorkspacePanelActive, Mode=OneWay}" />
+                                                </VisualState.StateTriggers>
+                                                <VisualState.Setters>
+                                                    <Setter Target="SearchTextBox.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="SearchTextBox.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="SearchTextBox.Foreground" Value="{ThemeResource ActivePaneForegroundBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <TextBox
+                                        x:Name="SearchTextBox"
+                                        x:Uid="SearchTextBox"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="12,5,12,4"
+                                        Visibility="{x:Bind PrimaryPaneSearchVisibility, Mode=OneWay}"
+                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
+                                        Foreground="{ThemeResource InactivePaneForegroundBrush}"
+                                        HorizontalAlignment="Stretch"
+                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
+                                        GotFocus="PrimaryPaneInput_GotFocus"
+                                        PointerPressed="PrimaryPaneInput_PointerPressed"
+                                        TextChanged="SearchTextBox_TextChanged"
+                                        KeyDown="SearchTextBox_KeyDown" />
+                                </Grid>
+                    </controls:ExplorerPaneNavigationBar.SearchContent>
+                </controls:ExplorerPaneNavigationBar>
             </Grid>
 
             <Grid
@@ -624,6 +660,7 @@
                     Width="{x:Bind ShellControlSize, Mode=OneWay}"
                     Height="{x:Bind ShellControlSize, Mode=OneWay}"
                     Padding="0"
+                    Margin="{x:Bind ExplorerPaneToggleButtonMargin, Mode=OneWay}"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Top"
                     Style="{ThemeResource SubtleButtonStyle}"
@@ -641,38 +678,68 @@
             <Grid
                 Grid.Column="2"
                 Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}">
-                <controls:ExplorerPaneToolbarChrome
+                <controls:ExplorerPaneNavigationBar
                     x:Name="SecondaryToolbarPaneHost"
                     PointerPressed="SecondaryPaneSurface_PointerPressed"
                     ChromePadding="{x:Bind ShellToolbarPadding, Mode=OneWay}"
                     ChromeBackground="{x:Bind SecondaryPaneToolbarBackground, Mode=OneWay}"
-                    ChromeBorderBrush="{x:Bind SecondaryPaneBorderBrush, Mode=OneWay}"
-                    ChromeBorderThickness="1">
-                    <controls:ExplorerPaneToolbarChrome.ToolbarContent>
-                        <controls:ExplorerPaneToolbarLayout
-                            LayoutHeight="{x:Bind ShellControlSize, Mode=OneWay}"
-                            ColumnSpacing="8">
-                            <controls:ExplorerPaneToolbarLayout.LeadingContent>
+                    ChromeBorderBrush="{x:Bind SecondaryPaneToolbarBorderBrush, Mode=OneWay}"
+                    ChromeBorderThickness="{x:Bind SecondaryPaneToolbarBorderThickness, Mode=OneWay}"
+                    ChromeTranslation="{x:Bind SecondaryPaneToolbarTranslation, Mode=OneWay}"
+                    LayoutHeight="{x:Bind ShellControlSize, Mode=OneWay}"
+                    ColumnSpacing="8">
+                    <controls:ExplorerPaneNavigationBar.LeadingContent>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button
+                                        x:Name="SecondaryPaneBackButton"
                                         Width="{x:Bind ShellControlSize, Mode=OneWay}"
                                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
                                         Padding="0"
-                                        Style="{ThemeResource SubtleButtonStyle}">
+                                        IsEnabled="{x:Bind SecondaryPaneCanGoBack, Mode=OneWay}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneBackButton_Click">
                                         <FontIcon
                                             FontFamily="Segoe Fluent Icons"
                                             FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
                                             Glyph="&#xE72B;" />
                                     </Button>
                                     <Button
+                                        x:Name="SecondaryPaneForwardButton"
                                         Width="{x:Bind ShellControlSize, Mode=OneWay}"
                                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
                                         Padding="0"
-                                        Style="{ThemeResource SubtleButtonStyle}">
+                                        IsEnabled="{x:Bind SecondaryPaneCanGoForward, Mode=OneWay}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneForwardButton_Click">
                                         <FontIcon
                                             FontFamily="Segoe Fluent Icons"
                                             FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
                                             Glyph="&#xE72A;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="SecondaryPaneUpButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        IsEnabled="{x:Bind SecondaryPaneCanGoUp, Mode=OneWay}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneUpButton_Click">
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE74A;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="SecondaryPaneLoadButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneLoadButton_Click">
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE72C;" />
                                     </Button>
                                     <Button
                                         x:Name="SecondaryPaneCloseButton"
@@ -691,33 +758,229 @@
                                             Glyph="&#xE711;" />
                                     </Button>
                                 </StackPanel>
-                            </controls:ExplorerPaneToolbarLayout.LeadingContent>
-                            <controls:ExplorerPaneToolbarLayout.CenterContent>
-                                <TextBox
-                                    x:Name="SecondaryPaneAddressTextBox"
-                                    Height="{x:Bind ShellControlSize, Mode=OneWay}"
-                                    Background="{x:Bind SecondaryPaneInputBackground, Mode=OneWay}"
-                                    BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
-                                    HorizontalAlignment="Stretch"
-                                    Text="{x:Bind SecondaryPaneAddressEditorText, Mode=TwoWay}"
-                                    TextChanged="SecondaryPaneAddressTextBox_TextChanged"
-                                    KeyDown="SecondaryPaneAddressTextBox_KeyDown" />
-                            </controls:ExplorerPaneToolbarLayout.CenterContent>
-                            <controls:ExplorerPaneToolbarLayout.TrailingContent>
-                                <TextBox
-                                    x:Name="SecondaryPaneSearchTextBox"
-                                    Height="{x:Bind ShellControlSize, Mode=OneWay}"
-                                    Background="{x:Bind SecondaryPaneInputBackground, Mode=OneWay}"
-                                    BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
-                                    HorizontalAlignment="Stretch"
-                                    PlaceholderText="{x:Bind SecondaryPaneSearchPlaceholderText, Mode=OneWay}"
-                                    Text="{x:Bind SecondaryPaneSearchText, Mode=TwoWay}"
-                                    TextChanged="SecondaryPaneSearchTextBox_TextChanged"
-                                    KeyDown="SecondaryPaneSearchTextBox_KeyDown" />
-                            </controls:ExplorerPaneToolbarLayout.TrailingContent>
-                        </controls:ExplorerPaneToolbarLayout>
-                    </controls:ExplorerPaneToolbarChrome.ToolbarContent>
-                </controls:ExplorerPaneToolbarChrome>
+                    </controls:ExplorerPaneNavigationBar.LeadingContent>
+                    <controls:ExplorerPaneNavigationBar.AddressContent>
+                                <Grid>
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="SecondaryAddressChromeStates">
+                                            <VisualState x:Name="SecondaryAddressChromeInactive" />
+                                            <VisualState x:Name="SecondaryAddressChromeActive">
+                                                <VisualState.StateTriggers>
+                                                    <controls:BoolStateTrigger Value="{x:Bind IsSecondaryWorkspacePanelActive, Mode=OneWay}" />
+                                                </VisualState.StateTriggers>
+                                                <VisualState.Setters>
+                                                    <Setter Target="SecondaryAddressBreadcrumbBorder.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="SecondaryAddressBreadcrumbBorder.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="SecondaryPaneAddressTextBox.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="SecondaryPaneAddressTextBox.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="SecondaryPaneAddressTextBox.Foreground" Value="{ThemeResource ActivePaneForegroundBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <Border
+                                        x:Name="SecondaryAddressBreadcrumbBorder"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="12,0,12,0"
+                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
+                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{StaticResource ControlCornerRadius}"
+                                        SizeChanged="SecondaryAddressBreadcrumbBorder_SizeChanged"
+                                        Tapped="SecondaryAddressBreadcrumbBorder_Tapped">
+                                        <Grid
+                                            ColumnDefinitions="Auto,*,40"
+                                            VerticalAlignment="Center">
+                                            <Button
+                                                x:Name="SecondaryOverflowBreadcrumbButton"
+                                                Grid.Column="0"
+                                                Padding="4,0,4,0"
+                                                Margin="0,0,4,0"
+                                                MinWidth="0"
+                                                MinHeight="0"
+                                                Background="Transparent"
+                                                BorderBrush="Transparent"
+                                                BorderThickness="0"
+                                                Visibility="Collapsed"
+                                                Click="SecondaryOverflowBreadcrumbButton_Click">
+                                                <FontIcon
+                                                    FontFamily="Segoe Fluent Icons"
+                                                    FontSize="12"
+                                                    Glyph="&#xE712;" />
+                                            </Button>
+                                            <ItemsControl
+                                                x:Name="SecondaryBreadcrumbMeasureItemsControl"
+                                                Grid.Column="1"
+                                                Opacity="0"
+                                                IsHitTestVisible="False"
+                                                HorizontalAlignment="Left"
+                                                ItemsSource="{x:Bind SecondaryPaneBreadcrumbs, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="2" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                                                        <Grid
+                                                            ColumnDefinitions="Auto,Auto"
+                                                            Loaded="SecondaryMeasureBreadcrumbItem_Loaded"
+                                                            SizeChanged="SecondaryMeasureBreadcrumbItem_SizeChanged">
+                                                            <Button
+                                                                Padding="6,0,6,0"
+                                                                MinWidth="0"
+                                                                MinHeight="0"
+                                                                Background="Transparent"
+                                                                BorderBrush="Transparent"
+                                                                BorderThickness="0"
+                                                                IsHitTestVisible="False">
+                                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="{Binding IconGlyph}"
+                                                                        Visibility="{Binding IconVisibility}" />
+                                                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button
+                                                                Grid.Column="1"
+                                                                Padding="4,0,4,0"
+                                                                MinWidth="0"
+                                                                MinHeight="0"
+                                                                Background="Transparent"
+                                                                BorderBrush="Transparent"
+                                                                BorderThickness="0"
+                                                                Visibility="{Binding ChevronVisibility}"
+                                                                IsHitTestVisible="False">
+                                                                <Button.Content>
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="&#xE76C;" />
+                                                                </Button.Content>
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <ItemsControl
+                                                x:Name="SecondaryBreadcrumbItemsControl"
+                                                Grid.Column="1"
+                                                HorizontalAlignment="Left"
+                                                ItemsSource="{x:Bind SecondaryPaneVisibleBreadcrumbs, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="2" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                                                        <Grid ColumnDefinitions="Auto,Auto">
+                                                            <Button
+                                                                Padding="6,0,6,0"
+                                                                MinWidth="0"
+                                                                MinHeight="0"
+                                                                Background="Transparent"
+                                                                BorderBrush="Transparent"
+                                                                BorderThickness="0"
+                                                                Tag="{Binding FullPath}"
+                                                                Click="SecondaryBreadcrumbButton_Click">
+                                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="{Binding IconGlyph}"
+                                                                        Visibility="{Binding IconVisibility}" />
+                                                                    <TextBlock
+                                                                        Text="{Binding Label}"
+                                                                        TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button
+                                                                Grid.Column="1"
+                                                                Padding="4,0,4,0"
+                                                                MinWidth="0"
+                                                                MinHeight="0"
+                                                                Background="Transparent"
+                                                                BorderBrush="Transparent"
+                                                                BorderThickness="0"
+                                                                Tag="{Binding FullPath}"
+                                                                Visibility="{Binding ChevronVisibility}"
+                                                                Click="SecondaryBreadcrumbChevronButton_Click">
+                                                                <Button.Content>
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="&#xE76C;" />
+                                                                </Button.Content>
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Visibility="{x:Bind SecondaryPaneAddressTextFallbackVisibility, Mode=OneWay}"
+                                                Text="{x:Bind SecondaryPaneDisplayAddressText, Mode=OneWay}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <Grid
+                                                x:Name="SecondaryAddressEditHitTarget"
+                                                Grid.Column="2"
+                                                Background="Transparent" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBox
+                                        x:Name="SecondaryPaneAddressTextBox"
+                                        Padding="12,6,36,0"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
+                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
+                                        Foreground="{ThemeResource InactivePaneForegroundBrush}"
+                                        HorizontalAlignment="Stretch"
+                                        Text="{x:Bind SecondaryPaneAddressEditorText, Mode=TwoWay}"
+                                        GotFocus="SecondaryPaneInput_GotFocus"
+                                        PointerPressed="SecondaryPaneInput_PointerPressed"
+                                        TextChanged="SecondaryPaneAddressTextBox_TextChanged"
+                                        Visibility="Collapsed"
+                                        KeyDown="SecondaryPaneAddressTextBox_KeyDown" />
+                                </Grid>
+                    </controls:ExplorerPaneNavigationBar.AddressContent>
+                    <controls:ExplorerPaneNavigationBar.SearchContent>
+                                <Grid>
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="SecondarySearchChromeStates">
+                                            <VisualState x:Name="SecondarySearchChromeInactive" />
+                                            <VisualState x:Name="SecondarySearchChromeActive">
+                                                <VisualState.StateTriggers>
+                                                    <controls:BoolStateTrigger Value="{x:Bind IsSecondaryWorkspacePanelActive, Mode=OneWay}" />
+                                                </VisualState.StateTriggers>
+                                                <VisualState.Setters>
+                                                    <Setter Target="SecondaryPaneSearchTextBox.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="SecondaryPaneSearchTextBox.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="SecondaryPaneSearchTextBox.Foreground" Value="{ThemeResource ActivePaneForegroundBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <TextBox
+                                        x:Name="SecondaryPaneSearchTextBox"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="12,5,12,4"
+                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
+                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
+                                        Foreground="{ThemeResource InactivePaneForegroundBrush}"
+                                        HorizontalAlignment="Stretch"
+                                        PlaceholderText="{x:Bind SecondaryPaneSearchPlaceholderText, Mode=OneWay}"
+                                        Text="{x:Bind SecondaryPaneSearchText, Mode=TwoWay}"
+                                        GotFocus="SecondaryPaneInput_GotFocus"
+                                        PointerPressed="SecondaryPaneInput_PointerPressed"
+                                        TextChanged="SecondaryPaneSearchTextBox_TextChanged"
+                                        KeyDown="SecondaryPaneSearchTextBox_KeyDown" />
+                                </Grid>
+                    </controls:ExplorerPaneNavigationBar.SearchContent>
+                </controls:ExplorerPaneNavigationBar>
             </Grid>
         </Grid>
 
@@ -753,8 +1016,8 @@
                             x:Name="ExplorerBodyBorder"
                             Padding="0"
                             Background="{x:Bind PrimaryPaneBodyBackground, Mode=OneWay}"
-                            BorderBrush="{x:Bind PrimaryPaneBorderBrush, Mode=OneWay}"
-                            BorderThickness="1"
+                            BorderBrush="{x:Bind PrimaryPaneBodyBorderBrush, Mode=OneWay}"
+                            BorderThickness="{x:Bind PrimaryPaneBodyBorderThickness, Mode=OneWay}"
                             CornerRadius="{ThemeResource OverlayCornerRadius}"
                             Loaded="ExplorerBodyBorder_Loaded"
                             Translation="{x:Bind PrimaryPaneBodyTranslation, Mode=OneWay}">
@@ -788,9 +1051,7 @@
 
                                 <Border
                                     x:Name="NameHeaderBorder"
-                                    Background="Transparent"
-                                    CornerRadius="4"
-                                    Padding="0,0,10,0"
+                                    Style="{StaticResource DetailsHeaderHitTargetStyle}"
                                     PointerEntered="DetailsHeader_PointerEntered"
                                     PointerExited="DetailsHeader_PointerExited"
                                     PointerPressed="DetailsHeader_PointerPressed"
@@ -804,23 +1065,17 @@
                                         <TextBlock
                                             x:Name="NameHeaderTextBlock"
                                             x:Uid="NameHeaderTextBlock"
-                                            FontSize="12"
-                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                            Opacity="0.72" />
+                                            Style="{StaticResource DetailsHeaderTextStyle}" />
                                         <TextBlock
                                             x:Name="NameHeaderSortGlyphTextBlock"
                                             Grid.Column="2"
-                                            FontSize="11"
-                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                            Visibility="Collapsed" />
+                                            Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
                                     </Grid>
                                 </Border>
                                 <Border
                                     x:Name="TypeHeaderBorder"
                                     Grid.Column="2"
-                                    Background="Transparent"
-                                    CornerRadius="4"
-                                    Padding="0,0,10,0"
+                                    Style="{StaticResource DetailsHeaderHitTargetStyle}"
                                     PointerEntered="DetailsHeader_PointerEntered"
                                     PointerExited="DetailsHeader_PointerExited"
                                     PointerPressed="DetailsHeader_PointerPressed"
@@ -834,23 +1089,17 @@
                                         <TextBlock
                                             x:Name="TypeHeaderTextBlock"
                                             x:Uid="TypeHeaderTextBlock"
-                                            FontSize="12"
-                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                            Opacity="0.72" />
+                                            Style="{StaticResource DetailsHeaderTextStyle}" />
                                         <TextBlock
                                             x:Name="TypeHeaderSortGlyphTextBlock"
                                             Grid.Column="2"
-                                            FontSize="11"
-                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                            Visibility="Collapsed" />
+                                            Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
                                     </Grid>
                                 </Border>
                                 <Border
                                     x:Name="SizeHeaderBorder"
                                     Grid.Column="4"
-                                    Background="Transparent"
-                                    CornerRadius="4"
-                                    Padding="0,0,10,0"
+                                    Style="{StaticResource DetailsHeaderHitTargetStyle}"
                                     PointerEntered="DetailsHeader_PointerEntered"
                                     PointerExited="DetailsHeader_PointerExited"
                                     PointerPressed="DetailsHeader_PointerPressed"
@@ -864,24 +1113,18 @@
                                         <TextBlock
                                             x:Name="SizeHeaderTextBlock"
                                             x:Uid="SizeHeaderTextBlock"
-                                            FontSize="12"
-                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                            Opacity="0.72" />
+                                            Style="{StaticResource DetailsHeaderTextStyle}" />
                                         <TextBlock
                                             x:Name="SizeHeaderSortGlyphTextBlock"
                                             Grid.Column="2"
-                                            FontSize="11"
-                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                            Visibility="Collapsed" />
+                                            Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
                                     </Grid>
                                 </Border>
                                 <Border
                                     x:Name="ModifiedHeaderBorder"
                                     Grid.Column="6"
                                     Margin="0,0,6,0"
-                                    Background="Transparent"
-                                    CornerRadius="4"
-                                    Padding="0,0,10,0"
+                                    Style="{StaticResource DetailsHeaderHitTargetStyle}"
                                     PointerEntered="DetailsHeader_PointerEntered"
                                     PointerExited="DetailsHeader_PointerExited"
                                     PointerPressed="DetailsHeader_PointerPressed"
@@ -895,15 +1138,11 @@
                                         <TextBlock
                                             x:Name="ModifiedHeaderTextBlock"
                                             x:Uid="ModifiedHeaderTextBlock"
-                                            FontSize="12"
-                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                            Opacity="0.72" />
+                                            Style="{StaticResource DetailsHeaderTextStyle}" />
                                         <TextBlock
                                             x:Name="ModifiedHeaderSortGlyphTextBlock"
                                             Grid.Column="2"
-                                            FontSize="11"
-                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                            Visibility="Collapsed" />
+                                            Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
                                     </Grid>
                                 </Border>
 
@@ -956,7 +1195,7 @@
                             PointerPressed="GroupedEntriesView_PointerPressedPreview"
                             RightTapped="GroupedEntriesView_RightTapped"
                             Visibility="{x:Bind DetailsItemsVisibility, Mode=OneWay}">
-                            <ItemsRepeater x:Name="DetailsEntriesRepeater" ItemsSource="{x:Bind _entries, Mode=OneWay}">
+                            <ItemsRepeater x:Name="DetailsEntriesRepeater" ItemsSource="{x:Bind PrimaryEntries, Mode=OneWay}">
                                 <ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
                                         <Grid RowDefinitions="Auto,Auto">
@@ -1053,7 +1292,7 @@
                             PointerPressed="GroupedEntriesView_PointerPressedPreview"
                             RightTapped="GroupedEntriesView_RightTapped"
                             Visibility="{x:Bind GroupedColumnsVisibility, Mode=OneWay}">
-                            <ItemsRepeater x:Name="GroupedEntriesRepeater" ItemsSource="{x:Bind _entries, Mode=OneWay}">
+                            <ItemsRepeater x:Name="GroupedEntriesRepeater" ItemsSource="{x:Bind PrimaryEntries, Mode=OneWay}">
                                 <ItemsRepeater.ItemTemplate>
                                     <DataTemplate>
                                         <Grid>
@@ -1204,69 +1443,6 @@
                             </Grid.Resources>
                         </Grid>
 
-                        <Canvas x:Name="RenameOverlayCanvas" Grid.Row="1" Margin="0,8,0,0">
-                            <Border
-                                x:Name="RenameOverlayBorder"
-                                Width="160"
-                                Height="24"
-                                Background="{ThemeResource TextControlBackgroundFocused}"
-                                BorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
-                                BorderThickness="1"
-                                Padding="1,0,8,1"
-                                CornerRadius="0"
-                                Visibility="Collapsed">
-                                <TextBox
-                                    x:Name="RenameOverlayTextBox"
-                                    Background="Transparent"
-                                    BeforeTextChanging="RenameOverlayTextBox_BeforeTextChanging"
-                                    BorderBrush="Transparent"
-                                    BorderThickness="0"
-                                    FontSize="14"
-                                    FocusVisualPrimaryThickness="0"
-                                    FocusVisualSecondaryThickness="0"
-                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                    HorizontalContentAlignment="Left"
-                                    KeyDown="RenameOverlayTextBox_KeyDown"
-                                    LostFocus="RenameOverlayTextBox_LostFocus"
-                                    MinHeight="24"
-                                    Padding="0"
-                                    TextAlignment="Left"
-                                    TextChanging="RenameOverlayTextBox_TextChanging"
-                                    Margin="0,-2,0,0"
-                                    UseSystemFocusVisuals="False"
-                                    VerticalContentAlignment="Center">
-                                    <TextBox.Template>
-                                        <ControlTemplate TargetType="TextBox">
-                                            <Grid>
-                                                <Border
-                                                    x:Name="BorderElement"
-                                                    Background="Transparent"
-                                                    BorderBrush="Transparent"
-                                                    BorderThickness="0"
-                                                    Control.IsTemplateFocusTarget="True" />
-                                                <ScrollViewer
-                                                    x:Name="ContentElement"
-                                                    AutomationProperties.AccessibilityView="Raw"
-                                                    Foreground="{TemplateBinding Foreground}"
-                                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                    HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
-                                                    HorizontalScrollMode="{TemplateBinding ScrollViewer.HorizontalScrollMode}"
-                                                    IsDeferredScrollingEnabled="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
-                                                    IsHorizontalRailEnabled="{TemplateBinding ScrollViewer.IsHorizontalRailEnabled}"
-                                                    IsTabStop="False"
-                                                    IsVerticalRailEnabled="{TemplateBinding ScrollViewer.IsVerticalRailEnabled}"
-                                                    Margin="{TemplateBinding BorderThickness}"
-                                                    Padding="{TemplateBinding Padding}"
-                                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                    VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
-                                                    VerticalScrollMode="{TemplateBinding ScrollViewer.VerticalScrollMode}"
-                                                    ZoomMode="Disabled" />
-                                            </Grid>
-                                        </ControlTemplate>
-                                    </TextBox.Template>
-                                </TextBox>
-                            </Border>
-                        </Canvas>
                             </Grid>
                         </Border>
 
@@ -1347,11 +1523,225 @@
                         x:Name="ExplorerPaneActionRailHost"
                         Grid.Column="1"
                         Visibility="{x:Bind ExplorerPaneActionRailVisibility, Mode=OneWay}">
+                        <local:ColumnSplitter
+                            x:Name="ExplorerPaneLeftSplitter"
+                            AutomationProperties.AutomationId="ExplorerPaneLeftSplitter"
+                            AutomationProperties.Name="调整主面板宽度"
+                            Width="{x:Bind ShellSplitterWidth, Mode=OneWay}"
+                            Margin="-4,0,0,0"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            GuideBrush="{ThemeResource SidebarGroupSeparatorBrush}"
+                            ShowGuide="False"
+                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                            PointerExited="ColumnSplitterHover_PointerExited"
+                            PointerPressed="PaneSplitter_PointerPressed"
+                            PointerMoved="PaneSplitter_PointerMoved"
+                            PointerReleased="PaneSplitter_PointerReleased"
+                            PointerCanceled="PaneSplitter_PointerReleased"
+                            PointerCaptureLost="PaneSplitter_PointerReleased" />
+                        <local:ColumnSplitter
+                            x:Name="ExplorerPaneRightSplitter"
+                            AutomationProperties.AutomationId="ExplorerPaneRightSplitter"
+                            AutomationProperties.Name="调整次面板宽度"
+                            Width="{x:Bind ShellSplitterWidth, Mode=OneWay}"
+                            Margin="0,0,-4,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Stretch"
+                            GuideBrush="{ThemeResource SidebarGroupSeparatorBrush}"
+                            ShowGuide="False"
+                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                            PointerExited="ColumnSplitterHover_PointerExited"
+                            PointerPressed="PaneSplitter_PointerPressed"
+                            PointerMoved="PaneSplitter_PointerMoved"
+                            PointerReleased="PaneSplitter_PointerReleased"
+                            PointerCanceled="PaneSplitter_PointerReleased"
+                            PointerCaptureLost="PaneSplitter_PointerReleased" />
                         <StackPanel
                             x:Name="ExplorerPaneActionButtonsHost"
                             Orientation="Vertical"
                             HorizontalAlignment="Center"
-                            VerticalAlignment="Center" />
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <Button
+                                x:Name="CopySelectedPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopySelectedPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制左侧选中项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B5;" />
+                            </Button>
+                            <Button
+                                x:Name="CopyAllPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopyAllPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制左侧全部项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B6;" />
+                            </Button>
+                            <Button
+                                x:Name="MoveSelectedPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveSelectedPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动左侧选中项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xEDE1;" />
+                            </Button>
+                            <Button
+                                x:Name="MoveAllPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveAllPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动左侧全部项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <controls:ExportAllIcon />
+                            </Button>
+                            <Button
+                                x:Name="SyncPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SyncPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="左侧同步到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE72A;" />
+                            </Button>
+                            <Button
+                                x:Name="SwapExplorerPanesButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SwapExplorerPanesButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="交换左右面板" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8AB;" />
+                            </Button>
+                            <Button
+                                x:Name="SyncSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SyncSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="右侧同步到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE72B;" />
+                            </Button>
+                            <Button
+                                x:Name="CopySelectedSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopySelectedSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制右侧选中项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B5;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="CopyAllSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopyAllSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制右侧全部项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B6;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="MoveSelectedSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveSelectedSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动右侧选中项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xEDE1;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="MoveAllSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveAllSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动右侧全部项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <controls:ExportAllIcon RenderTransformOrigin="0.5,0.5">
+                                    <controls:ExportAllIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </controls:ExportAllIcon.RenderTransform>
+                                </controls:ExportAllIcon>
+                            </Button>
+                        </StackPanel>
                     </Grid>
 
                     <Grid
@@ -1363,29 +1753,322 @@
                         <Border
                             x:Name="SecondaryPaneBodyBorder"
                             Background="{x:Bind SecondaryPaneBodyBackground, Mode=OneWay}"
-                            BorderBrush="{x:Bind SecondaryPaneBorderBrush, Mode=OneWay}"
-                            BorderThickness="1"
+                            BorderBrush="{x:Bind SecondaryPaneBodyBorderBrush, Mode=OneWay}"
+                            BorderThickness="{x:Bind SecondaryPaneBodyBorderThickness, Mode=OneWay}"
                             CornerRadius="{ThemeResource OverlayCornerRadius}"
                             Loaded="SecondaryPaneBodyBorder_Loaded"
                             Translation="{x:Bind SecondaryPaneBodyTranslation, Mode=OneWay}">
                             <Border.Shadow>
                                 <ThemeShadow x:Name="SecondaryPaneBodyThemeShadow" />
                             </Border.Shadow>
-                            <Grid>
+                            <Grid RowDefinitions="Auto,*">
+                                <Border
+                                    x:Name="SecondaryDetailsHeaderBorder"
+                                    Width="{x:Bind SecondaryDetailsRowWidth, Mode=OneWay}"
+                                    Margin="10,0,0,4"
+                                    Padding="0"
+                                    HorizontalAlignment="Left"
+                                    Background="Transparent"
+                                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Visibility="{x:Bind SecondaryDetailsHeaderVisibility, Mode=OneWay}">
+                                    <Grid x:Name="SecondaryDetailsHeaderGrid" Height="28" Margin="0" HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryNameColumnWidth}" MinWidth="120" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryTypeColumnWidth}" MinWidth="90" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondarySizeColumnWidth}" MinWidth="80" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryModifiedColumnWidth}" MinWidth="120" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border
+                                            x:Name="SecondaryNameHeaderBorder"
+                                            Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                            PointerEntered="SecondaryDetailsHeader_PointerEntered"
+                                            PointerExited="SecondaryDetailsHeader_PointerExited"
+                                            PointerPressed="SecondaryDetailsHeader_PointerPressed"
+                                            Tag="Name">
+                                            <Grid Margin="{Binding ElementName=RootWindow, Path=NameHeaderMargin}" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    x:Name="SecondaryNameHeaderTextBlock"
+                                                    Style="{StaticResource DetailsHeaderTextStyle}" />
+                                                <TextBlock
+                                                    x:Name="SecondaryNameHeaderSortGlyphTextBlock"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border
+                                            x:Name="SecondaryTypeHeaderBorder"
+                                            Grid.Column="2"
+                                            Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                            PointerEntered="SecondaryDetailsHeader_PointerEntered"
+                                            PointerExited="SecondaryDetailsHeader_PointerExited"
+                                            PointerPressed="SecondaryDetailsHeader_PointerPressed"
+                                            Tag="Type">
+                                            <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    x:Name="SecondaryTypeHeaderTextBlock"
+                                                    Style="{StaticResource DetailsHeaderTextStyle}" />
+                                                <TextBlock
+                                                    x:Name="SecondaryTypeHeaderSortGlyphTextBlock"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border
+                                            x:Name="SecondarySizeHeaderBorder"
+                                            Grid.Column="4"
+                                            Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                            PointerEntered="SecondaryDetailsHeader_PointerEntered"
+                                            PointerExited="SecondaryDetailsHeader_PointerExited"
+                                            PointerPressed="SecondaryDetailsHeader_PointerPressed"
+                                            Tag="Size">
+                                            <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    x:Name="SecondarySizeHeaderTextBlock"
+                                                    Style="{StaticResource DetailsHeaderTextStyle}" />
+                                                <TextBlock
+                                                    x:Name="SecondarySizeHeaderSortGlyphTextBlock"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border
+                                            x:Name="SecondaryModifiedHeaderBorder"
+                                            Grid.Column="6"
+                                            Margin="0,0,6,0"
+                                            Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                            PointerEntered="SecondaryDetailsHeader_PointerEntered"
+                                            PointerExited="SecondaryDetailsHeader_PointerExited"
+                                            PointerPressed="SecondaryDetailsHeader_PointerPressed"
+                                            Tag="ModifiedDate">
+                                            <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    x:Name="SecondaryModifiedHeaderTextBlock"
+                                                    Style="{StaticResource DetailsHeaderTextStyle}" />
+                                                <TextBlock
+                                                    x:Name="SecondaryModifiedHeaderSortGlyphTextBlock"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                            </Grid>
+                                        </Border>
+                                        <local:ColumnSplitter
+                                            x:Name="SecondaryHeaderSplitter1"
+                                            Grid.Column="1"
+                                            GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                            Tag="S1"
+                                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                                            PointerExited="ColumnSplitterHover_PointerExited" />
+                                        <local:ColumnSplitter
+                                            x:Name="SecondaryHeaderSplitter2"
+                                            Grid.Column="3"
+                                            GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                            Tag="S2"
+                                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                                            PointerExited="ColumnSplitterHover_PointerExited" />
+                                        <local:ColumnSplitter
+                                            x:Name="SecondaryHeaderSplitter3"
+                                            Grid.Column="5"
+                                            GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                            Tag="S3"
+                                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                                            PointerExited="ColumnSplitterHover_PointerExited" />
+                                        <local:ColumnSplitter
+                                            x:Name="SecondaryHeaderSplitter4"
+                                            Grid.ColumnSpan="7"
+                                            HorizontalAlignment="Right"
+                                            GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                            Tag="S4"
+                                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                                            PointerExited="ColumnSplitterHover_PointerExited" />
+                                    </Grid>
+                                </Border>
+
+                                <ScrollViewer
+                                    x:Name="SecondaryEntriesScrollViewer"
+                                    Grid.Row="1"
+                                    IsTabStop="True"
+                                    UseSystemFocusVisuals="False"
+                                    Margin="0"
+                                    HorizontalAlignment="Stretch"
+                                    Padding="10,4"
+                                    HorizontalScrollBarVisibility="Auto"
+                                    HorizontalScrollMode="Enabled"
+                                    VerticalScrollBarVisibility="Visible"
+                                    VerticalScrollMode="Enabled"
+                                    Background="Transparent"
+                                    DoubleTapped="SecondaryEntriesView_DoubleTapped"
+                                    PointerPressed="SecondaryPaneSurface_PointerPressed"
+                                    RightTapped="SecondaryEntriesView_RightTapped"
+                                    Visibility="{x:Bind SecondaryPaneItemsVisibility, Mode=OneWay}">
+                                    <ItemsRepeater
+                                        x:Name="SecondaryEntriesRepeater"
+                                        ItemsSource="{x:Bind SecondaryPaneEntries, Mode=OneWay}">
+                                        <ItemsRepeater.ItemTemplate>
+                                            <DataTemplate>
+                                                <controls:EntryItemHost
+                                                    Margin="0,2,0,2"
+                                                    Width="{Binding ElementName=RootWindow, Path=SecondaryDetailsRowWidth}"
+                                                    MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
+                                                    Padding="0,3,0,3"
+                                                    Background="Transparent"
+                                                    IndicatorBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
+                                                    IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
+                                                    IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
+                                                    AnchorBorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
+                                                    HorizontalAlignment="Left"
+                                                    PointerPressed="SecondaryEntryRow_PointerPressed"
+                                                    RightTapped="SecondaryEntryRow_RightTapped"
+                                                    SelectedBackground="{Binding RowBackground}"
+                                                    SelectedPointerOverBackground="{Binding RowBackground}"
+                                                    SelectedPressedBackground="{Binding RowBackground}"
+                                                    Loaded="SecondaryEntryRow_Loaded">
+                                                    <Grid
+                                                        Margin="6,0,0,0"
+                                                        HorizontalAlignment="Stretch"
+                                                        Loaded="SecondaryDetailsRowGrid_Loaded">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryNameColumnWidth}" MinWidth="120" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryTypeColumnWidth}" MinWidth="90" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondarySizeColumnWidth}" MinWidth="80" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryModifiedColumnWidth}" MinWidth="120" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <controls:EntryNameCell
+                                                            Grid.Column="0"
+                                                            ContentMargin="{Binding ElementName=RootWindow, Path=DetailsNameCellMargin}"
+                                                            Entry="{Binding}"
+                                                            Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
+                                                            VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding Type}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="4" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SizeText}" />
+                                                        <TextBlock Grid.Column="6" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding ModifiedText}" />
+                                                    </Grid>
+                                                </controls:EntryItemHost>
+                                            </DataTemplate>
+                                        </ItemsRepeater.ItemTemplate>
+                                    </ItemsRepeater>
+                                </ScrollViewer>
+
                                 <TextBlock
+                                    Grid.RowSpan="2"
                                     HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource InactivePaneForegroundBrush}"
                                     VerticalAlignment="Center"
                                     Opacity="0.72"
+                                    Visibility="{x:Bind SecondaryPanePlaceholderVisibility, Mode=OneWay}"
                                     Text="{x:Bind SecondaryPanePlaceholderText, Mode=OneWay}" />
                             </Grid>
                         </Border>
                     </Grid>
+
+                    <Canvas
+                        x:Name="RenameOverlayCanvas"
+                        Grid.ColumnSpan="3"
+                        Margin="0,8,0,0"
+                        IsHitTestVisible="True">
+                        <Border
+                            x:Name="RenameOverlayBorder"
+                            Width="160"
+                            Height="24"
+                            Background="{ThemeResource TextControlBackgroundFocused}"
+                            BorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
+                            BorderThickness="1"
+                            Padding="1,0,8,1"
+                            CornerRadius="0"
+                            IsHitTestVisible="True"
+                            Visibility="Collapsed">
+                            <TextBox
+                                x:Name="RenameOverlayTextBox"
+                                Background="Transparent"
+                                BeforeTextChanging="RenameOverlayTextBox_BeforeTextChanging"
+                                BorderBrush="Transparent"
+                                BorderThickness="0"
+                                FontSize="14"
+                                FocusVisualPrimaryThickness="0"
+                                FocusVisualSecondaryThickness="0"
+                                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                HorizontalContentAlignment="Left"
+                                KeyDown="RenameOverlayTextBox_KeyDown"
+                                LostFocus="RenameOverlayTextBox_LostFocus"
+                                MinHeight="24"
+                                Padding="0"
+                                TextAlignment="Left"
+                                TextChanging="RenameOverlayTextBox_TextChanging"
+                                Margin="0,-2,0,0"
+                                UseSystemFocusVisuals="False"
+                                VerticalContentAlignment="Center">
+                                <TextBox.Template>
+                                    <ControlTemplate TargetType="TextBox">
+                                        <Grid>
+                                            <Border
+                                                x:Name="BorderElement"
+                                                Background="Transparent"
+                                                BorderBrush="Transparent"
+                                                BorderThickness="0"
+                                                Control.IsTemplateFocusTarget="True" />
+                                            <ScrollViewer
+                                                x:Name="ContentElement"
+                                                AutomationProperties.AccessibilityView="Raw"
+                                                Foreground="{TemplateBinding Foreground}"
+                                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                                HorizontalScrollMode="{TemplateBinding ScrollViewer.HorizontalScrollMode}"
+                                                IsDeferredScrollingEnabled="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
+                                                IsHorizontalRailEnabled="{TemplateBinding ScrollViewer.IsHorizontalRailEnabled}"
+                                                IsTabStop="False"
+                                                IsVerticalRailEnabled="{TemplateBinding ScrollViewer.IsVerticalRailEnabled}"
+                                                Margin="{TemplateBinding BorderThickness}"
+                                                Padding="{TemplateBinding Padding}"
+                                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
+                                                VerticalScrollMode="{TemplateBinding ScrollViewer.VerticalScrollMode}"
+                                                ZoomMode="Disabled" />
+                                        </Grid>
+                                    </ControlTemplate>
+                                </TextBox.Template>
+                            </TextBox>
+                        </Border>
+                    </Canvas>
                 </Grid>
 
                 <Grid Grid.Row="1" Height="{x:Bind ShellStatusBarHeight, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="PrimaryStatusPaneColumn" Width="{x:Bind ExplorerPanePrimaryColumnWidth, Mode=OneWay}" />
+                        <ColumnDefinition x:Name="ExplorerPaneActionRailStatusColumn" Width="{x:Bind ExplorerPaneActionRailColumnWidth, Mode=OneWay}" />
+                        <ColumnDefinition x:Name="SecondaryStatusPaneColumn" Width="{x:Bind ExplorerPaneSecondaryColumnWidth, Mode=OneWay}" />
+                    </Grid.ColumnDefinitions>
+
                     <TextBlock
-                        x:Name="StatusTextBlock"
-                        x:Uid="StatusTextBlock"
+                        x:Name="PrimaryStatusTextBlock"
                         Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
                         VerticalAlignment="Center"
                         FontSize="11"
@@ -1393,7 +2076,22 @@
                         LineHeight="11"
                         LineStackingStrategy="BlockLineHeight"
                         Opacity="0.72"
+                        Text="{x:Bind PrimaryPaneStatusText, Mode=OneWay}"
                         TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                    <TextBlock
+                        x:Name="SecondaryStatusTextBlock"
+                        Grid.Column="2"
+                        Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                        LineHeight="11"
+                        LineStackingStrategy="BlockLineHeight"
+                        Opacity="0.72"
+                        Text="{x:Bind SecondaryPaneStatusText, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}"
                         TextWrapping="NoWrap" />
                 </Grid>
         </Grid>
@@ -1407,9 +2105,53 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Top"
             Background="Transparent"
+            Loaded="TitleBarDragRegion_Loaded"
+            SizeChanged="TitleBarDragRegion_SizeChanged"
             Visibility="{x:Bind SettingsShellVisibility, Mode=OneWay}" />
 
         <StackPanel Grid.RowSpan="3" Grid.ColumnSpan="2" Visibility="Collapsed">
+            <TextBlock
+                x:Name="TitleBarPrimaryBrushProbe"
+                Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+            <TextBlock
+                x:Name="TitleBarSecondaryBrushProbe"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock
+                x:Name="DetailsHeaderSecondaryBrushProbe"
+                Foreground="{ThemeResource DetailsHeaderSecondaryForegroundBrush}" />
+            <TextBlock
+                x:Name="ActivePaneForegroundBrushProbe"
+                Foreground="{ThemeResource ActivePaneForegroundBrush}" />
+            <TextBlock
+                x:Name="InactivePaneForegroundBrushProbe"
+                Foreground="{ThemeResource InactivePaneForegroundBrush}" />
+            <Border
+                x:Name="ActiveTabBackgroundBrushProbe"
+                Background="{ThemeResource TitleBarActiveTabPillBackgroundBrush}" />
+            <Border
+                x:Name="ActivePaneToolbarBrushProbe"
+                Background="{ThemeResource ActivePaneSurfaceBackgroundBrush}"
+                BorderBrush="{ThemeResource ActivePaneBorderBrush}" />
+            <Border
+                x:Name="InactivePaneToolbarBrushProbe"
+                Background="{ThemeResource InactivePaneSurfaceBackgroundBrush}"
+                BorderBrush="{ThemeResource InactivePaneBorderBrush}" />
+            <Border
+                x:Name="ActivePaneBodyBrushProbe"
+                Background="{ThemeResource ActivePaneSurfaceBackgroundBrush}"
+                BorderBrush="{ThemeResource ActivePaneBorderBrush}" />
+            <Border
+                x:Name="InactivePaneBodyBrushProbe"
+                Background="{ThemeResource InactivePaneSurfaceBackgroundBrush}"
+                BorderBrush="{ThemeResource InactivePaneBorderBrush}" />
+            <Border
+                x:Name="ActivePaneInputBrushProbe"
+                Background="{ThemeResource ActivePaneInputBackgroundBrush}"
+                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" />
+            <Border
+                x:Name="InactivePaneInputBrushProbe"
+                Background="{ThemeResource InactivePaneInputBackgroundBrush}"
+                BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}" />
             <Button
                 x:Name="NewFileButton"
                 Click="NewFileButton_Click" />
@@ -1499,7 +2241,13 @@
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <controls:SettingsView x:Name="SettingsViewControl" />
+            <Border
+                x:Name="SettingsContentHostBorder"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderThickness="0"
+                CornerRadius="{ThemeResource OverlayCornerRadius}">
+                <controls:SettingsView x:Name="SettingsViewControl" />
+            </Border>
         </NavigationView>
     </Grid>
 </Window>

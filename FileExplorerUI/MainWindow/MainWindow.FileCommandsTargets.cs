@@ -18,7 +18,10 @@ namespace FileExplorerUI
         private Task ExecutePasteForTargetAsync(FileCommandTarget target)
         {
             string targetPath = target.Path ?? string.Empty;
-            bool selectPastedEntry = string.Equals(targetPath, _currentPath, StringComparison.OrdinalIgnoreCase);
+            bool selectPastedEntry = string.Equals(
+                targetPath,
+                GetPanelCurrentPath(WorkspacePanelId.Primary),
+                StringComparison.OrdinalIgnoreCase);
             return PasteIntoDirectoryAsync(targetPath, selectPastedEntry);
         }
 
@@ -74,223 +77,51 @@ namespace FileExplorerUI
 
         private async Task ExecuteCreateShortcutCommandAsync(FileCommandTarget target)
         {
-            if (string.IsNullOrWhiteSpace(target.Path))
-            {
-                return;
-            }
-
-            if (!TryEnsureCurrentDirectoryAvailable(out string errorMessage))
-            {
-                UpdateStatusKey("StatusCreateShortcutFailed", errorMessage);
-                return;
-            }
-
-            try
-            {
-                SuppressNextWatcherRefresh(_currentPath);
-                FileOperationResult<CreatedEntryInfo> createResult = await _fileManagementCoordinator.TryCreateShortcutAsync(_currentPath, target.Path);
-                if (!createResult.Succeeded)
-                {
-                    UpdateStatusKey("StatusCreateShortcutFailed", createResult.Failure?.Message ?? S("ErrorFileOperationUnknown"));
-                    return;
-                }
-                CreatedEntryInfo created = createResult.Value!;
-                if (!created.ChangeNotified)
-                {
-                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, "create-shortcut");
-                }
-
-                _selectedEntryPath = created.FullPath;
-                await LoadFirstPageAsync();
-                _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
-                UpdateFileCommandStates();
-                UpdateStatusKey("StatusCreateShortcutSuccess", created.Name);
-            }
-            catch (Exception ex)
-            {
-                UpdateStatusKey("StatusCreateShortcutFailed", FileOperationErrors.ToUserMessage(ex));
-            }
+            await ExecuteCreateShortcutForPaneCoreInternalAsync(WorkspacePanelId.Primary, target);
         }
 
         private async Task ExecuteCompressZipCommandAsync(FileCommandTarget target)
         {
-            if (string.IsNullOrWhiteSpace(target.Path))
-            {
-                return;
-            }
-
-            try
-            {
-                string sourcePath = target.Path;
-                string destinationDirectory = Path.GetDirectoryName(sourcePath.TrimEnd('\\')) ?? _currentPath;
-                if (string.IsNullOrWhiteSpace(destinationDirectory) || !_explorerService.DirectoryExists(destinationDirectory))
-                {
-                    UpdateStatusKey("StatusCompressZipFailed", S("ErrorCurrentFolderUnavailable"));
-                    return;
-                }
-
-                string archiveName = _explorerService.GenerateUniqueZipArchiveName(destinationDirectory, sourcePath);
-                string archivePath = Path.Combine(destinationDirectory, archiveName);
-
-                bool destinationIsCurrentDirectory =
-                    string.Equals(destinationDirectory, _currentPath, StringComparison.OrdinalIgnoreCase);
-                double detailsVerticalOffset = DetailsEntriesScrollViewer.VerticalOffset;
-                double groupedHorizontalOffset = GroupedEntriesScrollViewer.HorizontalOffset;
-                if (destinationIsCurrentDirectory)
-                {
-                    SuppressNextWatcherRefresh(_currentPath);
-                }
-
-                FileOperationResult<string> zipResult = await _fileManagementCoordinator.TryCreateZipArchiveAsync(sourcePath, archivePath);
-                if (!zipResult.Succeeded)
-                {
-                    await ShowOperationFailureDialogAsync(
-                        "CompressZipFailureDialogTitle",
-                        SF("StatusCompressZipFailed", zipResult.Failure?.Message ?? S("ErrorFileOperationUnknown")));
-                    return;
-                }
-
-                if (destinationIsCurrentDirectory)
-                {
-                    EnsurePersistentRefreshFallbackInvalidation(_currentPath, "compress-zip");
-                    _selectedEntryPath = archivePath;
-                    await LoadFirstPageAsync();
-                    _ = DispatcherQueue.TryEnqueue(() =>
-                    {
-                        if (_currentViewMode == EntryViewMode.Details)
-                        {
-                            double maxOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableHeight);
-                            DetailsEntriesScrollViewer.ChangeView(null, Math.Min(maxOffset, detailsVerticalOffset), null, disableAnimation: true);
-                        }
-                        else
-                        {
-                            double maxOffset = Math.Max(0, GroupedEntriesScrollViewer.ScrollableWidth);
-                            GroupedEntriesScrollViewer.ChangeView(Math.Min(maxOffset, groupedHorizontalOffset), null, null, disableAnimation: true);
-                        }
-
-                        RestoreListSelectionByPathRespectingViewport();
-                        FocusEntriesList();
-                    });
-                    UpdateFileCommandStates();
-                }
-
-                UpdateStatusKey("StatusCompressZipSuccess", archiveName);
-            }
-            catch (Exception ex)
-            {
-                await ShowOperationFailureDialogAsync(
-                    "CompressZipFailureDialogTitle",
-                    SF("StatusCompressZipFailed", FileOperationErrors.ToUserMessage(ex)));
-            }
+            await ExecuteCompressZipForPaneCoreInternalAsync(WorkspacePanelId.Primary, target);
         }
 
         private Task ExecuteExtractZipSmartCommandAsync(FileCommandTarget target)
         {
-            return ExecuteExtractZipCommandCoreAsync(
+            return ExecuteExtractZipForPaneCoreInternalAsync(
+                WorkspacePanelId.Primary,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipSmartAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipSmartAsync(archivePath, progress, cancellationToken),
+                "StatusExtractZipFailed",
+                "ExtractZipFailureDialogTitle",
+                "StatusExtractZipSuccess",
                 "extract-smart");
         }
 
         private Task ExecuteExtractZipHereCommandAsync(FileCommandTarget target)
         {
-            return ExecuteExtractZipCommandCoreAsync(
+            return ExecuteExtractZipForPaneCoreInternalAsync(
+                WorkspacePanelId.Primary,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipHereAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipHereAsync(archivePath, progress, cancellationToken),
+                "StatusExtractZipFailed",
+                "ExtractZipFailureDialogTitle",
+                "StatusExtractZipSuccess",
                 "extract-here");
         }
 
         private Task ExecuteExtractZipToFolderCommandAsync(FileCommandTarget target)
         {
-            return ExecuteExtractZipCommandCoreAsync(
+            return ExecuteExtractZipForPaneCoreInternalAsync(
+                WorkspacePanelId.Primary,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipToFolderAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipToFolderAsync(archivePath, progress, cancellationToken),
+                "StatusExtractZipFailed",
+                "ExtractZipFailureDialogTitle",
+                "StatusExtractZipSuccess",
                 "extract-to-folder");
-        }
-
-        private async Task ExecuteExtractZipCommandCoreAsync(
-            FileCommandTarget target,
-            Func<string, Task<FileOperationResult<ZipExtractionInfo>>> extractAsync,
-            string invalidationReason)
-        {
-            if (string.IsNullOrWhiteSpace(target.Path))
-            {
-                return;
-            }
-
-            try
-            {
-                string archivePath = target.Path;
-                string destinationDirectory = Path.GetDirectoryName(archivePath.TrimEnd('\\')) ?? _currentPath;
-                if (string.IsNullOrWhiteSpace(destinationDirectory) || !_explorerService.DirectoryExists(destinationDirectory))
-                {
-                    UpdateStatusKey("StatusExtractZipFailed", S("ErrorCurrentFolderUnavailable"));
-                    return;
-                }
-
-                bool destinationIsCurrentDirectory =
-                    string.Equals(destinationDirectory, _currentPath, StringComparison.OrdinalIgnoreCase);
-                double detailsVerticalOffset = DetailsEntriesScrollViewer.VerticalOffset;
-                double groupedHorizontalOffset = GroupedEntriesScrollViewer.HorizontalOffset;
-                if (destinationIsCurrentDirectory)
-                {
-                    SuppressNextWatcherRefresh(_currentPath);
-                }
-
-                FileOperationResult<ZipExtractionInfo> extractResult = await extractAsync(archivePath);
-                if (!extractResult.Succeeded)
-                {
-                    await ShowOperationFailureDialogAsync(
-                        "ExtractZipFailureDialogTitle",
-                        SF("StatusExtractZipFailed", extractResult.Failure?.Message ?? S("ErrorFileOperationUnknown")));
-                    return;
-                }
-
-                ZipExtractionInfo extracted = extractResult.Value!;
-                string? extractedName = string.IsNullOrWhiteSpace(extracted.PrimarySelectionPath)
-                    ? null
-                    : Path.GetFileName(extracted.PrimarySelectionPath.TrimEnd('\\'));
-
-                if (destinationIsCurrentDirectory)
-                {
-                    if (!extracted.ChangeNotified)
-                    {
-                        EnsurePersistentRefreshFallbackInvalidation(_currentPath, invalidationReason);
-                    }
-
-                    _selectedEntryPath = extracted.PrimarySelectionPath;
-                    await LoadFirstPageAsync();
-                    _ = DispatcherQueue.TryEnqueue(() =>
-                    {
-                        if (_currentViewMode == EntryViewMode.Details)
-                        {
-                            double maxOffset = Math.Max(0, DetailsEntriesScrollViewer.ScrollableHeight);
-                            DetailsEntriesScrollViewer.ChangeView(null, Math.Min(maxOffset, detailsVerticalOffset), null, disableAnimation: true);
-                        }
-                        else
-                        {
-                            double maxOffset = Math.Max(0, GroupedEntriesScrollViewer.ScrollableWidth);
-                            GroupedEntriesScrollViewer.ChangeView(Math.Min(maxOffset, groupedHorizontalOffset), null, null, disableAnimation: true);
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(_selectedEntryPath))
-                        {
-                            RestoreListSelectionByPathRespectingViewport();
-                        }
-
-                        FocusEntriesList();
-                    });
-                    UpdateFileCommandStates();
-                }
-
-                UpdateStatusKey("StatusExtractZipSuccess", extractedName ?? target.DisplayName);
-            }
-            catch (Exception ex)
-            {
-                await ShowOperationFailureDialogAsync(
-                    "ExtractZipFailureDialogTitle",
-                    SF("StatusExtractZipFailed", FileOperationErrors.ToUserMessage(ex)));
-            }
         }
 
         private void ExecuteOpenInNewWindowCommand(FileCommandTarget target)
@@ -314,51 +145,27 @@ namespace FileExplorerUI
             }
         }
 
-        private async Task ExecuteOpenTargetCommandAsync(FileCommandTarget target)
+        private async Task ExecuteOpenInNewTabCommandAsync(FileCommandTarget target)
         {
-            if (string.IsNullOrWhiteSpace(target.Path) || target.IsDirectory)
+            if (string.IsNullOrWhiteSpace(target.Path) || !target.IsDirectory)
             {
                 return;
             }
 
             try
             {
-                string resolvedTargetPath = await Task.Run(() => _explorerService.ResolveShortcutTargetPath(target.Path));
-                if (Uri.TryCreate(resolvedTargetPath, UriKind.Absolute, out Uri? uri) &&
-                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-                {
-                    _ = Process.Start(new ProcessStartInfo
-                    {
-                        FileName = resolvedTargetPath,
-                        UseShellExecute = true
-                    });
-                    UpdateStatusKey("StatusOpened", target.DisplayName);
-                    return;
-                }
-
-                if (_explorerService.DirectoryExists(resolvedTargetPath))
-                {
-                    await NavigateToPathAsync(resolvedTargetPath, pushHistory: true);
-                    return;
-                }
-
-                if (_explorerService.PathExists(resolvedTargetPath))
-                {
-                    _ = Process.Start(new ProcessStartInfo
-                    {
-                        FileName = resolvedTargetPath,
-                        UseShellExecute = true
-                    });
-                    UpdateStatusKey("StatusOpened", Path.GetFileName(resolvedTargetPath));
-                    return;
-                }
-
-                UpdateStatusKey("StatusOpenTargetFailed", resolvedTargetPath);
+                await _workspaceTabController.OpenPathInNewTabAsync(target.Path);
+                UpdateStatusKey("StatusOpenedInNewTab", target.DisplayName);
             }
             catch (Exception ex)
             {
-                UpdateStatusKey("StatusOpenTargetFailed", FileOperationErrors.ToUserMessage(ex));
+                UpdateStatusKey("StatusOpenInNewTabFailed", FileOperationErrors.ToUserMessage(ex));
             }
+        }
+
+        private async Task ExecuteOpenTargetCommandAsync(FileCommandTarget target)
+        {
+            await ExecuteOpenTargetForPaneCoreInternalAsync(WorkspacePanelId.Primary, target);
         }
 
         private void ExecuteRunAsAdministratorCommand(FileCommandTarget target)

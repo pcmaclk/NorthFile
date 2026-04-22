@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using System.Numerics;
 
 namespace FileExplorerUI.Controls;
 
@@ -48,6 +49,13 @@ public sealed partial class ExplorerPaneToolbarChrome : UserControl
             typeof(ExplorerPaneToolbarChrome),
             new PropertyMetadata(1d, OnBindablePropertyChanged));
 
+    public static readonly DependencyProperty ChromeTranslationProperty =
+        DependencyProperty.Register(
+            nameof(ChromeTranslation),
+            typeof(Vector3),
+            typeof(ExplorerPaneToolbarChrome),
+            new PropertyMetadata(new Vector3(0, 0, 6), OnBindablePropertyChanged));
+
     public ExplorerPaneToolbarChrome()
     {
         InitializeComponent();
@@ -87,6 +95,12 @@ public sealed partial class ExplorerPaneToolbarChrome : UserControl
     {
         get => (double)GetValue(ChromeOpacityProperty);
         set => SetValue(ChromeOpacityProperty, value);
+    }
+
+    public Vector3 ChromeTranslation
+    {
+        get => (Vector3)GetValue(ChromeTranslationProperty);
+        set => SetValue(ChromeTranslationProperty, value);
     }
 
     private void ChromeBorder_Loaded(object sender, RoutedEventArgs e)

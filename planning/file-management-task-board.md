@@ -23,6 +23,9 @@ Deferred:
 
 ## Current Progress
 
+- 2026-04-22: dual-pane copy/move now routes selected/all transfers through the shared coordinator/paste path, batches path invalidation after the filesystem operation, skips expensive per-row local insertion for large paste results, and keeps pane-transfer buttons from implicitly switching the active pane
+- 2026-04-22: file-operation progress now uses a pull-based snapshot model: background operations update `FileOperationProgressStore`, while the WinUI overlay periodically reads the latest snapshot; copy/compress/extract report byte progress when totals are known, and item counts remain the fallback
+- 2026-04-22: ZIP compression and extraction now share the same progress overlay and cancellation path as copy/move, with stream progress reported by bytes instead of only file count
 - 2026-03-24: verified and fixed a details-row recycle regression introduced during first-frame optimization; `EntryNameCell` now listens to `EntryViewModel.PropertyChanged` for `Name`, `IconGlyph`, and `IconForeground`, so recycled rows no longer show blank name cells while type/size columns still update
 - 2026-03-24: confirmed that the recent details scrolling correctness regression was not caused by the earlier `readRange` / sparse-loading refactor (`263e3f5`), but by later first-frame/layout experiments around the details repeater; the stable scrolling path has been restored and re-committed before continuing performance work
 - 2026-03-24: completed a first external UI-automation smoke test with `WinUI_MCP` through OpenCode; the server can now attach to the running `NorthFile` window, read window info, and capture a WinUI accessibility snapshot, which gives a second verification path besides internal perf logs

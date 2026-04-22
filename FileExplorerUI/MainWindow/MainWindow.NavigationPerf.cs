@@ -2,6 +2,8 @@ using Microsoft.UI.Xaml.Media;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using FileExplorerUI.Workspace;
 
 namespace FileExplorerUI
 {
@@ -79,6 +81,26 @@ namespace FileExplorerUI
             }
 
             CompositionTarget.Rendering += OnRendering;
+        }
+
+        private void LogPrimaryTabDataState(string stage)
+        {
+            WorkspaceTabState activeTab = _workspaceSession.ActiveTab;
+            PanelViewState panel = activeTab.ShellState.Primary;
+            PanelDataSession session = panel.DataSession;
+            string entries = string.Join(", ", session.Entries
+                .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
+                .Take(6)
+                .Select(entry => entry.Name));
+            string presentation = string.Join(", ", session.PresentationSourceEntries
+                .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
+                .Take(6)
+                .Select(entry => entry.Name));
+
+            AppendNavigationPerfLog(
+                $"[TAB-DATA] stage={stage} tab={activeTab.Id:N} current=\"{panel.CurrentPath}\" loaded=\"{session.LoadedPath}\" " +
+                $"query=\"{panel.QueryText}\" entries={session.Entries.Count} presentation={session.PresentationSourceEntries.Count} " +
+                $"entries_head=[{entries}] presentation_head=[{presentation}]");
         }
     }
 }

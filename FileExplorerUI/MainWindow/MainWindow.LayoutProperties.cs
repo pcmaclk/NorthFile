@@ -12,7 +12,7 @@ namespace FileExplorerUI
     {
         public EntryItemMetrics EntryItemMetrics { get; private set; } = EntryItemMetrics.CreatePreset(EntryViewDensityMode.Normal);
 
-        public double EntryContainerWidth => _currentViewMode == EntryViewMode.List ? GetListEntryContainerWidth() : DetailsRowWidth;
+        public double EntryContainerWidth => GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.List ? GetListEntryContainerWidth() : DetailsRowWidth;
 
         public Visibility EntriesListVisibility => Visibility.Collapsed;
 
@@ -20,19 +20,19 @@ namespace FileExplorerUI
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        public Visibility DetailsItemsVisibility => _currentViewMode == EntryViewMode.Details
+        public Visibility DetailsItemsVisibility => GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        public Visibility DetailsHeaderVisibility => _currentViewMode == EntryViewMode.Details
+        public Visibility DetailsHeaderVisibility => GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        public Thickness NameHeaderMargin => _currentGroupField == EntryGroupField.None
+        public Thickness NameHeaderMargin => GetPanelGroupField(WorkspacePanelId.Primary) == EntryGroupField.None
             ? new Thickness(38, 0, 0, 0)
             : new Thickness(36, 0, 0, 0);
 
-        public Thickness DetailsNameCellMargin => _currentGroupField == EntryGroupField.None
+        public Thickness DetailsNameCellMargin => GetPanelGroupField(WorkspacePanelId.Primary) == EntryGroupField.None
             ? new Thickness(6, 0, 0, 0)
             : new Thickness(32, 0, 0, 0);
 
@@ -44,11 +44,11 @@ namespace FileExplorerUI
             ? ScrollMode.Enabled
             : ScrollMode.Disabled;
 
-        public Visibility DetailsEntryVisibility => _currentViewMode == EntryViewMode.Details
+        public Visibility DetailsEntryVisibility => GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        public Visibility ListEntryVisibility => _currentViewMode == EntryViewMode.List
+        public Visibility ListEntryVisibility => GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.List
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -59,7 +59,7 @@ namespace FileExplorerUI
             double widestText = 0;
             int sampled = 0;
 
-            foreach (EntryViewModel entry in _entries)
+            foreach (EntryViewModel entry in PrimaryEntries)
             {
                 if (!entry.IsLoaded || entry.IsGroupHeader)
                 {
@@ -168,7 +168,7 @@ namespace FileExplorerUI
             ? LocalizedStrings.Instance.Get("CommonExpand")
             : LocalizedStrings.Instance.Get("CommonCollapse");
 
-        public Thickness ShellToolbarMargin => new(0, 8, 0, ShellToolbarBottomSpacing);
+        public Thickness ShellToolbarMargin => new(0, ShellToolbarBottomSpacing, 0, ShellToolbarBottomSpacing);
 
         public Thickness ShellToolbarPadding => new(8, 4, 8, 4);
 
@@ -176,13 +176,19 @@ namespace FileExplorerUI
 
         public double ExplorerPanelHostSpacing => ShellToolbarBottomSpacing;
 
+        public Thickness SidebarContentPadding => new(0, ShellToolbarBottomSpacing + 4, 0, 0);
+
+        public Thickness AddWorkspaceTabButtonMargin => new(4, 4, 0, 0);
+
+        public Thickness ExplorerPaneToggleButtonMargin => new(0, 4, 0, 0);
+
         public double ShellStatusBarHeight => ShellStatusBarHeightValue;
 
         public Thickness ShellStatusTextMargin => new(22, 0, 18, 0);
 
         public double ShellSplitterWidth => ShellSplitterWidthValue;
 
-        public GridLength ExplorerPanePrimaryColumnWidth => new(1, GridUnitType.Star);
+        public GridLength ExplorerPanePrimaryColumnWidth => GetExplorerPanePrimaryColumnWidth();
 
         public GridLength ExplorerPaneToolbarActionRailColumnWidth => new(ExplorerPaneActionRailWidthValue);
 
@@ -191,7 +197,7 @@ namespace FileExplorerUI
             : new GridLength(0);
 
         public GridLength ExplorerPaneSecondaryColumnWidth => _isDualPaneEnabled
-            ? new GridLength(1, GridUnitType.Star)
+            ? GetExplorerPaneSecondaryColumnWidth()
             : new GridLength(0);
 
         public Visibility ExplorerPaneToolbarActionRailVisibility => Visibility.Visible;
@@ -218,14 +224,14 @@ namespace FileExplorerUI
 
         public GridLength NameColumnWidth
         {
-            get => _nameColumnWidth;
+            get => new(PrimaryPanelState.NameColumnWidth);
             set
             {
-                if (_nameColumnWidth.Equals(value))
+                if (Math.Abs(PrimaryPanelState.NameColumnWidth - value.Value) < 0.1)
                 {
                     return;
                 }
-                _nameColumnWidth = value;
+                PrimaryPanelState.NameColumnWidth = value.Value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameColumnWidth)));
             }
         }
@@ -247,56 +253,116 @@ namespace FileExplorerUI
 
         public GridLength TypeColumnWidth
         {
-            get => _typeColumnWidth;
+            get => new(PrimaryPanelState.TypeColumnWidth);
             set
             {
-                if (_typeColumnWidth.Equals(value))
+                if (Math.Abs(PrimaryPanelState.TypeColumnWidth - value.Value) < 0.1)
                 {
                     return;
                 }
-                _typeColumnWidth = value;
+                PrimaryPanelState.TypeColumnWidth = value.Value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TypeColumnWidth)));
             }
         }
 
         public GridLength SizeColumnWidth
         {
-            get => _sizeColumnWidth;
+            get => new(PrimaryPanelState.SizeColumnWidth);
             set
             {
-                if (_sizeColumnWidth.Equals(value))
+                if (Math.Abs(PrimaryPanelState.SizeColumnWidth - value.Value) < 0.1)
                 {
                     return;
                 }
-                _sizeColumnWidth = value;
+                PrimaryPanelState.SizeColumnWidth = value.Value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SizeColumnWidth)));
             }
         }
 
         public GridLength ModifiedColumnWidth
         {
-            get => _modifiedColumnWidth;
+            get => new(PrimaryPanelState.ModifiedColumnWidth);
             set
             {
-                if (_modifiedColumnWidth.Equals(value))
+                if (Math.Abs(PrimaryPanelState.ModifiedColumnWidth - value.Value) < 0.1)
                 {
                     return;
                 }
-                _modifiedColumnWidth = value;
+                PrimaryPanelState.ModifiedColumnWidth = value.Value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ModifiedColumnWidth)));
+            }
+        }
+
+        public GridLength SecondaryNameColumnWidth
+        {
+            get => new(SecondaryPanelState.NameColumnWidth);
+            set
+            {
+                if (Math.Abs(SecondaryPanelState.NameColumnWidth - value.Value) < 0.1)
+                {
+                    return;
+                }
+                SecondaryPanelState.NameColumnWidth = value.Value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryNameColumnWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
+            }
+        }
+
+        public GridLength SecondaryTypeColumnWidth
+        {
+            get => new(SecondaryPanelState.TypeColumnWidth);
+            set
+            {
+                if (Math.Abs(SecondaryPanelState.TypeColumnWidth - value.Value) < 0.1)
+                {
+                    return;
+                }
+                SecondaryPanelState.TypeColumnWidth = value.Value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryTypeColumnWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
+            }
+        }
+
+        public GridLength SecondarySizeColumnWidth
+        {
+            get => new(SecondaryPanelState.SizeColumnWidth);
+            set
+            {
+                if (Math.Abs(SecondaryPanelState.SizeColumnWidth - value.Value) < 0.1)
+                {
+                    return;
+                }
+                SecondaryPanelState.SizeColumnWidth = value.Value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondarySizeColumnWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
+            }
+        }
+
+        public GridLength SecondaryModifiedColumnWidth
+        {
+            get => new(SecondaryPanelState.ModifiedColumnWidth);
+            set
+            {
+                if (Math.Abs(SecondaryPanelState.ModifiedColumnWidth - value.Value) < 0.1)
+                {
+                    return;
+                }
+                SecondaryPanelState.ModifiedColumnWidth = value.Value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryModifiedColumnWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
             }
         }
 
         public double DetailsContentWidth
         {
-            get => _detailsContentWidth;
+            get => PrimaryPanelState.DetailsContentWidth;
             set
             {
-                if (Math.Abs(_detailsContentWidth - value) < 0.1)
+                if (Math.Abs(PrimaryPanelState.DetailsContentWidth - value) < 0.1)
                 {
                     return;
                 }
-                _detailsContentWidth = value;
+                PrimaryPanelState.DetailsContentWidth = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsContentWidth)));
                 DetailsRowWidth = value;
             }
@@ -304,18 +370,48 @@ namespace FileExplorerUI
 
         public double DetailsRowWidth
         {
-            get => _detailsRowWidth;
+            get => PrimaryPanelState.DetailsRowWidth;
             set
             {
-                if (Math.Abs(_detailsRowWidth - value) < 0.1)
+                if (Math.Abs(PrimaryPanelState.DetailsRowWidth - value) < 0.1)
                 {
                     return;
                 }
-                _detailsRowWidth = value;
+                PrimaryPanelState.DetailsRowWidth = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DetailsRowWidth)));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollBarVisibility)));
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntriesHorizontalScrollMode)));
                 InvalidateEntriesLayouts();
+            }
+        }
+
+        public double SecondaryDetailsContentWidth
+        {
+            get => SecondaryPanelState.DetailsContentWidth;
+            set
+            {
+                if (Math.Abs(SecondaryPanelState.DetailsContentWidth - value) < 0.1)
+                {
+                    return;
+                }
+                SecondaryPanelState.DetailsContentWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryDetailsContentWidth)));
+                SecondaryDetailsRowWidth = value;
+            }
+        }
+
+        public double SecondaryDetailsRowWidth
+        {
+            get => SecondaryPanelState.DetailsRowWidth;
+            set
+            {
+                if (Math.Abs(SecondaryPanelState.DetailsRowWidth - value) < 0.1)
+                {
+                    return;
+                }
+                SecondaryPanelState.DetailsRowWidth = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SecondaryDetailsRowWidth)));
+                RefreshRealizedSecondaryDetailsRowColumnWidths();
             }
         }
     }

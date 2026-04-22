@@ -41,6 +41,7 @@ public sealed class AppSettingsService
                     StartupLocationPreference = ReadEnum(localSettings, nameof(AppSettings.StartupLocationPreference), StartupLocationPreference.ThisPc),
                     StartupSpecifiedPath = ReadString(localSettings, nameof(AppSettings.StartupSpecifiedPath), "shell:mycomputer"),
                     LastOpenedPath = ReadString(localSettings, nameof(AppSettings.LastOpenedPath), "shell:mycomputer"),
+                    LastWorkspaceSessionJson = ReadString(localSettings, nameof(AppSettings.LastWorkspaceSessionJson), string.Empty),
                     DefaultSortField = ReadEnum(localSettings, nameof(AppSettings.DefaultSortField), EntrySortField.Name),
                     DefaultGroupField = ReadEnum(localSettings, nameof(AppSettings.DefaultGroupField), EntryGroupField.None),
                     ConfirmDelete = ReadBool(localSettings, nameof(AppSettings.ConfirmDelete), true),
@@ -48,10 +49,15 @@ public sealed class AppSettingsService
                     MinimizeToTrayEnabled = ReadBool(localSettings, nameof(AppSettings.MinimizeToTrayEnabled), false),
                     WindowWidth = ReadInt(localSettings, nameof(AppSettings.WindowWidth), 0),
                     WindowHeight = ReadInt(localSettings, nameof(AppSettings.WindowHeight), 0),
+                    WindowPosX = ReadInt(localSettings, nameof(AppSettings.WindowPosX), int.MinValue),
+                    WindowPosY = ReadInt(localSettings, nameof(AppSettings.WindowPosY), int.MinValue),
+                    WindowMaximized = ReadBool(localSettings, nameof(AppSettings.WindowMaximized), false),
                     FavoritesInitialized = ReadBool(localSettings, nameof(AppSettings.FavoritesInitialized), false),
                     Favorites = ReadFavorites(localSettings)
                 };
-                TraceWindowSizeSettings("加载设置", $"source=local-settings width={settings.WindowWidth} height={settings.WindowHeight}");
+                TraceWindowSizeSettings(
+                    "加载设置",
+                    $"source=local-settings width={settings.WindowWidth} height={settings.WindowHeight} x={settings.WindowPosX} y={settings.WindowPosY} maximized={settings.WindowMaximized}");
                 return settings;
             }
         }
@@ -70,7 +76,9 @@ public sealed class AppSettingsService
             ApplicationDataContainer? localSettings = TryGetLocalSettings();
             if (localSettings is not null)
             {
-                TraceWindowSizeSettings("保存到设置", $"target=local-settings width={settings.WindowWidth} height={settings.WindowHeight}");
+                TraceWindowSizeSettings(
+                    "保存到设置",
+                    $"target=local-settings width={settings.WindowWidth} height={settings.WindowHeight} x={settings.WindowPosX} y={settings.WindowPosY} maximized={settings.WindowMaximized}");
                 localSettings.Values[nameof(AppSettings.ShowFavorites)] = settings.ShowFavorites;
                 localSettings.Values[nameof(AppSettings.ShowCloud)] = settings.ShowCloud;
                 localSettings.Values[nameof(AppSettings.ShowNetwork)] = settings.ShowNetwork;
@@ -84,6 +92,7 @@ public sealed class AppSettingsService
                 localSettings.Values[nameof(AppSettings.StartupLocationPreference)] = (int)settings.StartupLocationPreference;
                 localSettings.Values[nameof(AppSettings.StartupSpecifiedPath)] = settings.StartupSpecifiedPath;
                 localSettings.Values[nameof(AppSettings.LastOpenedPath)] = settings.LastOpenedPath;
+                localSettings.Values[nameof(AppSettings.LastWorkspaceSessionJson)] = settings.LastWorkspaceSessionJson ?? string.Empty;
                 localSettings.Values[nameof(AppSettings.DefaultSortField)] = (int)settings.DefaultSortField;
                 localSettings.Values[nameof(AppSettings.DefaultGroupField)] = (int)settings.DefaultGroupField;
                 localSettings.Values[nameof(AppSettings.ConfirmDelete)] = settings.ConfirmDelete;
@@ -91,6 +100,9 @@ public sealed class AppSettingsService
                 localSettings.Values[nameof(AppSettings.MinimizeToTrayEnabled)] = settings.MinimizeToTrayEnabled;
                 localSettings.Values[nameof(AppSettings.WindowWidth)] = settings.WindowWidth;
                 localSettings.Values[nameof(AppSettings.WindowHeight)] = settings.WindowHeight;
+                localSettings.Values[nameof(AppSettings.WindowPosX)] = settings.WindowPosX;
+                localSettings.Values[nameof(AppSettings.WindowPosY)] = settings.WindowPosY;
+                localSettings.Values[nameof(AppSettings.WindowMaximized)] = settings.WindowMaximized;
                 localSettings.Values[nameof(AppSettings.FavoritesInitialized)] = settings.FavoritesInitialized;
                 localSettings.Values[nameof(AppSettings.Favorites)] = JsonSerializer.Serialize(settings.Favorites ?? new List<FavoriteItem>());
                 return;
@@ -209,7 +221,9 @@ public sealed class AppSettingsService
 
             string json = File.ReadAllText(_fallbackSettingsPath);
             AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
-            TraceWindowSizeSettings("加载设置", $"source=file width={settings.WindowWidth} height={settings.WindowHeight} path=\"{_fallbackSettingsPath}\"");
+            TraceWindowSizeSettings(
+                "加载设置",
+                $"source=file width={settings.WindowWidth} height={settings.WindowHeight} x={settings.WindowPosX} y={settings.WindowPosY} maximized={settings.WindowMaximized} path=\"{_fallbackSettingsPath}\"");
             return settings;
         }
         catch (Exception ex)
@@ -221,7 +235,9 @@ public sealed class AppSettingsService
 
     private void SaveToFile(AppSettings settings)
     {
-        TraceWindowSizeSettings("保存到设置", $"target=file width={settings.WindowWidth} height={settings.WindowHeight} path=\"{_fallbackSettingsPath}\"");
+        TraceWindowSizeSettings(
+            "保存到设置",
+            $"target=file width={settings.WindowWidth} height={settings.WindowHeight} x={settings.WindowPosX} y={settings.WindowPosY} maximized={settings.WindowMaximized} path=\"{_fallbackSettingsPath}\"");
         ExportToPath(settings, _fallbackSettingsPath);
     }
 

@@ -18,6 +18,8 @@
         <x:Double x:Key="SettingsCardHeaderIconMaxSize">20</x:Double>
         <x:Double x:Key="SettingsCardContentMinWidth">120</x:Double>
         <Thickness x:Key="SettingsCardHeaderIconMargin">2,0,20,0</Thickness>
+        <Thickness x:Key="SettingsPageContentMargin">36,24,36,36</Thickness>
+        <x:Double x:Key="SettingsPageContentMaxWidth">960</x:Double>
 
         <Style x:Key="SettingsSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
             <Setter Property="Margin" Value="1,28,0,6" />
@@ -96,10 +98,10 @@
         VerticalScrollBarVisibility="Auto"
         VerticalScrollMode="Auto"
         ViewChanged="RootScrollViewer_ViewChanged">
-        <Grid Margin="36,24,36,36">
+        <Grid Margin="{StaticResource SettingsPageContentMargin}">
         <StackPanel
             x:Name="SettingsSectionsHost"
-            MaxWidth="960"
+            MaxWidth="{StaticResource SettingsPageContentMaxWidth}"
             HorizontalAlignment="Stretch"
             Spacing="{StaticResource SettingsCardSpacing}">
 

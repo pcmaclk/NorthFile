@@ -19,8 +19,21 @@ namespace FileExplorerUI
 
     internal sealed class DirectoryViewState
     {
+        public double DetailsHorizontalOffset { get; init; }
         public double DetailsVerticalOffset { get; init; }
+        public double GroupedHorizontalOffset { get; init; }
         public string? SelectedEntryPath { get; init; }
+
+        public DirectoryViewState Clone()
+        {
+            return new DirectoryViewState
+            {
+                DetailsHorizontalOffset = DetailsHorizontalOffset,
+                DetailsVerticalOffset = DetailsVerticalOffset,
+                GroupedHorizontalOffset = GroupedHorizontalOffset,
+                SelectedEntryPath = SelectedEntryPath
+            };
+        }
     }
 
     internal sealed record EntryGroupDescriptor(string BucketKey, string StateKey, string Label, string OrderKey);

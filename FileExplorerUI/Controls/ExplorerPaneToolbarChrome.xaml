@@ -15,7 +15,7 @@
             CornerRadius="{ThemeResource OverlayCornerRadius}"
             Loaded="ChromeBorder_Loaded"
             Opacity="{x:Bind ChromeOpacity, Mode=OneWay}"
-            Translation="0,0,6">
+            Translation="{x:Bind ChromeTranslation, Mode=OneWay}">
             <Border.Shadow>
                 <ThemeShadow x:Name="ChromeShadow" />
             </Border.Shadow>

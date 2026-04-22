@@ -47,25 +47,29 @@ namespace FileExplorerUI
         public bool ApplyLocalDelete(
             BatchObservableCollection<EntryViewModel> entries,
             int index,
-            ref string? selectedEntryPath,
-            ref string? focusedEntryPath,
+            string? selectedEntryPath,
+            string? focusedEntryPath,
             ref uint totalEntries,
             ulong nextCursor,
+            out string? updatedSelectedEntryPath,
+            out string? updatedFocusedEntryPath,
             out bool hasMore)
         {
+            updatedSelectedEntryPath = selectedEntryPath;
+            updatedFocusedEntryPath = focusedEntryPath;
             hasMore = false;
             if (index < 0 || index >= entries.Count)
             {
                 return false;
             }
 
-            if (string.Equals(selectedEntryPath, entries[index].FullPath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(updatedSelectedEntryPath, entries[index].FullPath, StringComparison.OrdinalIgnoreCase))
             {
-                selectedEntryPath = null;
+                updatedSelectedEntryPath = null;
             }
-            if (string.Equals(focusedEntryPath, entries[index].FullPath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(updatedFocusedEntryPath, entries[index].FullPath, StringComparison.OrdinalIgnoreCase))
             {
-                focusedEntryPath = null;
+                updatedFocusedEntryPath = null;
             }
 
             entries.RemoveAt(index);

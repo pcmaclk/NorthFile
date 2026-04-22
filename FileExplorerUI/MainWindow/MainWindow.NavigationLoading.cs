@@ -1,6 +1,7 @@
 using FileExplorerUI.Interop;
 using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
+using FileExplorerUI.Collections;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,11 +14,104 @@ namespace FileExplorerUI
 {
     public sealed partial class MainWindow
     {
+        private readonly record struct PanelPageLoadCoreResult(
+            uint RequestedPageSize,
+            long ElapsedMilliseconds,
+            bool Ok,
+            FileBatchPage Page,
+            int RustErrorCode,
+            string RustErrorMessage,
+            List<FileRow> VisibleRows,
+            string Source);
+
+        private void ApplyPanelPageRows(
+            WorkspacePanelId panelId,
+            string path,
+            IReadOnlyList<FileRow> visibleRows,
+            bool append)
+        {
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                if (!append)
+                {
+                    ResetEntriesViewport();
+                    entries.Clear();
+                    EnsureLoadedRangeCapacity(0, visibleRows.Count);
+                    FillPageRows(0, visibleRows, path);
+                }
+                else
+                {
+                    EnsureLoadedRangeCapacity(entries.Count, visibleRows.Count);
+                    FillPageRows(entries.Count, visibleRows, path);
+                }
+
+                List<EntryViewModel> primaryLoadedEntries = entries
+                    .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
+                    .ToList();
+                SetPresentationSourceEntries(primaryLoadedEntries);
+                SetPanelTotalEntries(panelId, (uint)entries.Count);
+                MarkPanelDataLoadedForCurrentNavigation(panelId);
+                InvalidateEntriesLayouts();
+                LogPrimaryTabDataState($"ApplyPanelPageRows(primary, append={append})");
+                return;
+            }
+
+            PanelViewState panelState = _workspaceLayoutHost.GetPanelState(panelId);
+            int startIndex = append
+                ? checked((int)Math.Min(int.MaxValue, panelState.DataSession.NextCursor))
+                : 0;
+            if (!append)
+            {
+                entries.Clear();
+            }
+
+            uint logicalTotal = Math.Max(
+                GetPanelTotalEntries(panelId),
+                checked((uint)Math.Min(uint.MaxValue, startIndex + visibleRows.Count)));
+            if (logicalTotal > 0)
+            {
+                EnsurePanelPlaceholderCount(panelId, checked((int)Math.Min(int.MaxValue, logicalTotal)));
+            }
+            EnsurePanelLoadedRangeCapacity(panelId, startIndex, visibleRows.Count);
+            FillPanelPageRows(panelId, startIndex, visibleRows, path);
+            SetPanelPresentationSourceEntries(panelId, GetLoadedPanelEntries(panelId));
+            SetPanelTotalEntries(panelId, Math.Max(GetPanelTotalEntries(panelId), (uint)entries.Count));
+            MarkPanelDataLoadedForCurrentNavigation(panelId);
+            InvalidatePanelDetailsViewportRealization(panelId);
+        }
+
+        private Task LoadPanelDataAsync(WorkspacePanelId panelId, CancellationToken cancellationToken = default)
+        {
+            return panelId == WorkspacePanelId.Primary
+                ? LoadPrimaryPanelDataAsync(_workspaceLayoutHost.ShellState.Primary, cancellationToken: cancellationToken)
+                : ReloadPanelDataAsync(
+                    panelId,
+                    preserveViewport: false,
+                    ensureSelectionVisible: false,
+                    focusEntries: false);
+        }
+
         private async Task LoadFirstPageAsync(CancellationToken cancellationToken = default)
         {
             NavigationPerfSession? perf = TryGetCurrentNavigationPerfSession();
             perf?.Mark("load-first-page.enter");
-            _currentPath = string.IsNullOrWhiteSpace(PathTextBox.Text) ? ShellMyComputerPath : NormalizeAddressInputPath(PathTextBox.Text);
+            SetPrimaryPanelNavigationState(
+                string.IsNullOrWhiteSpace(PathTextBox.Text) ? ShellMyComputerPath : NormalizeAddressInputPath(PathTextBox.Text),
+                queryText: GetPanelQueryText(WorkspacePanelId.Primary),
+                addressText: PathTextBox.Text,
+                syncEditors: true);
+            await LoadPrimaryPanelDataAsync(
+                _workspaceLayoutHost.ShellState.Primary,
+                perf,
+                cancellationToken);
+        }
+
+        private async Task LoadPrimaryPanelDataAsync(
+            PanelViewState panelState,
+            NavigationPerfSession? perf = null,
+            CancellationToken cancellationToken = default)
+        {
             PersistLastOpenedPathIfNeeded();
             if (!_sidebarInitialized)
             {
@@ -29,16 +123,20 @@ namespace FileExplorerUI
                 UpdateSidebarSelectionOnly();
             }
             RefreshSidebarFavorites(refreshSelection: false);
-            _currentPageSize = InitialPageSize;
-            _lastFetchMs = 0;
-            UpdateBreadcrumbs(_currentPath);
+            panelState.CurrentPageSize = InitialPageSize;
+            panelState.DataSession.LastFetchMs = 0;
+            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            ClearPanelEntriesIfNavigationIsStale(WorkspacePanelId.Primary);
+            LogPrimaryTabDataState("LoadPrimaryPanelDataAsync.after-clear-stale");
+            UpdateBreadcrumbs(currentPath);
             UpdateDetailsHeaders();
-            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
                 _usnCapability = default;
                 ConfigureDirectoryWatcher(string.Empty);
                 PopulateMyComputerEntries();
                 ApplyCurrentPresentation();
+                LogPrimaryTabDataState("LoadPrimaryPanelDataAsync.my-computer.after-apply");
                 UpdateFileCommandStates();
                 if (perf is not null)
                 {
@@ -48,17 +146,17 @@ namespace FileExplorerUI
                 return;
             }
 
-            UpdateUsnCapability(_currentPath);
-            ConfigureDirectoryWatcher(_currentPath);
-            EnsureRefreshFallbackInvalidation(_currentPath, "manual_load");
+            UpdateUsnCapability(currentPath);
+            ConfigureDirectoryWatcher(currentPath);
+            EnsureRefreshFallbackInvalidation(currentPath, "manual_load");
             SyncActivePanelPresentationState();
             perf?.Mark("load-first-page.pipeline-selected", UsesClientPresentationPipeline() ? "client" : "paged");
             if (UsesClientPresentationPipeline())
             {
-                await LoadAllEntriesForPresentationAsync(_currentPath, perf, cancellationToken);
+                await LoadAllEntriesForPresentationAsync(currentPath, perf, cancellationToken);
                 return;
             }
-            await LoadPageAsync(_currentPath, cursor: 0, append: false, perf, cancellationToken);
+            await LoadPageAsync(currentPath, cursor: 0, append: false, perf, cancellationToken);
         }
 
         private async Task NavigateToPathAsync(string path, bool pushHistory, bool focusEntriesAfterNavigation = true)
@@ -70,29 +168,27 @@ namespace FileExplorerUI
             NavigationPerfSession perf = BeginNavigationPerfSession(target, pushHistory ? "navigate" : "history");
             try
             {
+                string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
                 if (string.Equals(target, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
                 {
                     _directorySessionController.ApplyPushHistoryIfNeeded(
                         _backStack,
                         _forwardStack,
-                        _currentPath,
+                        currentPath,
                         target,
                         pushHistory);
 
-                _currentPath = ShellMyComputerPath;
-                _pendingHistoryStateRestorePath = pushHistory ? null : ShellMyComputerPath;
-                PathTextBox.Text = GetDisplayPathText(ShellMyComputerPath);
-                _currentQuery = string.Empty;
-                SearchTextBox.Text = string.Empty;
-                UpdateBreadcrumbs(_currentPath);
-                UpdateNavButtonsState();
-                _ = SelectSidebarTreePathAsync(_currentPath);
-                await WaitForLoadIdleAsync();
-                await LoadFirstPageAsync();
-                ClearListSelection();
-                if (focusEntriesAfterNavigation)
-                {
-                    _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
+                    SetPrimaryPanelNavigationState(ShellMyComputerPath, queryText: string.Empty, syncEditors: true);
+                    _pendingHistoryStateRestorePath = pushHistory ? null : ShellMyComputerPath;
+                    UpdateBreadcrumbs(GetPanelCurrentPath(WorkspacePanelId.Primary));
+                    UpdateNavButtonsState();
+                    _ = SelectSidebarTreePathAsync(GetPanelCurrentPath(WorkspacePanelId.Primary));
+                    await WaitForLoadIdleAsync();
+                    await LoadPanelDataAsync(WorkspacePanelId.Primary);
+                    ClearListSelection();
+                    if (focusEntriesAfterNavigation)
+                    {
+                        _ = DispatcherQueue.TryEnqueue(FocusEntriesList);
                     }
                     perf.Mark("navigate.completed");
                     return;
@@ -108,20 +204,17 @@ namespace FileExplorerUI
                 _directorySessionController.ApplyPushHistoryIfNeeded(
                     _backStack,
                     _forwardStack,
-                    _currentPath,
+                    currentPath,
                     target,
                     pushHistory);
 
-                _currentPath = target;
+                SetPrimaryPanelNavigationState(target, queryText: string.Empty, syncEditors: true);
                 _pendingHistoryStateRestorePath = pushHistory ? null : target;
-                PathTextBox.Text = GetDisplayPathText(target);
-                _currentQuery = string.Empty;
-                SearchTextBox.Text = string.Empty;
                 UpdateBreadcrumbs(target);
                 UpdateNavButtonsState();
-                _ = SelectSidebarTreePathAsync(_currentPath);
+                _ = SelectSidebarTreePathAsync(GetPanelCurrentPath(WorkspacePanelId.Primary));
                 await WaitForLoadIdleAsync();
-                await LoadFirstPageAsync();
+                await LoadPanelDataAsync(WorkspacePanelId.Primary);
                 ClearListSelection();
                 if (focusEntriesAfterNavigation)
                 {
@@ -137,25 +230,41 @@ namespace FileExplorerUI
 
         private async Task LoadNextPageAsync()
         {
-            if (!_hasMore)
+            await LoadNextPanelPageAsync(WorkspacePanelId.Primary);
+        }
+
+        private async Task LoadNextPanelPageAsync(WorkspacePanelId panelId)
+        {
+            if (!GetPanelHasMore(panelId))
             {
-                UpdateStatusKey("StatusNoMoreEntries");
+                if (panelId == WorkspacePanelId.Primary)
+                {
+                    UpdateStatusKey("StatusNoMoreEntries");
+                }
+
                 return;
             }
 
-            await LoadPageAsync(_currentPath, _nextCursor, append: true);
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                await LoadPageAsync(GetPanelCurrentPath(WorkspacePanelId.Primary), GetPanelNextCursor(panelId), append: true);
+                return;
+            }
+
+            await LoadNextSimplePanelPageAsync(panelId);
         }
 
         private CancellationTokenSource BeginNavigationLoadTransition()
         {
-            CancelAndDispose(ref _navigationLoadCts);
-            _navigationLoadCts = new CancellationTokenSource();
-            return _navigationLoadCts;
+            CancellationTokenSource? navigationLoadCts = GetPanelNavigationLoadCts(WorkspacePanelId.Primary);
+            CancelAndDispose(ref navigationLoadCts);
+            SetPanelNavigationLoadCts(WorkspacePanelId.Primary, new CancellationTokenSource());
+            return GetPanelNavigationLoadCts(WorkspacePanelId.Primary)!;
         }
 
         private async Task WaitForLoadIdleAsync()
         {
-            while (_isLoading)
+            while (GetPanelIsLoading(WorkspacePanelId.Primary))
             {
                 await Task.Delay(16);
             }
@@ -172,8 +281,8 @@ namespace FileExplorerUI
                             path,
                             0,
                             1,
-                            _lastFetchMs,
-                            _currentSortMode,
+                            GetPanelLastFetchMs(WorkspacePanelId.Primary),
+                            GetPanelDirectorySortMode(WorkspacePanelId.Primary),
                             out FileBatchPage page,
                             out int code,
                             out string message
@@ -205,23 +314,31 @@ namespace FileExplorerUI
 
         private void EnsureActiveEntryResultSet(string path)
         {
-            string query = _currentQuery;
-            if (_activeEntryResultSet is not null &&
-                string.Equals(_activeEntryResultSet.Path, path, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(_activeEntryResultSet.Query, query, StringComparison.Ordinal) &&
-                _activeEntryResultSet.SortMode == _currentSortMode)
+            EnsureActiveEntryResultSet(WorkspacePanelId.Primary, path, GetPanelQueryText(WorkspacePanelId.Primary));
+        }
+
+        private void EnsureActiveEntryResultSet(WorkspacePanelId panelId, string path, string query)
+        {
+            IEntryResultSet? activeEntryResultSet = GetPanelActiveEntryResultSet(panelId);
+            DirectorySortMode sortMode = GetPanelDirectorySortMode(panelId);
+            if (activeEntryResultSet is not null &&
+                string.Equals(activeEntryResultSet.Path, path, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(activeEntryResultSet.Query, query, StringComparison.Ordinal) &&
+                activeEntryResultSet.SortMode == sortMode)
             {
                 return;
             }
 
-            _activeEntryResultSet = string.IsNullOrWhiteSpace(query)
-                ? _explorerService.CreateDirectoryResultSet(path, _currentSortMode)
-                : _explorerService.CreateSearchResultSet(path, query, _currentSortMode);
+            SetPanelActiveEntryResultSet(
+                panelId,
+                string.IsNullOrWhiteSpace(query)
+                    ? _explorerService.CreateDirectoryResultSet(path, sortMode)
+                    : _explorerService.CreateSearchResultSet(path, query, sortMode));
         }
 
         private async Task LoadPageAsync(string path, ulong cursor, bool append, NavigationPerfSession? perf = null, CancellationToken cancellationToken = default)
         {
-            if (_isLoading)
+            if (GetPanelIsLoading(WorkspacePanelId.Primary))
             {
                 perf?.Mark("load-page.skipped", "already-loading");
                 return;
@@ -241,40 +358,19 @@ namespace FileExplorerUI
                 BeginDirectorySnapshot();
             }
 
-            _isLoading = true;
+            SetPanelIsLoading(WorkspacePanelId.Primary, true);
             LoadButton.IsEnabled = false;
             NextButton.IsEnabled = false;
             StyledSidebarView.IsEnabled = false;
 
             try
             {
-                EnsureActiveEntryResultSet(path);
-                uint requestedPageSize = _currentPageSize;
-                Stopwatch sw = Stopwatch.StartNew();
-                FileBatchPage page;
-                bool ok;
-                int rustErrorCode;
-                string rustErrorMessage;
-                IEntryResultSet? resultSet = _activeEntryResultSet;
-                if (resultSet is null)
-                {
-                    throw new InvalidOperationException("active entry result set was not initialized");
-                }
-
-                (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(
-                    () =>
-                    {
-                        bool success = resultSet.TryReadRange(
-                            cursor,
-                            requestedPageSize,
-                            _lastFetchMs,
-                            out FileBatchPage p,
-                            out int code,
-                            out string msg
-                        );
-                        return (success, p, code, msg);
-                    }
-                );
+                PanelPageLoadCoreResult loadResult = await LoadPanelPageCoreAsync(
+                    WorkspacePanelId.Primary,
+                    path,
+                    GetPanelQueryText(WorkspacePanelId.Primary),
+                    cursor,
+                    cancellationToken);
 
                 if (cancellationToken.IsCancellationRequested)
                 {
@@ -282,17 +378,17 @@ namespace FileExplorerUI
                     return;
                 }
 
-                if (!ok)
+                if (!loadResult.Ok)
                 {
-                    if (IsRustAccessDenied(rustErrorCode, rustErrorMessage))
+                    if (IsRustAccessDenied(loadResult.RustErrorCode, loadResult.RustErrorMessage))
                     {
-                        _hasMore = false;
-                        _nextCursor = 0;
+                        SetPanelHasMore(WorkspacePanelId.Primary, false);
+                        SetPanelNextCursor(WorkspacePanelId.Primary, 0);
                         if (!append)
                         {
                             ResetEntriesViewport();
-                            _entries.Clear();
-                            _totalEntries = 0;
+                            PrimaryEntries.Clear();
+                            SetPanelTotalEntries(WorkspacePanelId.Primary, 0);
                             InvalidateEntriesLayouts();
                         }
 
@@ -300,32 +396,22 @@ namespace FileExplorerUI
                         return;
                     }
 
-                    throw new InvalidOperationException($"Rust error {rustErrorCode}: {rustErrorMessage}");
+                    throw new InvalidOperationException($"Rust error {loadResult.RustErrorCode}: {loadResult.RustErrorMessage}");
                 }
 
-                sw.Stop();
-                perf?.Mark("load-page.fetch-completed", $"rows={page.Rows.Count} total={page.TotalEntries} source={_explorerService.DescribeBatchSource(page.SourceKind)}");
-                _lastFetchMs = (uint)Math.Clamp(sw.ElapsedMilliseconds, 0, int.MaxValue);
-                List<FileRow> visibleRows = page.Rows
-                    .Where(row => ShouldIncludeEntry(Path.Combine(path, row.Name), row.Name))
-                    .ToList();
+                perf?.Mark("load-page.fetch-completed", $"rows={loadResult.Page.Rows.Count} total={loadResult.Page.TotalEntries} source={loadResult.Source}");
+                SetPanelLastFetchMs(WorkspacePanelId.Primary, (uint)Math.Clamp(loadResult.ElapsedMilliseconds, 0, int.MaxValue));
 
                 if (!append)
                 {
-                    ResetEntriesViewport();
-                    _entries.Clear();
-                    EnsureLoadedRangeCapacity(0, visibleRows.Count);
-                    FillPageRows(0, visibleRows, path);
-                    perf?.Mark("load-page.visible-entries-updated", $"count={_entries.Count}");
+                    ApplyPanelPageRows(WorkspacePanelId.Primary, path, loadResult.VisibleRows, append: false);
+                    perf?.Mark("load-page.visible-entries-updated", $"count={PrimaryEntries.Count}");
                 }
                 else
                 {
-                    EnsureLoadedRangeCapacity(_entries.Count, visibleRows.Count);
-                    FillPageRows(_entries.Count, visibleRows, path);
-                    perf?.Mark("load-page.visible-entries-updated", $"count={_entries.Count}");
+                    ApplyPanelPageRows(WorkspacePanelId.Primary, path, loadResult.VisibleRows, append: true);
+                    perf?.Mark("load-page.visible-entries-updated", $"count={PrimaryEntries.Count}");
                 }
-                _totalEntries = (uint)_entries.Count;
-                InvalidateEntriesLayouts();
                 perf?.Mark("load-page.layouts-invalidated");
                 if (!append && perf is not null)
                 {
@@ -345,17 +431,17 @@ namespace FileExplorerUI
                     }
                     perf?.Mark("load-page.selection-restored");
                 }
-                _nextCursor = page.NextCursor;
-                _hasMore = page.HasMore;
-                _currentPageSize = ClampPageSize(page.SuggestedNextLimit, requestedPageSize);
-                string source = _explorerService.DescribeBatchSource(page.SourceKind);
-                perf?.Mark("load-page.bind-completed", $"visible={_entries.Count} hasMore={_hasMore}");
+                SetPanelNextCursor(WorkspacePanelId.Primary, loadResult.Page.NextCursor);
+                SetPanelHasMore(WorkspacePanelId.Primary, loadResult.Page.HasMore);
+                SetPanelCurrentPageSize(WorkspacePanelId.Primary, ClampPageSize(loadResult.Page.SuggestedNextLimit, loadResult.RequestedPageSize));
+                string source = loadResult.Source;
+                perf?.Mark("load-page.bind-completed", $"visible={PrimaryEntries.Count} hasMore={GetPanelHasMore(WorkspacePanelId.Primary)}");
 
                 void FinalizeLoadedPageUi()
                 {
                     perf?.Mark("load-page.ui-finalize.begin");
                     UpdateFileCommandStates();
-                    if (_currentViewMode == EntryViewMode.Details)
+                    if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details)
                     {
                         CancelPendingViewportMetadataWork();
                     }
@@ -372,20 +458,20 @@ namespace FileExplorerUI
 
                     _lastTitleWasReadFailed = false;
                     UpdateWindowTitle();
-                    UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
+                    UpdateStatus(SF("StatusCurrentFolderItems", GetPanelTotalEntries(WorkspacePanelId.Primary)));
                     LogPerfSnapshot(
-                        mode: string.IsNullOrWhiteSpace(_currentQuery) ? "browse" : "search",
+                        mode: string.IsNullOrWhiteSpace(GetPanelQueryText(WorkspacePanelId.Primary)) ? "browse" : "search",
                         path: path,
-                        query: _currentQuery,
+                        query: GetPanelQueryText(WorkspacePanelId.Primary),
                         source: source,
-                        loaded: page.Rows.Count,
-                        total: page.TotalEntries,
-                        scanned: page.ScannedEntries,
-                        matched: page.MatchedEntries,
-                        fetchMs: sw.ElapsedMilliseconds,
-                        batch: _currentPageSize,
-                        hasMore: _hasMore,
-                        nextCursor: _nextCursor,
+                        loaded: loadResult.Page.Rows.Count,
+                        total: loadResult.Page.TotalEntries,
+                        scanned: loadResult.Page.ScannedEntries,
+                        matched: loadResult.Page.MatchedEntries,
+                        fetchMs: loadResult.ElapsedMilliseconds,
+                        batch: GetPanelCurrentPageSize(WorkspacePanelId.Primary),
+                        hasMore: GetPanelHasMore(WorkspacePanelId.Primary),
+                        nextCursor: GetPanelNextCursor(WorkspacePanelId.Primary),
                         usn: DescribeUsnCapability(_usnCapability)
                     );
                     perf?.Mark("load-page.ui-finalize.end");
@@ -416,17 +502,65 @@ namespace FileExplorerUI
             }
             finally
             {
-                _isLoading = false;
+                SetPanelIsLoading(WorkspacePanelId.Primary, false);
                 LoadButton.IsEnabled = true;
-                NextButton.IsEnabled = _hasMore;
+                NextButton.IsEnabled = GetPanelHasMore(WorkspacePanelId.Primary);
                 StyledSidebarView.IsEnabled = true;
                 perf?.Mark("load-page.exit");
             }
         }
 
+        private async Task<PanelPageLoadCoreResult> LoadPanelPageCoreAsync(
+            WorkspacePanelId panelId,
+            string path,
+            string query,
+            ulong cursor,
+            CancellationToken cancellationToken)
+        {
+            EnsureActiveEntryResultSet(panelId, path, query);
+            uint requestedPageSize = GetPanelCurrentPageSize(panelId);
+            Stopwatch sw = Stopwatch.StartNew();
+            IEntryResultSet? resultSet = GetPanelActiveEntryResultSet(panelId);
+            if (resultSet is null)
+            {
+                throw new InvalidOperationException("active entry result set was not initialized");
+            }
+
+            (bool ok, FileBatchPage page, int rustErrorCode, string rustErrorMessage) = await Task.Run(
+                () =>
+                {
+                    bool success = resultSet.TryReadRange(
+                        cursor,
+                        requestedPageSize,
+                        GetPanelLastFetchMs(panelId),
+                        out FileBatchPage p,
+                        out int code,
+                        out string msg);
+                    return (success, p, code, msg);
+                },
+                cancellationToken);
+
+            sw.Stop();
+            List<FileRow> visibleRows = ok
+                ? page.Rows
+                    .Where(row => ShouldIncludeEntry(Path.Combine(path, row.Name), row.Name))
+                    .ToList()
+                : [];
+
+            return new PanelPageLoadCoreResult(
+                RequestedPageSize: requestedPageSize,
+                ElapsedMilliseconds: sw.ElapsedMilliseconds,
+                Ok: ok,
+                Page: page,
+                RustErrorCode: rustErrorCode,
+                RustErrorMessage: rustErrorMessage,
+                VisibleRows: visibleRows,
+                Source: ok ? _explorerService.DescribeBatchSource(page.SourceKind) : string.Empty);
+        }
+
         private async Task LoadAllEntriesForPresentationAsync(string path, NavigationPerfSession? perf = null, CancellationToken cancellationToken = default)
         {
-            if (_isLoading)
+            if (GetPanelIsLoading(WorkspacePanelId.Primary))
             {
                 perf?.Mark("load-all.skipped", "already-loading");
                 return;
@@ -440,90 +574,40 @@ namespace FileExplorerUI
 
             BeginDirectorySnapshot();
             perf?.Mark("load-all.enter");
-            _isLoading = true;
+            SetPanelIsLoading(WorkspacePanelId.Primary, true);
             LoadButton.IsEnabled = false;
             NextButton.IsEnabled = false;
             StyledSidebarView.IsEnabled = false;
 
             try
             {
-                EnsureActiveEntryResultSet(path);
-                IEntryResultSet? resultSet = _activeEntryResultSet;
-                if (resultSet is null)
-                {
-                    throw new InvalidOperationException("active entry result set was not initialized");
-                }
-
-                var loadedEntries = new List<EntryViewModel>();
-                ulong cursor = 0;
-                uint limit = 512;
-                uint totalEntries = 0;
-                bool hasMore;
-                do
-                {
-                    FileBatchPage page;
-                    bool ok;
-                    int rustErrorCode;
-                    string rustErrorMessage;
-
-                    (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(() =>
-                    {
-                        bool success = resultSet.TryReadRange(
-                            cursor,
-                            limit,
-                            _lastFetchMs,
-                            out FileBatchPage p,
-                            out int code,
-                            out string msg);
-                        return (success, p, code, msg);
-                    });
-
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        perf?.Mark("load-all.skipped", "cancelled-or-stale");
-                        return;
-                    }
-
-                    if (!ok)
-                    {
-                        throw new InvalidOperationException($"Rust error {rustErrorCode}: {rustErrorMessage}");
-                    }
-
-                    totalEntries = page.TotalEntries;
-                    foreach (FileRow row in page.Rows)
-                    {
-                        if (!ShouldIncludeEntry(Path.Combine(path, row.Name), row.Name))
-                        {
-                            continue;
-                        }
-
-                        EntryViewModel entry = CreateLoadedEntryModel(path, row);
-                        PopulateEntryMetadata(entry);
-                        loadedEntries.Add(entry);
-                    }
-
-                    cursor = page.NextCursor;
-                    hasMore = page.HasMore;
-                    perf?.Mark("load-all.batch", $"loaded={loadedEntries.Count} total={totalEntries} hasMore={hasMore}");
-                } while (hasMore);
+                PanelEntriesLoadResult loadResult = await LoadPanelEntriesSnapshotAsync(
+                    path,
+                    GetPanelQueryText(WorkspacePanelId.Primary),
+                    GetPanelLastFetchMs(WorkspacePanelId.Primary),
+                    cancellationToken,
+                    perf,
+                    perfPrefix: "load-all");
 
                 ResetEntriesViewport();
-                SetPresentationSourceEntries(loadedEntries);
-                perf?.Mark("load-all.fetch-completed", $"loaded={loadedEntries.Count}");
+                SetPresentationSourceEntries(loadResult.Entries);
+                SetPanelActiveEntryResultSet(WorkspacePanelId.Primary, loadResult.ActiveEntryResultSet);
+                perf?.Mark("load-all.fetch-completed", $"loaded={loadResult.Entries.Count}");
                 ApplyCurrentPresentation(perf);
-                _totalEntries = (uint)loadedEntries.Count;
+                SetPanelTotalEntries(WorkspacePanelId.Primary, (uint)loadResult.Entries.Count);
+                MarkPanelDataLoadedForCurrentNavigation(WorkspacePanelId.Primary);
                 InvalidateEntriesLayouts();
-                _nextCursor = 0;
-                _hasMore = false;
-                _currentPageSize = InitialPageSize;
+                SetPanelNextCursor(WorkspacePanelId.Primary, 0);
+                SetPanelHasMore(WorkspacePanelId.Primary, false);
+                SetPanelCurrentPageSize(WorkspacePanelId.Primary, InitialPageSize);
                 _lastTitleWasReadFailed = false;
                 UpdateWindowTitle();
-                UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
+                UpdateStatus(SF("StatusCurrentFolderItems", GetPanelTotalEntries(WorkspacePanelId.Primary)));
                 if (perf is not null)
                 {
                     ScheduleNavigationPerfFirstFrameMark(perf, "load-all.first-frame");
                 }
-                perf?.Mark("load-all.completed", $"visible={_entries.Count}");
+                perf?.Mark("load-all.completed", $"visible={PrimaryEntries.Count}");
             }
             catch (Exception ex)
             {
@@ -538,9 +622,9 @@ namespace FileExplorerUI
             }
             finally
             {
-                _isLoading = false;
+                SetPanelIsLoading(WorkspacePanelId.Primary, false);
                 LoadButton.IsEnabled = true;
-                NextButton.IsEnabled = false;
+                NextButton.IsEnabled = GetPanelHasMore(WorkspacePanelId.Primary);
                 StyledSidebarView.IsEnabled = true;
                 UpdateFileCommandStates();
                 perf?.Mark("load-all.exit");

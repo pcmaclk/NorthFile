@@ -65,6 +65,11 @@ namespace FileExplorerUI
             return _activeSession?.CommitAsync() ?? Task.CompletedTask;
         }
 
+        public bool ShouldCommitActiveSessionOnExternalClick()
+        {
+            return _activeSession?.CommitOnExternalClick ?? true;
+        }
+
         public void CancelActiveSession()
         {
             _activeSession?.Cancel();
@@ -76,15 +81,18 @@ namespace FileExplorerUI
         private readonly Func<Task> _commitAsync;
         private readonly Action _cancel;
         private readonly Func<DependencyObject?, bool> _containsSource;
+        public bool CommitOnExternalClick { get; }
 
         public InlineEditSession(
             Func<Task> commitAsync,
             Action cancel,
-            Func<DependencyObject?, bool> containsSource)
+            Func<DependencyObject?, bool> containsSource,
+            bool commitOnExternalClick = true)
         {
             _commitAsync = commitAsync;
             _cancel = cancel;
             _containsSource = containsSource;
+            CommitOnExternalClick = commitOnExternalClick;
         }
 
         public Task CommitAsync() => _commitAsync();

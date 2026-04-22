@@ -74,19 +74,7 @@ namespace FileExplorerUI
                 RefreshLocalizedEntryPresentation();
                 UpdateDetailsHeaders();
 
-                if (_isLoading)
-                {
-                    UpdateStatus(S("StatusLoading"));
-                    return;
-                }
-
-                if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    UpdateStatus(SF("StatusDriveCount", _entries.Count));
-                    return;
-                }
-
-                UpdateStatus(SF("StatusCurrentFolderItems", _totalEntries));
+                RefreshAllPanelStatus();
             });
         }
 
@@ -104,55 +92,56 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(GetPanelCurrentPath(WorkspacePanelId.Primary), ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                this.AppWindow.Title = SF("WindowTitleDrivesFormat", _engineVersion, _entries.Count);
+                this.AppWindow.Title = SF("WindowTitleDrivesFormat", _engineVersion, PrimaryEntries.Count);
                 NotifyTitleBarTextChanged();
                 return;
             }
 
-            this.AppWindow.Title = SF("WindowTitleItemsFormat", _engineVersion, _entries.Count);
+            this.AppWindow.Title = SF("WindowTitleItemsFormat", _engineVersion, PrimaryEntries.Count);
             NotifyTitleBarTextChanged();
         }
 
-        public string CurrentTabTitleText => GetCurrentTabTitleText();
+        public string CurrentTabTitleText => _workspaceSession
+            .GetActiveTabPresentation(S("SidebarMyComputer"), "NorthFile")
+            .Title;
 
-        public string TitleBarTabGlyph => string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase)
-            ? "\uE7F4"
-            : "\uE8B7";
-
-        private string GetCurrentTabTitleText()
-        {
-            if (string.Equals(_currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return S("SidebarMyComputer");
-            }
-
-            if (string.IsNullOrWhiteSpace(_currentPath))
-            {
-                return "NorthFile";
-            }
-
-            string trimmed = _currentPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (string.IsNullOrWhiteSpace(trimmed))
-            {
-                return _currentPath;
-            }
-
-            string name = Path.GetFileName(trimmed);
-            return string.IsNullOrWhiteSpace(name) ? trimmed : name;
-        }
+        public string TitleBarTabGlyph => _workspaceSession
+            .GetActiveTabPresentation(S("SidebarMyComputer"), "NorthFile")
+            .Glyph;
 
         private void NotifyTitleBarTextChanged()
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentTabTitleText)));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TitleBarTabGlyph)));
+            string currentTitle = CurrentTabTitleText;
+            string currentGlyph = TitleBarTabGlyph;
+            bool titleChanged = !string.Equals(_lastNotifiedCurrentTabTitleText, currentTitle, StringComparison.Ordinal);
+            bool glyphChanged = !string.Equals(_lastNotifiedTitleBarTabGlyph, currentGlyph, StringComparison.Ordinal);
+            if (!titleChanged && !glyphChanged)
+            {
+                return;
+            }
+
+            _lastNotifiedCurrentTabTitleText = currentTitle;
+            _lastNotifiedTitleBarTabGlyph = currentGlyph;
+
+            if (titleChanged)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentTabTitleText)));
+            }
+
+            if (glyphChanged)
+            {
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TitleBarTabGlyph)));
+            }
+
+            RefreshActiveTitleBarTab();
         }
 
         private void RefreshLocalizedEntryPresentation()
         {
-            EntryViewModel[] presentationEntries = _presentationSourceEntries.ToArray();
-            EntryViewModel[] loadedEntries = _entries.ToArray();
+            EntryViewModel[] presentationEntries = GetPrimaryPresentationSourceEntries().ToArray();
+            EntryViewModel[] loadedEntries = PrimaryEntries.ToArray();
             var seen = new HashSet<EntryViewModel>();
             foreach (EntryViewModel entry in presentationEntries.Concat(loadedEntries))
             {
@@ -170,8 +159,8 @@ namespace FileExplorerUI
             }
 
             bool requiresPresentationRebuild =
-                _currentSortField == EntrySortField.Type ||
-                _currentGroupField == EntryGroupField.Type;
+                GetPanelSortField(WorkspacePanelId.Primary) == EntrySortField.Type ||
+                GetPanelGroupField(WorkspacePanelId.Primary) == EntryGroupField.Type;
 
             if (requiresPresentationRebuild)
             {
@@ -185,7 +174,7 @@ namespace FileExplorerUI
 
         private void UpdateDisplayedEntryNames()
         {
-            foreach (EntryViewModel entry in _entries)
+            foreach (EntryViewModel entry in PrimaryEntries)
             {
                 if (!entry.IsLoaded || entry.IsGroupHeader)
                 {
@@ -195,7 +184,7 @@ namespace FileExplorerUI
                 entry.DisplayName = GetEntryDisplayName(entry.Name, entry.IsDirectory);
             }
 
-            foreach (EntryViewModel entry in _presentationSourceEntries)
+            foreach (EntryViewModel entry in GetPrimaryPresentationSourceEntries())
             {
                 if (!entry.IsLoaded || entry.IsGroupHeader)
                 {
