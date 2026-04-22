@@ -57,21 +57,28 @@ namespace FileExplorerUI
                 return;
             }
 
-            List<EntryViewModel> loadedEntries = append
-                ? entries.Where(entry => entry.IsLoaded && !entry.IsGroupHeader).ToList()
-                : [];
-
-            foreach (FileRow row in visibleRows)
+            PanelViewState panelState = _workspaceLayoutHost.GetPanelState(panelId);
+            int startIndex = append
+                ? checked((int)Math.Min(int.MaxValue, panelState.DataSession.NextCursor))
+                : 0;
+            if (!append)
             {
-                loadedEntries.Add(CreateLoadedEntryModel(path, row));
+                entries.Clear();
             }
 
-            entries.ReplaceAll(loadedEntries);
-            PanelViewState panelState = _workspaceLayoutHost.GetPanelState(panelId);
-            panelState.DataSession.PresentationSourceEntries.Clear();
-            panelState.DataSession.PresentationSourceEntries.AddRange(loadedEntries);
-            SetPanelTotalEntries(panelId, (uint)entries.Count);
+            uint logicalTotal = Math.Max(
+                GetPanelTotalEntries(panelId),
+                checked((uint)Math.Min(uint.MaxValue, startIndex + visibleRows.Count)));
+            if (logicalTotal > 0)
+            {
+                EnsurePanelPlaceholderCount(panelId, checked((int)Math.Min(int.MaxValue, logicalTotal)));
+            }
+            EnsurePanelLoadedRangeCapacity(panelId, startIndex, visibleRows.Count);
+            FillPanelPageRows(panelId, startIndex, visibleRows, path);
+            SetPanelPresentationSourceEntries(panelId, GetLoadedPanelEntries(panelId));
+            SetPanelTotalEntries(panelId, Math.Max(GetPanelTotalEntries(panelId), (uint)entries.Count));
             MarkPanelDataLoadedForCurrentNavigation(panelId);
+            InvalidatePanelDetailsViewportRealization(panelId);
         }
 
         private Task LoadPanelDataAsync(WorkspacePanelId panelId, CancellationToken cancellationToken = default)

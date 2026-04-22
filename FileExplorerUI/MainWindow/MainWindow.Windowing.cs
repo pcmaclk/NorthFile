@@ -563,9 +563,20 @@ namespace FileExplorerUI
             }
         }
 
+        private void TitleBarDragRegion_Loaded(object sender, RoutedEventArgs e)
+        {
+            QueueTitleBarDragRectangleRefresh();
+        }
+
         private void TitleBarDragRegion_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            QueueTitleBarDragRectangleRefresh();
+        }
+
+        private void QueueTitleBarDragRectangleRefresh()
+        {
             RefreshTitleBarDragRectangles();
+            _ = DispatcherQueue.TryEnqueue(() => RefreshTitleBarDragRectangles());
         }
 
         private void RefreshTitleBarDragRectangles()

@@ -1,6 +1,6 @@
 # NorthFile File Management Command Architecture
 
-Last updated: 2026-03-16
+Last updated: 2026-04-22
 Applies to: post-`0.1.1` file-management phase
 
 ## Goal
@@ -33,6 +33,7 @@ Owned by:
 
 - [D:\Develop\Workspace\Rust\FileExplorer\FileExplorerUI\Services\ExplorerService.cs](D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI/Services/ExplorerService.cs)
 - [D:\Develop\Workspace\Rust\FileExplorer\FileExplorerUI\Services\FileManagementCoordinator.cs](D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI/Services/FileManagementCoordinator.cs)
+- [D:\Develop\Workspace\Rust\FileExplorer\FileExplorerUI\Services\FileOperationProgress.cs](D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI/Services/FileOperationProgress.cs)
 
 Responsibilities:
 
@@ -44,6 +45,7 @@ Responsibilities:
 - create / rename / delete execution
 - conflict detection
 - same-path detection
+- progress snapshot updates
 - low-level result reporting
 
 Rules:
@@ -59,6 +61,45 @@ Examples:
 - `DeleteEntryAsync(...)`
 - `SetClipboard(...)`
 - `PasteAsync(...)`
+
+## Dual-Pane Transfer Flow
+
+Dual-pane copy and move operations should still go through the same file-management coordinator used by normal paste.
+
+Current model:
+
+- pane toolbar buttons only select the source pane, target pane, transfer mode, and selected-vs-all scope
+- selected source paths are placed into the shared `FileManagementCoordinator` clipboard state
+- paste execution runs through `ExecutePasteIntoPaneDirectoryCoreAsync(...)`
+- copy and move target/source invalidation is batched after the filesystem operation instead of being marked per item
+- bulk paste intentionally skips per-row local insertion when the applied item count is large, then lets the pane reload through the shared viewport model
+
+Rules:
+
+- source/target pane choice must not fork the filesystem operation path
+- selected and all-items transfer may differ in source-path collection, but not in copy/move execution
+- command buttons between panes should not switch the active pane by themselves; panel activation should come from explicit panel interaction
+
+## Progress Model
+
+Long-running file operations use a pull-based UI progress model.
+
+Current structure:
+
+- `FileOperationProgressStore` is a thread-safe snapshot container
+- filesystem/coordinator code writes `CurrentPath`, item counts, and byte counts into the store
+- UI code owns the display loop and periodically reads `Snapshot`
+- background workers must not push UI updates, dispatch to WinUI, or signal the overlay directly
+- cancel requests flow from the overlay into the operation `CancellationToken`
+
+Rules:
+
+- progress state is data only; it must not contain `Brush`, `UIElement`, dispatcher objects, or other UI-thread-owned state
+- byte progress should be used for copy, compress, and extract when total bytes are known
+- item progress remains the fallback for operations where byte totals are not available
+- `CurrentPath` updates are informational and should not force a UI refresh per file
+
+This keeps large copy/move/compress/extract operations from making the UI update once per item while still allowing the progress dialog to sample the latest state smoothly.
 
 ## Layer 2: Command Layer
 

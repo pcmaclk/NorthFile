@@ -1521,4 +1521,34 @@
   <data name="AddressInputNotFoundTeachingTipMessage" xml:space="preserve">
     <value>{0}</value>
   </data>
+  <data name="OperationProgressTransferTitle" xml:space="preserve">
+    <value>正在传输项目</value>
+  </data>
+  <data name="OperationProgressTransferMessage" xml:space="preserve">
+    <value>正在复制或移动选中的项目。</value>
+  </data>
+  <data name="OperationProgressCompressTitle" xml:space="preserve">
+    <value>正在压缩</value>
+  </data>
+  <data name="OperationProgressCompressMessage" xml:space="preserve">
+    <value>正在按项目创建压缩包。</value>
+  </data>
+  <data name="OperationProgressExtractTitle" xml:space="preserve">
+    <value>正在解压</value>
+  </data>
+  <data name="OperationProgressExtractMessage" xml:space="preserve">
+    <value>正在按项目解压压缩包。</value>
+  </data>
+  <data name="OperationProgressDeleteTitle" xml:space="preserve">
+    <value>正在删除</value>
+  </data>
+  <data name="OperationProgressDeleteMessage" xml:space="preserve">
+    <value>正在删除选中的项目。</value>
+  </data>
+  <data name="OperationProgressCountFormat" xml:space="preserve">
+    <value>{0} / {1}</value>
+  </data>
+  <data name="OperationProgressCanceling" xml:space="preserve">
+    <value>正在取消...</value>
+  </data>
 </root>

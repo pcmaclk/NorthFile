@@ -192,7 +192,8 @@ namespace FileExplorerUI
             return ExecuteExtractZipForPaneCoreInternalAsync(
                 panelId,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipSmartAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipSmartAsync(archivePath, progress, cancellationToken),
                 "StatusExtractZipFailed",
                 "ExtractZipFailureDialogTitle",
                 "StatusExtractZipSuccess",
@@ -204,7 +205,8 @@ namespace FileExplorerUI
             return ExecuteExtractZipForPaneCoreInternalAsync(
                 panelId,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipHereAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipHereAsync(archivePath, progress, cancellationToken),
                 "StatusExtractZipFailed",
                 "ExtractZipFailureDialogTitle",
                 "StatusExtractZipSuccess",
@@ -216,7 +218,8 @@ namespace FileExplorerUI
             return ExecuteExtractZipForPaneCoreInternalAsync(
                 panelId,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipToFolderAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipToFolderAsync(archivePath, progress, cancellationToken),
                 "StatusExtractZipFailed",
                 "ExtractZipFailureDialogTitle",
                 "StatusExtractZipSuccess",
@@ -421,7 +424,11 @@ namespace FileExplorerUI
                         return;
                     }
 
-                    FileOperationResult<bool> deleteResult = await _fileManagementCoordinator.TryDeleteEntryAsync(target.Path, recursive);
+                    FileOperationResult<bool> deleteResult = await RunFileOperationWithProgressAsync(
+                        "OperationProgressDeleteTitle",
+                        "OperationProgressDeleteMessage",
+                        (progress, cancellationToken) =>
+                            _fileManagementCoordinator.TryDeleteEntryAsync(target.Path, recursive, progress, cancellationToken));
                     FileOperationsController.DeleteDecision deleteDecision = _fileOperationsController.AnalyzeDeleteResult(
                         deleteResult,
                         S("ErrorFileOperationUnknown"));
@@ -472,7 +479,11 @@ namespace FileExplorerUI
             }
         }
 
-        private async Task ExecutePasteIntoPaneDirectoryCoreAsync(WorkspacePanelId panelId, string targetDirectoryPath, bool selectPastedEntry)
+        private async Task ExecutePasteIntoPaneDirectoryCoreAsync(
+            WorkspacePanelId panelId,
+            string targetDirectoryPath,
+            bool selectPastedEntry,
+            bool deferContentRefresh = false)
         {
             if (string.IsNullOrWhiteSpace(targetDirectoryPath) ||
                 string.Equals(targetDirectoryPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
@@ -499,9 +510,19 @@ namespace FileExplorerUI
                 {
                     PreparePanelDirectoryMutation(panelId, targetDirectoryPath);
 
-                    FilePasteOperationResult pasteOperation = await _fileManagementCoordinator.TryPasteAsync(targetDirectoryPath);
+                    FilePasteOperationResult pasteOperation = await RunFileOperationWithProgressAsync(
+                        "OperationProgressTransferTitle",
+                        "OperationProgressTransferMessage",
+                        (progress, cancellationToken) =>
+                            _fileManagementCoordinator.TryPasteAsync(targetDirectoryPath, progress, cancellationToken));
                     if (!pasteOperation.Succeeded || pasteOperation.PasteResult is null)
                     {
+                        if (pasteOperation.Failure?.Error == FileOperationError.Canceled)
+                        {
+                            UpdateStatus(S("ErrorFileOperationCanceled"));
+                            return;
+                        }
+
                         string failureMessage = pasteOperation.Failure?.Message ?? S("ErrorFileOperationUnknown");
                         await ShowOperationFailureDialogAsync(
                             "PasteFailureDialogTitle",
@@ -548,11 +569,23 @@ namespace FileExplorerUI
                             break;
                         }
 
-                        FilePasteOperationResult replaceOperation = await _fileManagementCoordinator.TryResolvePasteConflictsAsync(
-                            result,
-                            replaceAll: decision == PasteConflictDialogDecision.ReplaceAll);
+                        FilePasteOperationResult replaceOperation = await RunFileOperationWithProgressAsync(
+                            "OperationProgressTransferTitle",
+                            "OperationProgressTransferMessage",
+                            (progress, cancellationToken) =>
+                                _fileManagementCoordinator.TryResolvePasteConflictsAsync(
+                                    result,
+                                    decision == PasteConflictDialogDecision.ReplaceAll,
+                                    progress,
+                                    cancellationToken));
                         if (!replaceOperation.Succeeded || replaceOperation.PasteResult is null)
                         {
+                            if (replaceOperation.Failure?.Error == FileOperationError.Canceled)
+                            {
+                                UpdateStatus(S("ErrorFileOperationCanceled"));
+                                return;
+                            }
+
                             string failureMessage = replaceOperation.Failure?.Message ?? S("ErrorFileOperationUnknown");
                             await ShowOperationFailureDialogAsync(
                                 "PasteFailureDialogTitle",
@@ -595,6 +628,7 @@ namespace FileExplorerUI
                         panelId,
                         targetDirectoryPath,
                         selectPastedEntry,
+                        deferContentRefresh,
                         appliedCount,
                         samePathCount,
                         failureCount,
@@ -671,6 +705,7 @@ namespace FileExplorerUI
             WorkspacePanelId panelId,
             string targetDirectoryPath,
             bool selectPastedEntry,
+            bool deferContentRefresh,
             int appliedCount,
             int samePathCount,
             int failureCount,
@@ -683,6 +718,7 @@ namespace FileExplorerUI
                 panelId,
                 targetDirectoryPath,
                 selectPastedEntry,
+                deferContentRefresh,
                 appliedCount,
                 appliedDirectory,
                 firstAppliedPath,
@@ -772,9 +808,19 @@ namespace FileExplorerUI
                     PreparePanelDirectoryMutation(panelId, destinationDirectory);
                 }
 
-                FileOperationResult<string> zipResult = await _fileManagementCoordinator.TryCreateZipArchiveAsync(sourcePath, archivePath);
+                FileOperationResult<string> zipResult = await RunFileOperationWithProgressAsync(
+                    "OperationProgressCompressTitle",
+                    "OperationProgressCompressMessage",
+                    (progress, cancellationToken) =>
+                        _fileManagementCoordinator.TryCreateZipArchiveAsync(sourcePath, archivePath, progress, cancellationToken));
                 if (!zipResult.Succeeded)
                 {
+                    if (zipResult.Failure?.Error == FileOperationError.Canceled)
+                    {
+                        UpdateStatus(S("ErrorFileOperationCanceled"));
+                        return;
+                    }
+
                     await ShowOperationFailureDialogAsync(
                         "CompressZipFailureDialogTitle",
                         SF("StatusCompressZipFailed", zipResult.Failure?.Message ?? S("ErrorFileOperationUnknown")));
@@ -799,7 +845,7 @@ namespace FileExplorerUI
         private async Task ExecuteExtractZipForPaneCoreInternalAsync(
             WorkspacePanelId panelId,
             FileCommandTarget target,
-            Func<string, Task<FileOperationResult<ZipExtractionInfo>>> extractAsync,
+            Func<string, FileOperationProgressStore, CancellationToken, Task<FileOperationResult<ZipExtractionInfo>>> extractAsync,
             string failureStatusKey,
             string failureDialogTitleKey,
             string successStatusKey,
@@ -826,9 +872,18 @@ namespace FileExplorerUI
                     PreparePanelDirectoryMutation(panelId, destinationDirectory);
                 }
 
-                FileOperationResult<ZipExtractionInfo> extractResult = await extractAsync(archivePath);
+                FileOperationResult<ZipExtractionInfo> extractResult = await RunFileOperationWithProgressAsync(
+                    "OperationProgressExtractTitle",
+                    "OperationProgressExtractMessage",
+                    (progress, cancellationToken) => extractAsync(archivePath, progress, cancellationToken));
                 if (!extractResult.Succeeded)
                 {
+                    if (extractResult.Failure?.Error == FileOperationError.Canceled)
+                    {
+                        UpdateStatus(S("ErrorFileOperationCanceled"));
+                        return;
+                    }
+
                     await ShowOperationFailureDialogAsync(
                         failureDialogTitleKey,
                         SF(failureStatusKey, extractResult.Failure?.Message ?? S("ErrorFileOperationUnknown")));

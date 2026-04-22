@@ -1521,4 +1521,34 @@
   <data name="AddressInputNotFoundTeachingTipMessage" xml:space="preserve">
     <value>{0}</value>
   </data>
+  <data name="OperationProgressTransferTitle" xml:space="preserve">
+    <value>Transferring items</value>
+  </data>
+  <data name="OperationProgressTransferMessage" xml:space="preserve">
+    <value>Copying or moving the selected items.</value>
+  </data>
+  <data name="OperationProgressCompressTitle" xml:space="preserve">
+    <value>Compressing</value>
+  </data>
+  <data name="OperationProgressCompressMessage" xml:space="preserve">
+    <value>Creating the archive by item count.</value>
+  </data>
+  <data name="OperationProgressExtractTitle" xml:space="preserve">
+    <value>Extracting</value>
+  </data>
+  <data name="OperationProgressExtractMessage" xml:space="preserve">
+    <value>Extracting the archive by item count.</value>
+  </data>
+  <data name="OperationProgressDeleteTitle" xml:space="preserve">
+    <value>Deleting</value>
+  </data>
+  <data name="OperationProgressDeleteMessage" xml:space="preserve">
+    <value>Deleting the selected item.</value>
+  </data>
+  <data name="OperationProgressCountFormat" xml:space="preserve">
+    <value>{0} / {1}</value>
+  </data>
+  <data name="OperationProgressCanceling" xml:space="preserve">
+    <value>Canceling...</value>
+  </data>
 </root>

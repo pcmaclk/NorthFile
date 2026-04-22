@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -98,10 +99,20 @@ namespace FileExplorerUI
 
         private void EnsurePlaceholderCount(int target)
         {
-            PrimaryEntries.Resize(target, CreatePlaceholderEntryModel);
+            EnsurePanelPlaceholderCount(WorkspacePanelId.Primary, target);
+        }
+
+        private void EnsurePanelPlaceholderCount(WorkspacePanelId panelId, int target)
+        {
+            GetPanelEntries(panelId).Resize(target, CreatePlaceholderEntryModel);
         }
 
         private void EnsureLoadedRangeCapacity(int startIndex, int rowCount)
+        {
+            EnsurePanelLoadedRangeCapacity(WorkspacePanelId.Primary, startIndex, rowCount);
+        }
+
+        private void EnsurePanelLoadedRangeCapacity(WorkspacePanelId panelId, int startIndex, int rowCount)
         {
             if (startIndex < 0 || rowCount <= 0)
             {
@@ -109,9 +120,10 @@ namespace FileExplorerUI
             }
 
             int target = checked(startIndex + rowCount);
-            if (target > PrimaryEntries.Count)
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            if (target > entries.Count)
             {
-                EnsurePlaceholderCount(target);
+                EnsurePanelPlaceholderCount(panelId, target);
             }
         }
 
@@ -138,19 +150,71 @@ namespace FileExplorerUI
 
         private void FillPageRows(int startIndex, IReadOnlyList<FileRow> rows, string? basePathOverride = null)
         {
-            if (startIndex < 0 || startIndex >= PrimaryEntries.Count)
+            FillPanelPageRows(WorkspacePanelId.Primary, startIndex, rows, basePathOverride);
+        }
+
+        private void FillPanelPageRows(
+            WorkspacePanelId panelId,
+            int startIndex,
+            IReadOnlyList<FileRow> rows,
+            string? basePathOverride = null)
+        {
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            if (startIndex < 0 || startIndex >= entries.Count)
             {
                 return;
             }
 
             string basePath = string.IsNullOrWhiteSpace(basePathOverride)
-                ? GetPanelCurrentPath(WorkspacePanelId.Primary)
+                ? GetPanelCurrentPath(panelId)
                 : basePathOverride;
-            int max = Math.Min(rows.Count, PrimaryEntries.Count - startIndex);
+            int max = Math.Min(rows.Count, entries.Count - startIndex);
             for (int i = 0; i < max; i++)
             {
-                ApplyLoadedEntryRow(PrimaryEntries[startIndex + i], basePath, rows[i]);
+                ApplyLoadedEntryRow(entries[startIndex + i], basePath, rows[i]);
             }
+        }
+
+        private void FillPanelLoadedEntries(
+            WorkspacePanelId panelId,
+            int startIndex,
+            IReadOnlyList<EntryViewModel> loadedEntries)
+        {
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            if (startIndex < 0 || startIndex >= entries.Count)
+            {
+                return;
+            }
+
+            int max = Math.Min(loadedEntries.Count, entries.Count - startIndex);
+            for (int i = 0; i < max; i++)
+            {
+                entries[startIndex + i] = loadedEntries[i];
+            }
+        }
+
+        private List<EntryViewModel> GetLoadedPanelEntries(WorkspacePanelId panelId)
+        {
+            return GetPanelEntries(panelId)
+                .Where(entry => entry.IsLoaded && !entry.IsGroupHeader)
+                .ToList();
+        }
+
+        private void SetPanelPresentationSourceEntries(
+            WorkspacePanelId panelId,
+            IReadOnlyList<EntryViewModel> loadedEntries)
+        {
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                SetPresentationSourceEntries(loadedEntries);
+                return;
+            }
+
+            PanelDataSession session = GetPanelDataSession(panelId);
+            session.PresentationSourceEntries.Clear();
+            session.PresentationSourceEntries.AddRange(loadedEntries);
+            session.PresentationSourceInitialized = true;
+            session.PresentationSourceVersion++;
         }
 
         private EntryViewModel CreateLoadedEntryModel(string basePath, FileRow row)
@@ -442,26 +506,128 @@ namespace FileExplorerUI
 
         private bool IsViewportRangeLoaded(int startIndex, int endIndex)
         {
+            return IsPanelViewportRangeLoaded(WorkspacePanelId.Primary, startIndex, endIndex);
+        }
+
+        private bool IsPanelViewportRangeLoaded(WorkspacePanelId panelId, int startIndex, int endIndex)
+        {
             if (startIndex < 0 || endIndex < startIndex)
             {
                 return true;
             }
 
-            if (startIndex >= PrimaryEntries.Count)
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            if (startIndex >= entries.Count)
             {
                 return false;
             }
 
-            int cappedEnd = Math.Min(endIndex, PrimaryEntries.Count - 1);
+            int cappedEnd = Math.Min(endIndex, entries.Count - 1);
             for (int index = startIndex; index <= cappedEnd; index++)
             {
-                if (!PrimaryEntries[index].IsLoaded)
+                if (!entries[index].IsLoaded)
                 {
                     return false;
                 }
             }
 
             return cappedEnd >= endIndex;
+        }
+
+        private async Task EnsureSimplePanelDataForViewportAsync(
+            WorkspacePanelId panelId,
+            int startIndex,
+            int endIndex,
+            bool preferMinimalPage = false)
+        {
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                await EnsureDataForViewportAsync(startIndex, endIndex, preferMinimalPage);
+                return;
+            }
+
+            if (panelId == WorkspacePanelId.Secondary && !_isDualPaneEnabled)
+            {
+                return;
+            }
+
+            int logicalCount = GetLogicalEntryCount(panelId);
+            if (logicalCount <= 0)
+            {
+                return;
+            }
+
+            int safeStartIndex = Math.Clamp(Math.Min(startIndex, endIndex), 0, logicalCount - 1);
+            int safeEndIndex = Math.Clamp(Math.Max(startIndex, endIndex), safeStartIndex, logicalCount - 1);
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            if (GetPanelViewMode(panelId) == EntryViewMode.Details && entries.Count < logicalCount)
+            {
+                EnsurePanelPlaceholderCount(panelId, logicalCount);
+                InvalidatePanelDetailsViewportRealization(panelId);
+            }
+
+            if (!IsPanelViewportRangeLoaded(panelId, safeStartIndex, safeEndIndex))
+            {
+                await QueueSparseSimplePanelViewportLoadAsync(panelId, safeStartIndex, preferMinimalPage);
+                return;
+            }
+
+            if (MaybePrefetchSimplePanelDetailsViewportBlock(panelId, safeStartIndex, safeEndIndex, preferMinimalPage))
+            {
+                return;
+            }
+        }
+
+        private bool MaybePrefetchSimplePanelDetailsViewportBlock(
+            WorkspacePanelId panelId,
+            int startIndex,
+            int endIndex,
+            bool preferMinimalPage)
+        {
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                return MaybePrefetchDetailsViewportBlock(startIndex, endIndex, preferMinimalPage);
+            }
+
+            if (GetPanelViewMode(panelId) != EntryViewMode.Details || IsSecondarySparseViewportLoadQueuedOrActive())
+            {
+                return false;
+            }
+
+            int logicalCount = GetLogicalEntryCount(panelId);
+            if (logicalCount <= 0 || endIndex < 0)
+            {
+                return false;
+            }
+
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            int visibleCount = Math.Max(1, endIndex - startIndex + 1);
+            int prefetchDistance = Math.Max(6, visibleCount / 3);
+            int searchStart = Math.Min(logicalCount - 1, endIndex + 1);
+            int searchEnd = Math.Min(logicalCount - 1, endIndex + Math.Max(visibleCount * 2, 36));
+            int firstUnloadedIndex = -1;
+            for (int index = searchStart; index <= searchEnd; index++)
+            {
+                if (index >= entries.Count || !entries[index].IsLoaded)
+                {
+                    firstUnloadedIndex = index;
+                    break;
+                }
+            }
+
+            if (firstUnloadedIndex < 0)
+            {
+                return false;
+            }
+
+            int distanceToViewportEnd = firstUnloadedIndex - endIndex;
+            if (distanceToViewportEnd > prefetchDistance)
+            {
+                return false;
+            }
+
+            _ = QueueSparseSimplePanelViewportLoadAsync(panelId, firstUnloadedIndex, preferMinimalPage);
+            return true;
         }
 
         private bool MaybePrefetchDetailsViewportBlock(int startIndex, int endIndex, bool preferMinimalPage)
@@ -712,6 +878,202 @@ namespace FileExplorerUI
             LogDetailsViewportPerf(
                 "sparse-bind.end",
                 $"req={requestId} elapsed={bindSw.ElapsedMilliseconds}ms cursor={cursor} rows={page.Rows.Count} entries={PrimaryEntries.Count} total={GetPanelTotalEntries(WorkspacePanelId.Primary)}");
+        }
+
+        private async Task LoadSparseSimplePanelViewportPageAsync(
+            WorkspacePanelId panelId,
+            int targetIndex,
+            bool preferMinimalPage)
+        {
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                await LoadSparseViewportPageAsync(targetIndex, preferMinimalPage);
+                return;
+            }
+
+            PanelViewState panelState = GetPanelState(panelId);
+            if (panelState.DataSession.IsLoading)
+            {
+                return;
+            }
+
+            string currentPath = string.IsNullOrWhiteSpace(panelState.CurrentPath)
+                ? ShellMyComputerPath
+                : panelState.CurrentPath;
+            if (GetPanelViewMode(panelId) != EntryViewMode.Details ||
+                string.Equals(currentPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            int logicalCount = GetLogicalEntryCount(panelId);
+            if (logicalCount <= 0)
+            {
+                return;
+            }
+
+            ScrollViewer viewer = GetPanelDetailsScrollViewer(panelId);
+            double viewportHeight = viewer.ViewportHeight > 0
+                ? viewer.ViewportHeight
+                : viewer.ActualHeight;
+            int visibleCount = Math.Max(1, (int)Math.Ceiling(Math.Max(1, viewportHeight) / _estimatedItemHeight));
+            int blockSize = preferMinimalPage
+                ? Math.Max(64, visibleCount * 4)
+                : Math.Max(192, visibleCount * 8);
+            blockSize = Math.Min(blockSize, logicalCount);
+            int alignedStartIndex = (targetIndex / Math.Max(1, blockSize)) * blockSize;
+            int maxStartIndex = Math.Max(0, logicalCount - blockSize);
+            int startIndex = Math.Clamp(alignedStartIndex, 0, maxStartIndex);
+            int pageSize = Math.Min(blockSize, logicalCount - startIndex);
+            ulong cursor = (ulong)startIndex;
+
+            string path = currentPath;
+            string query = panelState.QueryText;
+            long snapshotVersion = GetPanelDirectorySnapshotVersion(panelId);
+            EnsureActiveEntryResultSet(panelId, path, query);
+            IEntryResultSet? resultSet = GetPanelActiveEntryResultSet(panelId);
+            if (resultSet is null)
+            {
+                return;
+            }
+
+            panelState.DataSession.IsLoading = true;
+            RaiseSimplePanelDataStateChanged(panelId);
+            try
+            {
+                uint lastFetchMs = GetPanelLastFetchMs(panelId);
+                Stopwatch sw = Stopwatch.StartNew();
+                FileBatchPage page;
+                bool ok;
+                int rustErrorCode;
+                string rustErrorMessage;
+                int viewportIndexDelta = GetPanelLastDetailsViewportIndexDelta(panelId);
+                int viewportBlockDelta = Math.Max(0, (int)Math.Ceiling(viewportIndexDelta / (double)Math.Max(1, blockSize)));
+                bool useSynchronousRead = preferMinimalPage && viewportBlockDelta <= 1;
+
+                if (useSynchronousRead)
+                {
+                    ok = resultSet.TryReadRange(
+                        cursor,
+                        (uint)pageSize,
+                        lastFetchMs,
+                        out page,
+                        out rustErrorCode,
+                        out rustErrorMessage);
+                }
+                else
+                {
+                    (ok, page, rustErrorCode, rustErrorMessage) = await Task.Run(() =>
+                    {
+                        bool success = resultSet.TryReadRange(
+                            cursor,
+                            (uint)pageSize,
+                            lastFetchMs,
+                            out FileBatchPage p,
+                            out int code,
+                            out string msg);
+                        return (success, p, code, msg);
+                    });
+                }
+                sw.Stop();
+
+                LogDetailsViewportPerf(
+                    "simple-sparse-fetch.end",
+                    $"panel={panelId} ok={ok} elapsed={sw.ElapsedMilliseconds}ms target={targetIndex} cursor={cursor} rows={page.Rows.Count} total={page.TotalEntries} rust={rustErrorCode} sync={useSynchronousRead} indexDelta={viewportIndexDelta} blockDelta={viewportBlockDelta}");
+
+                if (!ok ||
+                    snapshotVersion != GetPanelDirectorySnapshotVersion(panelId) ||
+                    !string.Equals(path, GetPanelCurrentPath(panelId), StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                SetPanelLastFetchMs(panelId, (uint)Math.Clamp(sw.ElapsedMilliseconds, 0, int.MaxValue));
+                SetPanelTotalEntries(panelId, Math.Max(GetPanelTotalEntries(panelId), page.TotalEntries));
+                EnsurePanelPlaceholderCount(panelId, checked((int)Math.Min(int.MaxValue, GetPanelTotalEntries(panelId))));
+                FillPanelPageRows(panelId, (int)cursor, page.Rows, path);
+                SetPanelPresentationSourceEntries(panelId, GetLoadedPanelEntries(panelId));
+                SetPanelNextCursor(panelId, page.NextCursor);
+                SetPanelHasMore(panelId, page.HasMore);
+                MarkPanelDataLoadedForCurrentNavigation(panelId);
+                InvalidatePanelDetailsViewportRealization(panelId);
+                RefreshPanelStatus(panelId);
+                UpdateSimplePanelSelectionVisuals(panelId);
+            }
+            finally
+            {
+                panelState.DataSession.IsLoading = false;
+                RaiseSimplePanelDataStateChanged(panelId);
+            }
+        }
+
+        private async Task QueueSparseSimplePanelViewportLoadAsync(
+            WorkspacePanelId panelId,
+            int targetIndex,
+            bool preferMinimalPage = false)
+        {
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                await QueueSparseViewportLoadAsync(targetIndex, preferMinimalPage);
+                return;
+            }
+
+            int logicalCount = GetLogicalEntryCount(panelId);
+            if (logicalCount <= 0)
+            {
+                return;
+            }
+
+            bool shouldStartPump = false;
+            int clampedTargetIndex = Math.Clamp(targetIndex, 0, logicalCount - 1);
+            lock (_secondarySparseViewportGate)
+            {
+                _pendingSecondarySparseViewportTargetIndex = clampedTargetIndex;
+                _pendingSecondarySparseViewportPreferMinimalPage = preferMinimalPage;
+                if (!_isSecondarySparseViewportLoadActive)
+                {
+                    _isSecondarySparseViewportLoadActive = true;
+                    shouldStartPump = true;
+                }
+            }
+
+            if (!shouldStartPump)
+            {
+                LogDetailsViewportPerf("secondary-sparse-queue.update", $"target={clampedTargetIndex}");
+                return;
+            }
+
+            try
+            {
+                while (true)
+                {
+                    int nextTargetIndex;
+                    bool consumeMinimalPage;
+                    lock (_secondarySparseViewportGate)
+                    {
+                        if (_pendingSecondarySparseViewportTargetIndex is null)
+                        {
+                            _isSecondarySparseViewportLoadActive = false;
+                            return;
+                        }
+
+                        nextTargetIndex = _pendingSecondarySparseViewportTargetIndex.Value;
+                        consumeMinimalPage = _pendingSecondarySparseViewportPreferMinimalPage;
+                        _pendingSecondarySparseViewportTargetIndex = null;
+                        _pendingSecondarySparseViewportPreferMinimalPage = false;
+                    }
+
+                    LogDetailsViewportPerf("secondary-sparse-queue.consume", $"target={nextTargetIndex} minimal={consumeMinimalPage}");
+                    await LoadSparseSimplePanelViewportPageAsync(panelId, nextTargetIndex, consumeMinimalPage);
+                }
+            }
+            finally
+            {
+                lock (_secondarySparseViewportGate)
+                {
+                    _isSecondarySparseViewportLoadActive = false;
+                }
+            }
         }
 
         private static void LogDetailsViewportPerf(string stage, string detail)

@@ -220,6 +220,7 @@ namespace FileExplorerUI
             WorkspacePanelId panelId,
             string targetDirectoryPath,
             bool selectPastedEntry,
+            bool deferContentRefresh,
             int appliedCount,
             bool appliedDirectory,
             string? firstAppliedPath,
@@ -236,6 +237,17 @@ namespace FileExplorerUI
             }
 
             PreparePanelDirectoryMutation(panelId, targetDirectoryPath);
+
+            if (deferContentRefresh)
+            {
+                await RefreshPanelsAfterDeferredPasteMutationAsync(
+                    panelId,
+                    targetDirectoryPath,
+                    itemResults,
+                    shouldEnsureSelectionVisible,
+                    firstAppliedPath);
+                return;
+            }
 
             if (string.Equals(targetDirectoryPath, GetPanelCurrentPath(panelId), StringComparison.OrdinalIgnoreCase))
             {
@@ -270,6 +282,62 @@ namespace FileExplorerUI
             }
         }
 
+        private async Task RefreshPanelsAfterDeferredPasteMutationAsync(
+            WorkspacePanelId targetPanelId,
+            string targetDirectoryPath,
+            IReadOnlyList<FilePasteItemResult> itemResults,
+            bool ensureSelectionVisible,
+            string? firstAppliedPath)
+        {
+            var panelsToReload = new HashSet<WorkspacePanelId>();
+            if (string.Equals(targetDirectoryPath, GetPanelCurrentPath(targetPanelId), StringComparison.OrdinalIgnoreCase))
+            {
+                if (ensureSelectionVisible && !string.IsNullOrWhiteSpace(firstAppliedPath))
+                {
+                    SetPanelSelectedEntryPath(targetPanelId, firstAppliedPath);
+                    SetPanelFocusedEntryPath(targetPanelId, firstAppliedPath);
+                }
+
+                panelsToReload.Add(targetPanelId);
+            }
+
+            var sourceParents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (FilePasteItemResult item in itemResults)
+            {
+                if (!item.Applied || string.IsNullOrWhiteSpace(item.SourcePath))
+                {
+                    continue;
+                }
+
+                string? sourceParentPath = _explorerService.GetParentPath(item.SourcePath);
+                if (string.IsNullOrWhiteSpace(sourceParentPath))
+                {
+                    continue;
+                }
+
+                sourceParents.Add(sourceParentPath);
+                SuppressNextWatcherRefresh(sourceParentPath);
+            }
+
+            foreach (WorkspacePanelId candidatePanelId in new[] { WorkspacePanelId.Primary, WorkspacePanelId.Secondary })
+            {
+                if (sourceParents.Contains(GetPanelCurrentPath(candidatePanelId)))
+                {
+                    panelsToReload.Add(candidatePanelId);
+                }
+            }
+
+            foreach (WorkspacePanelId reloadPanelId in panelsToReload)
+            {
+                InvalidatePanelDataLoadedForCurrentNavigation(reloadPanelId);
+                await ReloadPanelDataAsync(
+                    reloadPanelId,
+                    preserveViewport: false,
+                    ensureSelectionVisible: reloadPanelId == targetPanelId && ensureSelectionVisible,
+                    focusEntries: reloadPanelId == targetPanelId);
+            }
+        }
+
         private bool TryApplyLocalPasteTargetMutationForPanel(
             WorkspacePanelId panelId,
             string targetDirectoryPath,
@@ -280,7 +348,8 @@ namespace FileExplorerUI
         {
             if (appliedCount <= 0 ||
                 string.Equals(targetDirectoryPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase) ||
-                !string.IsNullOrWhiteSpace(GetPanelQueryText(panelId)))
+                !string.IsNullOrWhiteSpace(GetPanelQueryText(panelId)) ||
+                appliedCount > 32)
             {
                 return false;
             }

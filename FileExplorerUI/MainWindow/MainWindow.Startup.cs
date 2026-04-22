@@ -38,6 +38,7 @@ namespace FileExplorerUI
             RegisterColumnSplitterHandlers(SecondaryHeaderSplitter4);
             RegisterSidebarSplitterHandlers(SidebarSplitter);
             DetailsEntriesRepeater.Layout = _detailsVirtualizingLayout;
+            SecondaryEntriesRepeater.Layout = _secondaryDetailsVirtualizingLayout;
             GroupedEntriesRepeater.Layout = _groupedVirtualizingLayout;
             RegisterEntriesKeyHandlers(DetailsEntriesScrollViewer);
             RegisterEntriesKeyHandlers(GroupedEntriesScrollViewer);

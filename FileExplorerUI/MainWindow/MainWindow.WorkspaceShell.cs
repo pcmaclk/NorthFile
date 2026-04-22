@@ -2,7 +2,9 @@ using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -279,10 +281,17 @@ namespace FileExplorerUI
             }
 
             UpdateFileCommandStates();
+            bool deferContentRefresh = transferAllLoadedEntries && transferMode == FileTransferMode.Cut;
+            string sourceDirectoryPath = GetPanelCurrentPath(sourcePanelId);
+            using IDisposable? watcherSuppression = deferContentRefresh
+                ? SuppressWatcherRefreshesUntilDisposed(sourceDirectoryPath, targetDirectoryPath)
+                : null;
+
             await ExecutePasteIntoPaneDirectoryCoreAsync(
                 targetPanelId,
                 targetDirectoryPath,
-                selectPastedEntry: true);
+                selectPastedEntry: true,
+                deferContentRefresh: deferContentRefresh);
         }
 
         private async Task<bool> ConfirmTransferAllPaneEntriesAsync(
@@ -370,6 +379,29 @@ namespace FileExplorerUI
             if (string.Equals(sourceDirectoryPath, ShellMyComputerPath, System.StringComparison.OrdinalIgnoreCase))
             {
                 return [];
+            }
+
+            if (string.IsNullOrWhiteSpace(GetPanelQueryText(sourcePanelId)))
+            {
+                try
+                {
+                    return await Task.Run(() => Directory
+                        .EnumerateFileSystemEntries(sourceDirectoryPath)
+                        .Where(path =>
+                        {
+                            string name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                            return !string.IsNullOrWhiteSpace(name) &&
+                                ShouldIncludeEntry(path, name) &&
+                                !IsDriveRoot(path);
+                        })
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList());
+                }
+                catch (Exception ex)
+                {
+                    UpdateStatusKey("StatusPasteFailedWithReason", FileOperationErrors.ToUserMessage(ex));
+                    return [];
+                }
             }
 
             PanelEntriesLoadResult loadResult = await LoadPanelEntriesSnapshotAsync(

@@ -90,7 +90,8 @@ namespace FileExplorerUI
             return ExecuteExtractZipForPaneCoreInternalAsync(
                 WorkspacePanelId.Primary,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipSmartAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipSmartAsync(archivePath, progress, cancellationToken),
                 "StatusExtractZipFailed",
                 "ExtractZipFailureDialogTitle",
                 "StatusExtractZipSuccess",
@@ -102,7 +103,8 @@ namespace FileExplorerUI
             return ExecuteExtractZipForPaneCoreInternalAsync(
                 WorkspacePanelId.Primary,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipHereAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipHereAsync(archivePath, progress, cancellationToken),
                 "StatusExtractZipFailed",
                 "ExtractZipFailureDialogTitle",
                 "StatusExtractZipSuccess",
@@ -114,7 +116,8 @@ namespace FileExplorerUI
             return ExecuteExtractZipForPaneCoreInternalAsync(
                 WorkspacePanelId.Primary,
                 target,
-                archivePath => _fileManagementCoordinator.TryExtractZipToFolderAsync(archivePath),
+                (archivePath, progress, cancellationToken) =>
+                    _fileManagementCoordinator.TryExtractZipToFolderAsync(archivePath, progress, cancellationToken),
                 "StatusExtractZipFailed",
                 "ExtractZipFailureDialogTitle",
                 "StatusExtractZipSuccess",

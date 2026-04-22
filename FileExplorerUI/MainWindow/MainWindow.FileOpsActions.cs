@@ -1,5 +1,6 @@
 using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
@@ -160,7 +161,11 @@ namespace FileExplorerUI
                         return;
                     }
 
-                    FileOperationResult<bool> deleteResult = await _fileManagementCoordinator.TryDeleteEntryAsync(targetPath, recursive);
+                    FileOperationResult<bool> deleteResult = await RunFileOperationWithProgressAsync(
+                        "OperationProgressDeleteTitle",
+                        "OperationProgressDeleteMessage",
+                        (progress, cancellationToken) =>
+                            _fileManagementCoordinator.TryDeleteEntryAsync(targetPath, recursive, progress, cancellationToken));
                     FileOperationsController.DeleteDecision deleteDecision = _fileOperationsController.AnalyzeDeleteResult(
                         deleteResult,
                         S("ErrorFileOperationUnknown"));
@@ -410,6 +415,76 @@ namespace FileExplorerUI
 
             _operationFeedbackDialog = new Controls.ModalActionDialog();
             AttachWindowOverlay(_operationFeedbackDialog);
+        }
+
+        private async Task<T> RunFileOperationWithProgressAsync<T>(
+            string titleKey,
+            string messageKey,
+            Func<FileOperationProgressStore, CancellationToken, Task<T>> operation,
+            string operationName = "file-operation",
+            long totalItems = 1,
+            long totalBytes = 0)
+        {
+            EnsureFileOperationProgressOverlay();
+            using var cancellation = new CancellationTokenSource();
+            var progressStore = new FileOperationProgressStore(operationName, totalItems, totalBytes);
+
+            _fileOperationProgressOverlay?.Show(
+                S(titleKey),
+                S(messageKey),
+                S("DialogCancelButton"),
+                () =>
+                {
+                    _fileOperationProgressOverlay?.MarkCanceling(S("OperationProgressCanceling"));
+                    progressStore.MarkCanceled();
+                    cancellation.Cancel();
+                });
+
+            Task<T> completion = Task.Run(async () => await operation(progressStore, cancellation.Token));
+            var job = new FileOperationJob<T>(progressStore, completion, cancellation);
+
+            try
+            {
+                T result = await PollFileOperationJobAsync(job);
+                progressStore.MarkCompleted();
+                _fileOperationProgressOverlay?.Update(progressStore.Snapshot, S("OperationProgressCountFormat"));
+                return result;
+            }
+            finally
+            {
+                _fileOperationProgressOverlay?.Close();
+            }
+        }
+
+        private async Task<T> PollFileOperationJobAsync<T>(FileOperationJob<T> job)
+        {
+            FileOperationProgress lastSnapshot = job.ProgressStore.Snapshot;
+            _fileOperationProgressOverlay?.Update(lastSnapshot, S("OperationProgressCountFormat"));
+
+            while (!job.Completion.IsCompleted)
+            {
+                await Task.WhenAny(job.Completion, Task.Delay(16));
+
+                FileOperationProgress snapshot = job.ProgressStore.Snapshot;
+                if (!snapshot.Equals(lastSnapshot))
+                {
+                    _fileOperationProgressOverlay?.Update(snapshot, S("OperationProgressCountFormat"));
+                    lastSnapshot = snapshot;
+                }
+            }
+
+            return await job.Completion;
+        }
+
+        private void EnsureFileOperationProgressOverlay()
+        {
+            if (_fileOperationProgressOverlay is not null)
+            {
+                return;
+            }
+
+            _fileOperationProgressOverlay = new Controls.FileOperationProgressOverlay();
+            AttachWindowOverlay(_fileOperationProgressOverlay, zIndex: 210);
         }
     }
 }

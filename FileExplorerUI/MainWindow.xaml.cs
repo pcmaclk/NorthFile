@@ -38,6 +38,23 @@ namespace FileExplorerUI
                     return Math.Max(1, viewportHeight);
                 });
             _detailsVirtualizingLayout = new FixedExtentVirtualizingLayout(_detailsRepeaterLayoutProfile);
+            _secondaryDetailsRepeaterLayoutProfile = new EntriesRepeaterLayoutProfile(
+                isVertical: true,
+                primaryItemExtentProvider: () => Math.Max(32.0, EntryItemMetrics.RowHeight + 4),
+                totalItemCountProvider: () =>
+                {
+                    PanelDataSession session = SecondaryPanelState.DataSession;
+                    return checked((int)Math.Max((uint)session.Entries.Count, session.TotalEntries));
+                },
+                crossAxisExtentProvider: () => Math.Max(1, SecondaryDetailsRowWidth),
+                viewportPrimaryExtentProvider: () =>
+                {
+                    double viewportHeight = SecondaryEntriesScrollViewer.ViewportHeight > 0
+                        ? SecondaryEntriesScrollViewer.ViewportHeight
+                        : SecondaryEntriesScrollViewer.ActualHeight;
+                    return Math.Max(1, viewportHeight);
+                });
+            _secondaryDetailsVirtualizingLayout = new FixedExtentVirtualizingLayout(_secondaryDetailsRepeaterLayoutProfile);
             _groupedRepeaterLayoutProfile = new GroupedListRepeaterLayoutProfile(
                 itemsProvider: () => PrimaryEntries,
                 itemWidthProvider: () => Math.Max(1, EntryContainerWidth),

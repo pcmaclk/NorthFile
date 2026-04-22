@@ -115,6 +115,8 @@ namespace FileExplorerUI
         private readonly EntriesPresentationBuilder _entriesPresentationBuilder = new();
         private readonly EntriesRepeaterLayoutProfile _detailsRepeaterLayoutProfile;
         private readonly FixedExtentVirtualizingLayout _detailsVirtualizingLayout;
+        private readonly EntriesRepeaterLayoutProfile _secondaryDetailsRepeaterLayoutProfile;
+        private readonly FixedExtentVirtualizingLayout _secondaryDetailsVirtualizingLayout;
         private readonly GroupedListRepeaterLayoutProfile _groupedRepeaterLayoutProfile;
         private readonly GroupedListVirtualizingLayout _groupedVirtualizingLayout;
         private IEntriesViewHost? _detailsEntriesViewHost;
@@ -201,10 +203,15 @@ namespace FileExplorerUI
         private readonly ExplorerService _explorerService = new();
         private readonly FileManagementCoordinator _fileManagementCoordinator;
         private readonly Dictionary<string, long> _suppressedWatcherRefreshPaths = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, int> _activeWatcherRefreshSuppressions = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _sparseViewportGate = new();
         private int? _pendingSparseViewportTargetIndex;
         private bool _pendingSparseViewportPreferMinimalPage;
         private bool _isSparseViewportLoadActive;
+        private readonly object _secondarySparseViewportGate = new();
+        private int? _pendingSecondarySparseViewportTargetIndex;
+        private bool _pendingSecondarySparseViewportPreferMinimalPage;
+        private bool _isSecondarySparseViewportLoadActive;
         private readonly string _engineVersion;
         private EntryViewModel? _activeRenameOverlayEntry;
         private WorkspacePanelId _activeRenameOverlayPanelId = WorkspacePanelId.Primary;
@@ -275,6 +282,7 @@ namespace FileExplorerUI
         private bool _suppressRenameTextFiltering;
         private Controls.ModalActionDialog? _operationFeedbackDialog;
         private Controls.ModalActionDialog? _pasteConflictDialog;
+        private Controls.FileOperationProgressOverlay? _fileOperationProgressOverlay;
 
         private readonly record struct PrimaryPresentationNotificationState(
             EntryViewMode ViewMode,

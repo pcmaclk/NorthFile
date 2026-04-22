@@ -99,6 +99,7 @@
                     x:Name="LeftTitleBarDragRegion"
                     Grid.Column="1"
                     Background="Transparent"
+                    Loaded="TitleBarDragRegion_Loaded"
                     SizeChanged="TitleBarDragRegion_SizeChanged" />
             </Grid>
 
@@ -306,7 +307,10 @@
                     <Grid
                         x:Name="WindowTabDragRegion"
                         Grid.Column="1"
+                        MinWidth="188"
+                        HorizontalAlignment="Stretch"
                         Background="Transparent"
+                        Loaded="TitleBarDragRegion_Loaded"
                         SizeChanged="TitleBarDragRegion_SizeChanged" />
                 </Grid>
             </TabView.TabStripFooter>
@@ -2101,6 +2105,7 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Top"
             Background="Transparent"
+            Loaded="TitleBarDragRegion_Loaded"
             SizeChanged="TitleBarDragRegion_SizeChanged"
             Visibility="{x:Bind SettingsShellVisibility, Mode=OneWay}" />
 

@@ -1,3 +1,4 @@
+using FileExplorerUI.Collections;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -339,15 +340,37 @@ namespace FileExplorerUI
                     }
                     return false;
                 case Windows.System.VirtualKey.Home:
+                    if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details)
+                    {
+                        _ = SelectDetailsEntryByLogicalIndexAsync(WorkspacePanelId.Primary, 0);
+                        return true;
+                    }
                     TrySelectBoundaryEntry(first: true);
                     return true;
                 case Windows.System.VirtualKey.End:
+                    if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details)
+                    {
+                        _ = SelectDetailsEntryByLogicalIndexAsync(
+                            WorkspacePanelId.Primary,
+                            Math.Max(0, GetLogicalEntryCount(WorkspacePanelId.Primary) - 1));
+                        return true;
+                    }
                     TrySelectBoundaryEntry(first: false);
                     return true;
                 case Windows.System.VirtualKey.PageUp:
+                    if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details)
+                    {
+                        _ = MoveDetailsSelectionByPageAsync(WorkspacePanelId.Primary, -1);
+                        return true;
+                    }
                     TryMoveSelectionByPage(-1);
                     return true;
                 case Windows.System.VirtualKey.PageDown:
+                    if (GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details)
+                    {
+                        _ = MoveDetailsSelectionByPageAsync(WorkspacePanelId.Primary, 1);
+                        return true;
+                    }
                     TryMoveSelectionByPage(1);
                     return true;
                 case Windows.System.VirtualKey.Enter:
@@ -647,6 +670,139 @@ namespace FileExplorerUI
             return true;
         }
 
+        private async Task MoveDetailsSelectionByPageAsync(WorkspacePanelId panelId, int direction)
+        {
+            int logicalCount = GetLogicalEntryCount(panelId);
+            if (logicalCount <= 0)
+            {
+                return;
+            }
+
+            int currentIndex = GetSelectedDetailsEntryIndex(panelId);
+            if (currentIndex < 0)
+            {
+                currentIndex = EstimateViewportIndex(panelId, GetPanelDetailsScrollViewer(panelId));
+            }
+
+            int step = Math.Max(1, GetDetailsKeyboardPageStep(panelId));
+            int targetIndex = Math.Clamp(currentIndex + (direction * step), 0, logicalCount - 1);
+            await SelectDetailsEntryByLogicalIndexAsync(panelId, targetIndex);
+        }
+
+        private async Task SelectDetailsEntryByLogicalIndexAsync(WorkspacePanelId panelId, int targetIndex)
+        {
+            int logicalCount = GetLogicalEntryCount(panelId);
+            if (logicalCount <= 0)
+            {
+                return;
+            }
+
+            int safeIndex = Math.Clamp(targetIndex, 0, logicalCount - 1);
+            ScrollDetailsIndexIntoView(panelId, safeIndex);
+
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                await EnsureDataForViewportAsync(safeIndex, safeIndex, preferMinimalPage: true);
+            }
+            else
+            {
+                await EnsureSimplePanelDataForViewportAsync(panelId, safeIndex, safeIndex, preferMinimalPage: true);
+            }
+
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            if (safeIndex >= entries.Count || !entries[safeIndex].IsLoaded)
+            {
+                return;
+            }
+
+            SelectPanelEntryFromKeyboardByIndex(panelId, entries[safeIndex], safeIndex);
+        }
+
+        private int GetSelectedDetailsEntryIndex(WorkspacePanelId panelId)
+        {
+            string? activePath = panelId == WorkspacePanelId.Secondary
+                ? !string.IsNullOrWhiteSpace(SecondaryPanelState.SelectedEntryPath)
+                    ? SecondaryPanelState.SelectedEntryPath
+                    : SecondaryPanelState.FocusedEntryPath
+                : !string.IsNullOrWhiteSpace(_selectedEntryPath)
+                    ? _selectedEntryPath
+                    : _focusedEntryPath;
+            if (string.IsNullOrWhiteSpace(activePath))
+            {
+                return -1;
+            }
+
+            BatchObservableCollection<EntryViewModel> entries = GetPanelEntries(panelId);
+            for (int index = 0; index < entries.Count; index++)
+            {
+                EntryViewModel entry = entries[index];
+                if (entry.IsLoaded && string.Equals(entry.FullPath, activePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        private int GetDetailsKeyboardPageStep(WorkspacePanelId panelId)
+        {
+            ScrollViewer viewer = GetPanelDetailsScrollViewer(panelId);
+            double viewportHeight = viewer.ViewportHeight > 0
+                ? viewer.ViewportHeight
+                : viewer.ActualHeight;
+            if (viewportHeight <= 0 || _estimatedItemHeight <= 0)
+            {
+                return 8;
+            }
+
+            return Math.Max(1, (int)Math.Floor(viewportHeight / _estimatedItemHeight));
+        }
+
+        private void SelectPanelEntryFromKeyboardByIndex(WorkspacePanelId panelId, EntryViewModel entry, int index)
+        {
+            if (panelId == WorkspacePanelId.Secondary)
+            {
+                SecondarySelectEntryInList(entry);
+                ScrollDetailsIndexIntoView(panelId, index);
+                return;
+            }
+
+            SelectEntryInList(entry, ensureVisible: false);
+            ScrollDetailsIndexIntoView(panelId, index);
+        }
+
+        private void ScrollDetailsIndexIntoView(WorkspacePanelId panelId, int index)
+        {
+            if (index < 0)
+            {
+                return;
+            }
+
+            ScrollViewer viewer = GetPanelDetailsScrollViewer(panelId);
+            double itemExtent = Math.Max(1.0, _estimatedItemHeight);
+            double viewportHeight = viewer.ViewportHeight > 0
+                ? viewer.ViewportHeight
+                : viewer.ActualHeight;
+            viewportHeight = Math.Max(itemExtent, viewportHeight);
+
+            double currentTop = Math.Max(0, viewer.VerticalOffset);
+            double currentBottom = currentTop + viewportHeight;
+            double itemTop = index * itemExtent;
+            double itemBottom = itemTop + itemExtent;
+            if (itemTop >= currentTop && itemBottom <= currentBottom)
+            {
+                return;
+            }
+
+            double targetOffset = itemTop < currentTop
+                ? itemTop
+                : Math.Max(0, itemBottom - viewportHeight);
+            double logicalMaxOffset = Math.Max(0, (GetLogicalEntryCount(panelId) * itemExtent) - viewportHeight);
+            double maxOffset = Math.Max(viewer.ScrollableHeight, logicalMaxOffset);
+            viewer.ChangeView(null, Math.Min(maxOffset, targetOffset), null, disableAnimation: true);
+        }
+
         private void SelectEntryFromKeyboard(EntryViewModel entry)
         {
             ScrollViewer viewer = GetPanelViewMode(WorkspacePanelId.Primary) == EntryViewMode.Details
@@ -751,13 +907,19 @@ namespace FileExplorerUI
                 case Windows.System.VirtualKey.Down:
                     return TryMoveSecondarySelectionBy(1);
                 case Windows.System.VirtualKey.Home:
-                    return TrySelectSecondaryBoundaryEntry(first: true);
+                    _ = SelectDetailsEntryByLogicalIndexAsync(WorkspacePanelId.Secondary, 0);
+                    return true;
                 case Windows.System.VirtualKey.End:
-                    return TrySelectSecondaryBoundaryEntry(first: false);
+                    _ = SelectDetailsEntryByLogicalIndexAsync(
+                        WorkspacePanelId.Secondary,
+                        Math.Max(0, GetLogicalEntryCount(WorkspacePanelId.Secondary) - 1));
+                    return true;
                 case Windows.System.VirtualKey.PageUp:
-                    return TryMoveSecondarySelectionByPage(-1);
+                    _ = MoveDetailsSelectionByPageAsync(WorkspacePanelId.Secondary, -1);
+                    return true;
                 case Windows.System.VirtualKey.PageDown:
-                    return TryMoveSecondarySelectionByPage(1);
+                    _ = MoveDetailsSelectionByPageAsync(WorkspacePanelId.Secondary, 1);
+                    return true;
                 case Windows.System.VirtualKey.Enter:
                     return TryActivateSecondarySelectedEntry();
                 default:

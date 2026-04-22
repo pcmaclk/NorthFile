@@ -391,12 +391,13 @@ namespace FileExplorerUI
                 }
 
                 SetPanelLastFetchMs(panelId, (uint)Math.Clamp(loadResult.ElapsedMilliseconds, 0, int.MaxValue));
+                uint totalEntries = !loadResult.Page.HasMore || loadResult.Page.TotalEntries == 0
+                    ? Math.Max(GetPanelTotalEntries(panelId), checked((uint)Math.Min(uint.MaxValue, panelState.DataSession.NextCursor + (ulong)loadResult.VisibleRows.Count)))
+                    : loadResult.Page.TotalEntries;
+                SetPanelTotalEntries(panelId, totalEntries);
                 ApplyPanelPageRows(panelId, path, loadResult.VisibleRows, append: true);
                 SetPanelNextCursor(panelId, loadResult.Page.NextCursor);
                 SetPanelHasMore(panelId, loadResult.Page.HasMore);
-                SetPanelTotalEntries(panelId, !loadResult.Page.HasMore || loadResult.Page.TotalEntries == 0
-                    ? (uint)panelState.DataSession.Entries.Count
-                    : loadResult.Page.TotalEntries);
                 RefreshPanelStatus(panelId);
                 if (panelId == WorkspacePanelId.Secondary)
                 {
@@ -430,15 +431,20 @@ namespace FileExplorerUI
             bool focusEntries)
         {
             PanelDataSession session = panelState.DataSession;
-            session.Entries.ReplaceAll(loadResult.Entries);
-            session.PresentationSourceEntries.Clear();
-            session.PresentationSourceEntries.AddRange(loadResult.Entries);
             session.GroupedEntryColumns.Clear();
             session.ActiveEntryResultSet = loadResult.ActiveEntryResultSet;
             session.NextCursor = loadResult.NextCursor;
             session.HasMore = loadResult.HasMore;
             session.TotalEntries = loadResult.TotalEntries;
+            session.Entries.Clear();
+            int logicalCount = checked((int)Math.Min(
+                int.MaxValue,
+                Math.Max(loadResult.TotalEntries, (uint)loadResult.Entries.Count)));
+            EnsurePanelPlaceholderCount(panelId, logicalCount);
+            FillPanelLoadedEntries(panelId, 0, loadResult.Entries);
+            SetPanelPresentationSourceEntries(panelId, GetLoadedPanelEntries(panelId));
             MarkPanelDataLoadedForCurrentNavigation(panelId);
+            InvalidatePanelDetailsViewportRealization(panelId);
             RefreshPanelStatus(panelId);
             if (panelId == WorkspacePanelId.Secondary)
             {

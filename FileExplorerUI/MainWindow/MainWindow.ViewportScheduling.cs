@@ -87,9 +87,9 @@ namespace FileExplorerUI
                 {
                     _ = EnsureDataForViewportAsync(viewportStartIndex, viewportBottomIndex, preferMinimalPage: e.IsIntermediate);
                 }
-                else if (ShouldPrefetchSecondaryPanePage(viewer, e.IsIntermediate))
+                else
                 {
-                    _ = LoadNextSimplePanelPageAsync(panelId);
+                    _ = EnsureSimplePanelDataForViewportAsync(panelId, viewportStartIndex, viewportBottomIndex, preferMinimalPage: e.IsIntermediate);
                 }
             }
 
@@ -209,6 +209,14 @@ namespace FileExplorerUI
             lock (_sparseViewportGate)
             {
                 return _isSparseViewportLoadActive || _pendingSparseViewportTargetIndex is not null;
+            }
+        }
+
+        private bool IsSecondarySparseViewportLoadQueuedOrActive()
+        {
+            lock (_secondarySparseViewportGate)
+            {
+                return _isSecondarySparseViewportLoadActive || _pendingSecondarySparseViewportTargetIndex is not null;
             }
         }
 
