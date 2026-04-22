@@ -121,7 +121,14 @@
             HorizontalAlignment="Stretch"
             RowDefinitions="Auto,Auto,*">
             <Grid.Resources>
-                <ResourceDictionary Source="Resources/MainWindowDetailsHeaderResources.xaml" />
+                <ResourceDictionary>
+                    <ResourceDictionary.MergedDictionaries>
+                        <ResourceDictionary Source="Resources/MainWindowDetailsHeaderResources.xaml" />
+                        <ResourceDictionary Source="Resources/MainWindowPaneChromeResources.xaml" />
+                        <ResourceDictionary Source="Resources/MainWindowOverlayResources.xaml" />
+                        <ResourceDictionary Source="Resources/MainWindowStatusResources.xaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                </ResourceDictionary>
             </Grid.Resources>
         <!-- Right-side title bar shell: tab strip stays aligned to the content column. -->
         <TabView
@@ -323,11 +330,7 @@
                                     <Border
                                         x:Name="AddressBreadcrumbBorder"
                                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
-                                        Padding="12,0,12,0"
-                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
-                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="{StaticResource ControlCornerRadius}"
+                                        Style="{StaticResource PaneAddressBreadcrumbBorderStyle}"
                                         SizeChanged="AddressBreadcrumbBorder_SizeChanged"
                                         Tapped="AddressBreadcrumbBorder_Tapped">
                                         <Grid
@@ -336,13 +339,7 @@
                                             <Button
                                                 x:Name="OverflowBreadcrumbButton"
                                                 Grid.Column="0"
-                                                Padding="4,0,4,0"
-                                                Margin="0,0,4,0"
-                                                MinWidth="0"
-                                                MinHeight="0"
-                                                Background="Transparent"
-                                                BorderBrush="Transparent"
-                                                BorderThickness="0"
+                                                Style="{StaticResource PaneOverflowBreadcrumbButtonStyle}"
                                                 Visibility="Collapsed"
                                                 Click="OverflowBreadcrumbButton_Click">
                                                 <ToolTipService.ToolTip>
@@ -372,12 +369,7 @@
                                                             Loaded="MeasureBreadcrumbItem_Loaded"
                                                             SizeChanged="MeasureBreadcrumbItem_SizeChanged">
                                                             <Button
-                                                                Padding="6,0,6,0"
-                                                                MinWidth="0"
-                                                                MinHeight="0"
-                                                                Background="Transparent"
-                                                                BorderBrush="Transparent"
-                                                                BorderThickness="0"
+                                                                Style="{StaticResource PaneBreadcrumbButtonStyle}"
                                                                 IsHitTestVisible="False">
                                                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                                                     <FontIcon
@@ -390,12 +382,7 @@
                                                             </Button>
                                                             <Button
                                                                 Grid.Column="1"
-                                                                Padding="4,0,4,0"
-                                                                MinWidth="0"
-                                                                MinHeight="0"
-                                                                Background="Transparent"
-                                                                BorderBrush="Transparent"
-                                                                BorderThickness="0"
+                                                                Style="{StaticResource PaneBreadcrumbChevronButtonStyle}"
                                                                 Visibility="{Binding ChevronVisibility}"
                                                                 IsHitTestVisible="False">
                                                                 <Button.Content>
@@ -423,12 +410,7 @@
                                                     <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
                                                         <Grid ColumnDefinitions="Auto,Auto">
                                                             <Button
-                                                                Padding="6,0,6,0"
-                                                                MinWidth="0"
-                                                                MinHeight="0"
-                                                                Background="Transparent"
-                                                                BorderBrush="Transparent"
-                                                                BorderThickness="0"
+                                                                Style="{StaticResource PaneBreadcrumbButtonStyle}"
                                                                 Tag="{Binding FullPath}"
                                                                 Click="BreadcrumbButton_Click">
                                                                 <StackPanel Orientation="Horizontal" Spacing="12">
@@ -444,12 +426,7 @@
                                                             </Button>
                                                             <Button
                                                                 Grid.Column="1"
-                                                                Padding="4,0,4,0"
-                                                                MinWidth="0"
-                                                                MinHeight="0"
-                                                                Background="Transparent"
-                                                                BorderBrush="Transparent"
-                                                                BorderThickness="0"
+                                                                Style="{StaticResource PaneBreadcrumbChevronButtonStyle}"
                                                                 Tag="{Binding FullPath}"
                                                                 Visibility="{Binding ChevronVisibility}"
                                                                 Click="BreadcrumbChevronButton_Click">
@@ -479,10 +456,7 @@
                                     <TextBox
                                         x:Name="PathTextBox"
                                         x:Uid="PathTextBox"
-                                        Padding="12,6,36,0"
-                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
-                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
-                                        Foreground="{ThemeResource InactivePaneForegroundBrush}"
+                                        Style="{StaticResource PaneAddressTextBoxStyle}"
                                         GotFocus="PrimaryPaneInput_GotFocus"
                                         PointerPressed="PrimaryPaneInput_PointerPressed"
                                         TextChanging="PathTextBox_TextChanging"
@@ -518,12 +492,8 @@
                                         x:Name="SearchTextBox"
                                         x:Uid="SearchTextBox"
                                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
-                                        Padding="12,5,12,4"
                                         Visibility="{x:Bind PrimaryPaneSearchVisibility, Mode=OneWay}"
-                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
-                                        Foreground="{ThemeResource InactivePaneForegroundBrush}"
-                                        HorizontalAlignment="Stretch"
-                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
+                                        Style="{StaticResource PaneSearchTextBoxStyle}"
                                         GotFocus="PrimaryPaneInput_GotFocus"
                                         PointerPressed="PrimaryPaneInput_PointerPressed"
                                         TextChanged="SearchTextBox_TextChanged"
@@ -663,11 +633,7 @@
                                     <Border
                                         x:Name="SecondaryAddressBreadcrumbBorder"
                                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
-                                        Padding="12,0,12,0"
-                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
-                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="{StaticResource ControlCornerRadius}"
+                                        Style="{StaticResource PaneAddressBreadcrumbBorderStyle}"
                                         SizeChanged="SecondaryAddressBreadcrumbBorder_SizeChanged"
                                         Tapped="SecondaryAddressBreadcrumbBorder_Tapped">
                                         <Grid
@@ -676,13 +642,7 @@
                                             <Button
                                                 x:Name="SecondaryOverflowBreadcrumbButton"
                                                 Grid.Column="0"
-                                                Padding="4,0,4,0"
-                                                Margin="0,0,4,0"
-                                                MinWidth="0"
-                                                MinHeight="0"
-                                                Background="Transparent"
-                                                BorderBrush="Transparent"
-                                                BorderThickness="0"
+                                                Style="{StaticResource PaneOverflowBreadcrumbButtonStyle}"
                                                 Visibility="Collapsed"
                                                 Click="SecondaryOverflowBreadcrumbButton_Click">
                                                 <FontIcon
@@ -709,12 +669,7 @@
                                                             Loaded="SecondaryMeasureBreadcrumbItem_Loaded"
                                                             SizeChanged="SecondaryMeasureBreadcrumbItem_SizeChanged">
                                                             <Button
-                                                                Padding="6,0,6,0"
-                                                                MinWidth="0"
-                                                                MinHeight="0"
-                                                                Background="Transparent"
-                                                                BorderBrush="Transparent"
-                                                                BorderThickness="0"
+                                                                Style="{StaticResource PaneBreadcrumbButtonStyle}"
                                                                 IsHitTestVisible="False">
                                                                 <StackPanel Orientation="Horizontal" Spacing="12">
                                                                     <FontIcon
@@ -727,12 +682,7 @@
                                                             </Button>
                                                             <Button
                                                                 Grid.Column="1"
-                                                                Padding="4,0,4,0"
-                                                                MinWidth="0"
-                                                                MinHeight="0"
-                                                                Background="Transparent"
-                                                                BorderBrush="Transparent"
-                                                                BorderThickness="0"
+                                                                Style="{StaticResource PaneBreadcrumbChevronButtonStyle}"
                                                                 Visibility="{Binding ChevronVisibility}"
                                                                 IsHitTestVisible="False">
                                                                 <Button.Content>
@@ -760,12 +710,7 @@
                                                     <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
                                                         <Grid ColumnDefinitions="Auto,Auto">
                                                             <Button
-                                                                Padding="6,0,6,0"
-                                                                MinWidth="0"
-                                                                MinHeight="0"
-                                                                Background="Transparent"
-                                                                BorderBrush="Transparent"
-                                                                BorderThickness="0"
+                                                                Style="{StaticResource PaneBreadcrumbButtonStyle}"
                                                                 Tag="{Binding FullPath}"
                                                                 Click="SecondaryBreadcrumbButton_Click">
                                                                 <StackPanel Orientation="Horizontal" Spacing="12">
@@ -781,12 +726,7 @@
                                                             </Button>
                                                             <Button
                                                                 Grid.Column="1"
-                                                                Padding="4,0,4,0"
-                                                                MinWidth="0"
-                                                                MinHeight="0"
-                                                                Background="Transparent"
-                                                                BorderBrush="Transparent"
-                                                                BorderThickness="0"
+                                                                Style="{StaticResource PaneBreadcrumbChevronButtonStyle}"
                                                                 Tag="{Binding FullPath}"
                                                                 Visibility="{Binding ChevronVisibility}"
                                                                 Click="SecondaryBreadcrumbChevronButton_Click">
@@ -815,12 +755,8 @@
                                     </Border>
                                     <TextBox
                                         x:Name="SecondaryPaneAddressTextBox"
-                                        Padding="12,6,36,0"
                                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
-                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
-                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
-                                        Foreground="{ThemeResource InactivePaneForegroundBrush}"
-                                        HorizontalAlignment="Stretch"
+                                        Style="{StaticResource PaneAddressTextBoxStyle}"
                                         Text="{x:Bind SecondaryPaneAddressEditorText, Mode=TwoWay}"
                                         GotFocus="SecondaryPaneInput_GotFocus"
                                         PointerPressed="SecondaryPaneInput_PointerPressed"
@@ -849,11 +785,7 @@
                                     <TextBox
                                         x:Name="SecondaryPaneSearchTextBox"
                                         Height="{x:Bind ShellControlSize, Mode=OneWay}"
-                                        Padding="12,5,12,4"
-                                        Background="{ThemeResource InactivePaneInputBackgroundBrush}"
-                                        BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}"
-                                        Foreground="{ThemeResource InactivePaneForegroundBrush}"
-                                        HorizontalAlignment="Stretch"
+                                        Style="{StaticResource PaneSearchTextBoxStyle}"
                                         PlaceholderText="{x:Bind SecondaryPaneSearchPlaceholderText, Mode=OneWay}"
                                         Text="{x:Bind SecondaryPaneSearchText, Mode=TwoWay}"
                                         GotFocus="SecondaryPaneInput_GotFocus"
@@ -1879,65 +1811,15 @@
                         IsHitTestVisible="True">
                         <Border
                             x:Name="RenameOverlayBorder"
-                            Width="160"
-                            Height="24"
-                            Background="{ThemeResource TextControlBackgroundFocused}"
-                            BorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
-                            BorderThickness="1"
-                            Padding="1,0,8,1"
-                            CornerRadius="0"
-                            IsHitTestVisible="True"
+                            Style="{StaticResource RenameOverlayBorderStyle}"
                             Visibility="Collapsed">
                             <TextBox
                                 x:Name="RenameOverlayTextBox"
-                                Background="Transparent"
                                 BeforeTextChanging="RenameOverlayTextBox_BeforeTextChanging"
-                                BorderBrush="Transparent"
-                                BorderThickness="0"
-                                FontSize="14"
-                                FocusVisualPrimaryThickness="0"
-                                FocusVisualSecondaryThickness="0"
-                                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                HorizontalContentAlignment="Left"
                                 KeyDown="RenameOverlayTextBox_KeyDown"
                                 LostFocus="RenameOverlayTextBox_LostFocus"
-                                MinHeight="24"
-                                Padding="0"
-                                TextAlignment="Left"
                                 TextChanging="RenameOverlayTextBox_TextChanging"
-                                Margin="0,-2,0,0"
-                                UseSystemFocusVisuals="False"
-                                VerticalContentAlignment="Center">
-                                <TextBox.Template>
-                                    <ControlTemplate TargetType="TextBox">
-                                        <Grid>
-                                            <Border
-                                                x:Name="BorderElement"
-                                                Background="Transparent"
-                                                BorderBrush="Transparent"
-                                                BorderThickness="0"
-                                                Control.IsTemplateFocusTarget="True" />
-                                            <ScrollViewer
-                                                x:Name="ContentElement"
-                                                AutomationProperties.AccessibilityView="Raw"
-                                                Foreground="{TemplateBinding Foreground}"
-                                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
-                                                HorizontalScrollMode="{TemplateBinding ScrollViewer.HorizontalScrollMode}"
-                                                IsDeferredScrollingEnabled="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
-                                                IsHorizontalRailEnabled="{TemplateBinding ScrollViewer.IsHorizontalRailEnabled}"
-                                                IsTabStop="False"
-                                                IsVerticalRailEnabled="{TemplateBinding ScrollViewer.IsVerticalRailEnabled}"
-                                                Margin="{TemplateBinding BorderThickness}"
-                                                Padding="{TemplateBinding Padding}"
-                                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
-                                                VerticalScrollMode="{TemplateBinding ScrollViewer.VerticalScrollMode}"
-                                                ZoomMode="Disabled" />
-                                        </Grid>
-                                    </ControlTemplate>
-                                </TextBox.Template>
-                            </TextBox>
+                                Style="{StaticResource RenameOverlayTextBoxStyle}" />
                         </Border>
                     </Canvas>
                 </Grid>
@@ -1952,29 +1834,16 @@
                     <TextBlock
                         x:Name="PrimaryStatusTextBlock"
                         Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
-                        VerticalAlignment="Center"
-                        FontSize="11"
-                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                        LineHeight="11"
-                        LineStackingStrategy="BlockLineHeight"
-                        Opacity="0.72"
+                        Style="{StaticResource PaneStatusTextStyle}"
                         Text="{x:Bind PrimaryPaneStatusText, Mode=OneWay}"
-                        TextTrimming="CharacterEllipsis"
-                        TextWrapping="NoWrap" />
+                        />
                     <TextBlock
                         x:Name="SecondaryStatusTextBlock"
                         Grid.Column="2"
                         Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
-                        VerticalAlignment="Center"
-                        FontSize="11"
-                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                        LineHeight="11"
-                        LineStackingStrategy="BlockLineHeight"
-                        Opacity="0.72"
+                        Style="{StaticResource PaneStatusTextStyle}"
                         Text="{x:Bind SecondaryPaneStatusText, Mode=OneWay}"
-                        TextTrimming="CharacterEllipsis"
-                        Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}"
-                        TextWrapping="NoWrap" />
+                        Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}" />
                 </Grid>
         </Grid>
         </Grid>
