@@ -127,6 +127,7 @@
                         <ResourceDictionary Source="Resources/MainWindowPaneChromeResources.xaml" />
                         <ResourceDictionary Source="Resources/MainWindowOverlayResources.xaml" />
                         <ResourceDictionary Source="Resources/MainWindowStatusResources.xaml" />
+                        <ResourceDictionary Source="Resources/MainWindowEntryListResources.xaml" />
                     </ResourceDictionary.MergedDictionaries>
                 </ResourceDictionary>
             </Grid.Resources>
@@ -995,16 +996,11 @@
                         <ScrollViewer
                             x:Name="DetailsEntriesScrollViewer"
                             Grid.Row="1"
-                            IsTabStop="True"
-                            UseSystemFocusVisuals="False"
-                            Margin="0"
-                            HorizontalAlignment="Stretch"
-                            Padding="10,4"
+                            Style="{StaticResource EntryListScrollViewerStyle}"
                             HorizontalScrollBarVisibility="{x:Bind EntriesHorizontalScrollBarVisibility, Mode=OneWay}"
                             HorizontalScrollMode="{x:Bind EntriesHorizontalScrollMode, Mode=OneWay}"
                             VerticalScrollBarVisibility="Visible"
                             VerticalScrollMode="Enabled"
-                            Background="Transparent"
                             DoubleTapped="GroupedEntriesView_DoubleTapped"
                             PointerPressed="GroupedEntriesView_PointerPressedPreview"
                             RightTapped="GroupedEntriesView_RightTapped"
@@ -1046,16 +1042,11 @@
                                             </Border>
                                             <controls:EntryItemHost
                                                 Grid.Row="1"
-                                                Margin="0,2,0,2"
+                                                Style="{StaticResource DetailsEntryItemHostStyle}"
                                                 Width="{Binding ElementName=RootWindow, Path=DetailsRowWidth}"
                                                 MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
-                                                Padding="0,3,0,3"
-                                                Background="Transparent"
-                                                IndicatorBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                                                 IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
                                                 IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
-                                                AnchorBorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
-                                                HorizontalAlignment="Left"
                                                 PointerPressed="EntryRow_PointerPressed"
                                                 SelectedBackground="{Binding RowBackground}"
                                                 SelectedPointerOverBackground="{Binding RowBackground}"
@@ -1077,9 +1068,9 @@
                                                         Entry="{Binding}"
                                                         Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
                                                         VerticalAlignment="Center" />
-                                                    <TextBlock Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding Type}" TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Grid.Column="4" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SizeText}" />
-                                                    <TextBlock Grid.Column="6" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding ModifiedText}" />
+                                                    <TextBlock Grid.Column="2" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding Type}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="4" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding SizeText}" />
+                                                    <TextBlock Grid.Column="6" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding ModifiedText}" />
                                                 </Grid>
                                             </controls:EntryItemHost>
                                         </Grid>
@@ -1091,17 +1082,12 @@
                         <ScrollViewer
                             x:Name="GroupedEntriesScrollViewer"
                             Grid.Row="1"
-                            IsTabStop="True"
-                            UseSystemFocusVisuals="False"
-                            Margin="0"
-                            HorizontalAlignment="Stretch"
-                            Padding="10,4"
+                            Style="{StaticResource EntryListScrollViewerStyle}"
                             HorizontalScrollBarVisibility="Auto"
                             HorizontalScrollMode="Enabled"
                             SizeChanged="GroupedEntriesScrollViewer_SizeChanged"
                             VerticalScrollBarVisibility="Hidden"
                             VerticalScrollMode="Disabled"
-                            Background="Transparent"
                             DoubleTapped="GroupedEntriesView_DoubleTapped"
                             PointerPressed="GroupedEntriesView_PointerPressedPreview"
                             RightTapped="GroupedEntriesView_RightTapped"
@@ -1125,15 +1111,10 @@
                                                     ShowExpandGlyph="False" />
                                             </Border>
                                             <controls:EntryItemHost
-                                                Margin="0,2,0,2"
+                                                Style="{StaticResource GroupedEntryItemHostStyle}"
                                                 MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
-                                                Padding="0,3,0,3"
-                                                Background="Transparent"
-                                                IndicatorBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                                                 IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
                                                 IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
-                                                AnchorBorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
-                                                HorizontalAlignment="Stretch"
                                                 PointerPressed="EntryRow_PointerPressed"
                                                 SelectedBackground="{Binding RowBackground}"
                                                 SelectedPointerOverBackground="{Binding RowBackground}"
@@ -1727,16 +1708,11 @@
                                 <ScrollViewer
                                     x:Name="SecondaryEntriesScrollViewer"
                                     Grid.Row="1"
-                                    IsTabStop="True"
-                                    UseSystemFocusVisuals="False"
-                                    Margin="0"
-                                    HorizontalAlignment="Stretch"
-                                    Padding="10,4"
+                                    Style="{StaticResource EntryListScrollViewerStyle}"
                                     HorizontalScrollBarVisibility="Auto"
                                     HorizontalScrollMode="Enabled"
                                     VerticalScrollBarVisibility="Visible"
                                     VerticalScrollMode="Enabled"
-                                    Background="Transparent"
                                     DoubleTapped="SecondaryEntriesView_DoubleTapped"
                                     PointerPressed="SecondaryPaneSurface_PointerPressed"
                                     RightTapped="SecondaryEntriesView_RightTapped"
@@ -1747,16 +1723,11 @@
                                         <ItemsRepeater.ItemTemplate>
                                             <DataTemplate>
                                                 <controls:EntryItemHost
-                                                    Margin="0,2,0,2"
+                                                    Style="{StaticResource DetailsEntryItemHostStyle}"
                                                     Width="{Binding ElementName=RootWindow, Path=SecondaryDetailsRowWidth}"
                                                     MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
-                                                    Padding="0,3,0,3"
-                                                    Background="Transparent"
-                                                    IndicatorBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
                                                     IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
                                                     IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
-                                                    AnchorBorderBrush="{ThemeResource TreeViewItemSelectionIndicatorForeground}"
-                                                    HorizontalAlignment="Left"
                                                     PointerPressed="SecondaryEntryRow_PointerPressed"
                                                     RightTapped="SecondaryEntryRow_RightTapped"
                                                     SelectedBackground="{Binding RowBackground}"
@@ -1782,9 +1753,9 @@
                                                             Entry="{Binding}"
                                                             Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
                                                             VerticalAlignment="Center" />
-                                                        <TextBlock Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding Type}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Grid.Column="4" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SizeText}" />
-                                                        <TextBlock Grid.Column="6" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding ModifiedText}" />
+                                                        <TextBlock Grid.Column="2" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding Type}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="4" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding SizeText}" />
+                                                        <TextBlock Grid.Column="6" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding ModifiedText}" />
                                                     </Grid>
                                                 </controls:EntryItemHost>
                                             </DataTemplate>
