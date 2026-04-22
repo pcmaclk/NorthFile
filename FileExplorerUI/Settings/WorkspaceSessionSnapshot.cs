@@ -20,7 +20,7 @@ public static class WorkspaceSessionSnapshot
             Tabs = session.Tabs.Select(FromTab).ToList()
         };
 
-        return JsonSerializer.Serialize(snapshot);
+        return JsonSerializer.Serialize(snapshot, AppJsonSerializerContext.Default.SnapshotDto);
     }
 
     public static bool TryRestore(string? json, string shellRootPath, out List<WorkspaceTabState> tabs, out int activeTabIndex)
@@ -36,7 +36,7 @@ public static class WorkspaceSessionSnapshot
         SnapshotDto? snapshot;
         try
         {
-            snapshot = JsonSerializer.Deserialize<SnapshotDto>(json);
+            snapshot = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.SnapshotDto);
         }
         catch
         {
@@ -190,20 +190,20 @@ public static class WorkspaceSessionSnapshot
             : Math.Clamp(value, 0.25, 4);
     }
 
-    private sealed class SnapshotDto
+    internal sealed class SnapshotDto
     {
         public int Version { get; set; }
         public int ActiveTabIndex { get; set; }
         public List<TabDto> Tabs { get; set; } = [];
     }
 
-    private sealed class TabDto
+    public sealed class TabDto
     {
         public string CustomTitle { get; set; } = string.Empty;
         public ShellDto? Shell { get; set; }
     }
 
-    private sealed class ShellDto
+    public sealed class ShellDto
     {
         public WorkspaceLayoutMode LayoutMode { get; set; } = WorkspaceLayoutMode.Single;
         public WorkspacePanelId ActivePanel { get; set; } = WorkspacePanelId.Primary;
@@ -213,7 +213,7 @@ public static class WorkspaceSessionSnapshot
         public PanelDto? Secondary { get; set; }
     }
 
-    private sealed class PanelDto
+    public sealed class PanelDto
     {
         public string CurrentPath { get; set; } = "shell:mycomputer";
         public string AddressText { get; set; } = string.Empty;

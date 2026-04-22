@@ -6,6 +6,7 @@ using UICancelOption = Microsoft.VisualBasic.FileIO.UICancelOption;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -566,6 +567,14 @@ public sealed class ExplorerService
         }
     }
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2072",
+        Justification = "WScript.Shell COM automation is resolved by ProgID at runtime; this path is Windows-only and not trimmer-analyzable.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2075",
+        Justification = "WScript.Shell shortcut properties are accessed through runtime COM dispatch.")]
     public string ResolveShortcutTargetPath(string shortcutPath)
     {
         if (string.IsNullOrWhiteSpace(shortcutPath))
@@ -722,6 +731,14 @@ public sealed class ExplorerService
         return isDirectory ? CreateDirectoryAsync(path) : CreateEmptyFileAsync(path);
     }
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2072",
+        Justification = "WScript.Shell COM automation is resolved by ProgID at runtime; this path is Windows-only and not trimmer-analyzable.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2075",
+        Justification = "WScript.Shell shortcut properties are accessed through runtime COM dispatch.")]
     public Task CreateShortcutAsync(string targetPath, string shortcutPath)
     {
         return Task.Run(
