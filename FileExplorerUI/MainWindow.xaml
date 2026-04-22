@@ -128,6 +128,7 @@
                         <ResourceDictionary Source="Resources/MainWindowOverlayResources.xaml" />
                         <ResourceDictionary Source="Resources/MainWindowStatusResources.xaml" />
                         <ResourceDictionary Source="Resources/MainWindowEntryListResources.xaml" />
+                        <ResourceDictionary Source="Resources/MainWindowCommandDockResources.xaml" />
                     </ResourceDictionary.MergedDictionaries>
                 </ResourceDictionary>
             </Grid.Resources>
@@ -1243,15 +1244,7 @@
 
                         <Border
                             x:Name="CommandDockPanel"
-                            Width="360"
-                            Margin="10"
-                            Padding="10"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Top"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            CornerRadius="10"
+                            Style="{StaticResource CommandDockPanelStyle}"
                             PointerExited="CommandDockPanel_PointerExited"
                             Visibility="Collapsed">
                             <StackPanel Spacing="8">
@@ -1306,9 +1299,7 @@
                         <Button
                             x:Name="CommandPeekButton"
                             x:Uid="CommandPeekButton"
-                            Margin="10"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Top"
+                            Style="{StaticResource CommandPeekButtonStyle}"
                             Click="CommandPeekButton_Click"
                             Visibility="Collapsed" />
                     </Grid>
