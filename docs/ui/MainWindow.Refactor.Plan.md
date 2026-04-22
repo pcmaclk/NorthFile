@@ -40,6 +40,13 @@
   - `dotnet build`
   - MCP smoke navigation to `D:\New Folder`
 
+## XAML Resource Split (completed)
+
+- App-level theme, entry host, and menu flyout resources now live under `FileExplorerUI/Resources`.
+- `MainWindow.xaml` uses `Resources/MainWindowResources.xaml` as a single local resource index.
+- Stable visual styles were split out for tabs, details headers, pane address/search chrome, entry lists, overlays, status text, and command dock surfaces.
+- The split intentionally stops before moving blocks with `x:Name`, `x:Bind`, or code-behind event handlers. Those areas should only move later as proper controls, not as loose resource dictionaries.
+
 ## Phase 1: Partial split (completed)
 
 - `MainWindow.Favorites.cs`

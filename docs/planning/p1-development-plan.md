@@ -150,7 +150,7 @@ Definition of done:
 
 Architecture note:
 
-- use the command architecture in [D:\Develop\Workspace\Rust\FileExplorer\planning\file-management-command-architecture.md](D:/Develop/Workspace/Rust/FileExplorer/planning/file-management-command-architecture.md)
+- use the command architecture in [D:\Develop\Workspace\Rust\FileExplorer\docs\planning\file-management-command-architecture.md](D:/Develop/Workspace/Rust/FileExplorer/docs/planning/file-management-command-architecture.md)
 - keep operation logic in service/coordinator layers
 - keep one unified command path per action in the window layer
 - keep toolbar, context-menu, and shortcut handlers as thin entry points only

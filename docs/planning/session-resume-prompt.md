@@ -3,7 +3,7 @@
 新开会话时，直接使用下面这段：
 
 ```text
-继续做 FileExplorer。先看 planning/file-management-command-architecture.md、planning/file-management-task-board.md、CHANGELOG.md，基于 main 上的最新提交，继续推进文件管理命令层重构和 FM-03。
+继续做 FileExplorer。先看 docs/planning/file-management-command-architecture.md、docs/planning/file-management-task-board.md、CHANGELOG.md，基于 main 上的最新提交，继续推进文件管理命令层重构和 FM-03。
 
 重点看 FileExplorerUI/MainWindow.xaml.cs、FileExplorerUI/Services/FileManagementCoordinator.cs、FileExplorerUI/Services/ExplorerService.cs。
 
