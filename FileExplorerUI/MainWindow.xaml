@@ -121,16 +121,7 @@
             HorizontalAlignment="Stretch"
             RowDefinitions="Auto,Auto,*">
             <Grid.Resources>
-                <ResourceDictionary>
-                    <ResourceDictionary.MergedDictionaries>
-                        <ResourceDictionary Source="Resources/MainWindowDetailsHeaderResources.xaml" />
-                        <ResourceDictionary Source="Resources/MainWindowPaneChromeResources.xaml" />
-                        <ResourceDictionary Source="Resources/MainWindowOverlayResources.xaml" />
-                        <ResourceDictionary Source="Resources/MainWindowStatusResources.xaml" />
-                        <ResourceDictionary Source="Resources/MainWindowEntryListResources.xaml" />
-                        <ResourceDictionary Source="Resources/MainWindowCommandDockResources.xaml" />
-                    </ResourceDictionary.MergedDictionaries>
-                </ResourceDictionary>
+                <ResourceDictionary Source="Resources/MainWindowResources.xaml" />
             </Grid.Resources>
         <!-- Right-side title bar shell: tab strip stays aligned to the content column. -->
         <TabView
