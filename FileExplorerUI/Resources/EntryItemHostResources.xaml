@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:FileExplorerUI.Controls">
+    <Style TargetType="controls:EntryItemHost">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="PointerOverBackground" Value="{ThemeResource ListViewItemBackgroundPointerOver}" />
+        <Setter Property="PressedBackground" Value="{ThemeResource ListViewItemBackgroundPressed}" />
+        <Setter Property="SelectedBackground" Value="{ThemeResource ListViewItemBackgroundSelected}" />
+        <Setter Property="SelectedPointerOverBackground" Value="{ThemeResource ListViewItemBackgroundSelectedPointerOver}" />
+        <Setter Property="SelectedPressedBackground" Value="{ThemeResource ListViewItemBackgroundSelectedPressed}" />
+        <Setter Property="IndicatorBrush" Value="{ThemeResource TreeViewItemSelectionIndicatorForeground}" />
+        <Setter Property="IndicatorCornerRadius" Value="{ThemeResource ListViewItemSelectionIndicatorCornerRadius}" />
+        <Setter Property="IndicatorWidth" Value="3" />
+        <Setter Property="AnchorBorderBrush" Value="{ThemeResource TreeViewItemSelectionIndicatorForeground}" />
+        <Setter Property="AnchorBorderThickness" Value="1" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="controls:EntryItemHost">
+                    <Border
+                        CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                        MinHeight="{TemplateBinding MinHeight}">
+                        <Grid>
+                            <Border
+                                x:Name="BackgroundBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{ThemeResource ListViewItemCornerRadius}" />
+                            <Border
+                                x:Name="AnchorBorder"
+                                BorderBrush="{TemplateBinding AnchorBorderBrush}"
+                                BorderThickness="{TemplateBinding AnchorBorderThickness}"
+                                CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                                Margin="1"
+                                Visibility="Collapsed" />
+                            <Grid Margin="{TemplateBinding Padding}">
+                                <Border
+                                    x:Name="SelectionIndicator"
+                                    HorizontalAlignment="Left"
+                                    Width="{TemplateBinding IndicatorWidth}"
+                                    Height="16"
+                                    VerticalAlignment="Center"
+                                    Margin="0"
+                                    Visibility="Collapsed" />
+                                <ContentPresenter
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    Margin="0,-1,0,1"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

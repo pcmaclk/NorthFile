@@ -121,22 +121,7 @@
             HorizontalAlignment="Stretch"
             RowDefinitions="Auto,Auto,*">
             <Grid.Resources>
-                <Style x:Key="DetailsHeaderHitTargetStyle" TargetType="Border">
-                    <Setter Property="Background" Value="Transparent" />
-                    <Setter Property="CornerRadius" Value="4" />
-                    <Setter Property="Padding" Value="0,0,10,0" />
-                </Style>
-
-                <Style x:Key="DetailsHeaderTextStyle" TargetType="TextBlock">
-                    <Setter Property="FontSize" Value="12" />
-                    <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
-                </Style>
-
-                <Style x:Key="DetailsHeaderSortGlyphStyle" TargetType="TextBlock">
-                    <Setter Property="FontSize" Value="11" />
-                    <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <Setter Property="Visibility" Value="Collapsed" />
-                </Style>
+                <ResourceDictionary Source="Resources/MainWindowDetailsHeaderResources.xaml" />
             </Grid.Resources>
         <!-- Right-side title bar shell: tab strip stays aligned to the content column. -->
         <TabView
@@ -152,110 +137,7 @@
             SelectionChanged="SingleTabTitleBarView_SelectionChanged"
             TabWidthMode="Equal">
             <TabView.Resources>
-                <ResourceDictionary>
-                    <Style x:Key="TitleBarSingleTabItemStyle" TargetType="TabViewItem">
-                        <Setter Property="Background" Value="Transparent" />
-                        <Setter Property="BorderBrush" Value="Transparent" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                        <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                        <Setter Property="UseSystemFocusVisuals" Value="False" />
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="TabViewItem">
-                                    <Grid Background="Transparent">
-                                        <ContentPresenter
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch"
-                                            Content="{TemplateBinding Header}" />
-                                    </Grid>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                    <Style x:Key="TitleBarInactiveTabItemStyle" TargetType="TabViewItem">
-                        <Setter Property="Background" Value="Transparent" />
-                        <Setter Property="BorderBrush" Value="Transparent" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                        <Setter Property="VerticalContentAlignment" Value="Center" />
-                        <Setter Property="UseSystemFocusVisuals" Value="False" />
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="TabViewItem">
-                                    <Grid Background="Transparent">
-                                        <VisualStateManager.VisualStateGroups>
-                                            <VisualStateGroup x:Name="CommonStates">
-                                                <VisualState x:Name="Normal" />
-                                                <VisualState x:Name="PointerOver">
-                                                    <VisualState.Setters>
-                                                        <Setter Target="HoverBorder.Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
-                                                    </VisualState.Setters>
-                                                </VisualState>
-                                                <VisualState x:Name="Pressed">
-                                                    <VisualState.Setters>
-                                                        <Setter Target="HoverBorder.Background" Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
-                                                    </VisualState.Setters>
-                                                </VisualState>
-                                                <VisualState x:Name="Disabled" />
-                                            </VisualStateGroup>
-                                        </VisualStateManager.VisualStateGroups>
-                                        <Border
-                                            x:Name="HoverBorder"
-                                            Height="32"
-                                            Margin="3,0,1,0"
-                                            Background="Transparent"
-                                            CornerRadius="8"
-                                            VerticalAlignment="Top" />
-                                        <ContentPresenter
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Center"
-                                            Content="{TemplateBinding Header}" />
-                                    </Grid>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                    <SolidColorBrush x:Key="TabViewBorderBrush" Color="Transparent" />
-                    <ResourceDictionary.ThemeDictionaries>
-                        <ResourceDictionary x:Key="Light">
-                            <SolidColorBrush x:Key="TabViewItemSeparator" Color="#22000000" />
-                            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="Transparent" />
-                            <SolidColorBrush x:Key="TabViewItemHeaderDragBackground" Color="Transparent" />
-                            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="Transparent" />
-                            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="Transparent" />
-                            <StaticResource x:Key="TitleBarActiveTabForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
-                            <StaticResource x:Key="TitleBarInactiveTabForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
-                            <StaticResource x:Key="TabViewItemHeaderForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
-                            <StaticResource x:Key="TabViewItemIconForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
-                            <StaticResource x:Key="TabViewItemHeaderForegroundPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
-                            <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="Transparent" />
-                            <StaticResource x:Key="TitleBarActiveTabPillBackgroundBrush" ResourceKey="LayerFillColorDefaultBrush" />
-                            <LinearGradientBrush x:Key="TitleBarActiveTabPillBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
-                                <GradientStop Color="#08000000" Offset="0" />
-                                <GradientStop Color="#08000000" Offset="1" />
-                            </LinearGradientBrush>
-                        </ResourceDictionary>
-                        <ResourceDictionary x:Key="Dark">
-                            <SolidColorBrush x:Key="TabViewItemSeparator" Color="#24FFFFFF" />
-                            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundSelected" Color="Transparent" />
-                            <SolidColorBrush x:Key="TabViewItemHeaderDragBackground" Color="Transparent" />
-                            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="Transparent" />
-                            <SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="Transparent" />
-                            <StaticResource x:Key="TitleBarActiveTabForegroundBrush" ResourceKey="TextFillColorPrimaryBrush" />
-                            <StaticResource x:Key="TitleBarInactiveTabForegroundBrush" ResourceKey="TextFillColorSecondaryBrush" />
-                            <StaticResource x:Key="TabViewItemHeaderForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
-                            <StaticResource x:Key="TabViewItemIconForegroundSelected" ResourceKey="TextFillColorPrimaryBrush" />
-                            <StaticResource x:Key="TabViewItemHeaderForegroundPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
-                            <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="Transparent" />
-                            <StaticResource x:Key="TitleBarActiveTabPillBackgroundBrush" ResourceKey="ActivePaneInputBackgroundBrush" />
-                            <LinearGradientBrush x:Key="TitleBarActiveTabPillBorderBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="0,4">
-                                <GradientStop Color="#10FFFFFF" Offset="0" />
-                                <GradientStop Color="#10FFFFFF" Offset="1" />
-                            </LinearGradientBrush>
-                        </ResourceDictionary>
-                    </ResourceDictionary.ThemeDictionaries>
-                </ResourceDictionary>
+                <ResourceDictionary Source="Resources/MainWindowTabResources.xaml" />
             </TabView.Resources>
             <TabView.TabStripHeader>
                 <Grid
