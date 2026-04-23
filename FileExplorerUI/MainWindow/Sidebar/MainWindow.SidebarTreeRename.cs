@@ -396,17 +396,31 @@ namespace FileExplorerUI
                         await PopulateSidebarTreeChildrenAsync(parentNode, parentPath, CancellationToken.None, expandAfterLoad: true);
                     }
 
-                    string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+                    WorkspacePanelId targetPanelId = GetSidebarNavigationTargetPanelId();
+                    string currentPath = GetPanelCurrentPath(targetPanelId);
                     if (IsPathWithin(currentPath, renamed.SourcePath))
                     {
                         string suffix = currentPath.Length > renamed.SourcePath.Length
                             ? currentPath[renamed.SourcePath.Length..]
                             : string.Empty;
-                        SetPrimaryPanelNavigationState(renamed.TargetPath + suffix, GetPanelQueryText(WorkspacePanelId.Primary), syncEditors: true);
-                        UpdateBreadcrumbs(GetPanelCurrentPath(WorkspacePanelId.Primary));
-                        UpdateNavButtonsState();
-                        StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(WorkspacePanelId.Primary));
-                        await LoadPanelDataAsync(WorkspacePanelId.Primary);
+                        string updatedPath = renamed.TargetPath + suffix;
+                        if (targetPanelId == WorkspacePanelId.Primary)
+                        {
+                            SetPrimaryPanelNavigationState(updatedPath, GetPanelQueryText(WorkspacePanelId.Primary), syncEditors: true);
+                            UpdateBreadcrumbs(GetPanelCurrentPath(WorkspacePanelId.Primary));
+                            UpdateNavButtonsState();
+                            StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(WorkspacePanelId.Primary));
+                            await LoadPanelDataAsync(WorkspacePanelId.Primary);
+                        }
+                        else
+                        {
+                            SetPanelCurrentPath(targetPanelId, updatedPath);
+                            RaisePaneAddressPropertiesChanged(targetPanelId);
+                            RaisePanelNavigationStateChanged(targetPanelId);
+                            UpdateSecondaryPaneBreadcrumbs(updatedPath);
+                            StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(targetPanelId));
+                            await ReloadPanelDataAsync(targetPanelId, preserveViewport: false, ensureSelectionVisible: false, focusEntries: false);
+                        }
                     }
                     else if (wasSelectedInTree)
                     {

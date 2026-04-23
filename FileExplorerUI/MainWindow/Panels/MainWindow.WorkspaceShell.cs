@@ -350,18 +350,17 @@ namespace FileExplorerUI
                 return [];
             }
 
-            if (!TryGetSelectedLoadedEntryForPane(sourcePanelId, out EntryViewModel? entry))
+            List<EntryViewModel> selectedEntries = GetSelectedLoadedEntriesForPane(sourcePanelId);
+            if (selectedEntries.Count == 0)
             {
                 return [];
             }
 
-            string sourcePath = GetPaneEntryPath(sourcePanelId, entry);
-            if (string.IsNullOrWhiteSpace(sourcePath) || IsDriveRoot(sourcePath))
-            {
-                return [];
-            }
-
-            return [sourcePath];
+            return selectedEntries
+                .Select(entry => GetPaneEntryPath(sourcePanelId, entry))
+                .Where(path => !string.IsNullOrWhiteSpace(path) && !IsDriveRoot(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         private async Task<IReadOnlyList<string>> GetTransferSourcePathsForPaneAsync(

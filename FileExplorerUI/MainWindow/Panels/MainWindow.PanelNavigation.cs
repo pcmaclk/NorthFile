@@ -138,6 +138,8 @@ namespace FileExplorerUI
 
         private void RaisePanelNavigationStateChanged(WorkspacePanelId panelId)
         {
+            UpdateSidebarSelectionForPanelPathChange(panelId);
+
             if (panelId == WorkspacePanelId.Primary)
             {
                 UpdateNavButtonsState();

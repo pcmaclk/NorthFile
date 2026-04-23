@@ -14,8 +14,8 @@ namespace FileExplorerUI
                 return;
             }
 
-            _selectedEntryPath = entry.FullPath;
-            _focusedEntryPath = entry.FullPath;
+            string entryPath = GetPaneEntryPath(WorkspacePanelId.Primary, entry);
+            SetPanelSingleSelectionPath(WorkspacePanelId.Primary, entryPath, entryPath);
             if (ensureVisible)
             {
                 _ = DispatcherQueue.TryEnqueue(() => ScrollEntryIntoView(entry));

@@ -42,6 +42,8 @@ public sealed class AppSettings
 
     public bool ShowFileExtensions { get; set; } = true;
 
+    public bool ExpandSidebarTreeToCurrentPath { get; set; } = false;
+
     public AppThemePreference ThemePreference { get; set; } = AppThemePreference.UseSystem;
 
     public AppLanguagePreference LanguagePreference { get; set; } = AppLanguagePreference.UseSystem;

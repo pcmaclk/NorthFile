@@ -17,11 +17,17 @@ namespace FileExplorerUI
                 nameof(ExplorerChromeVisibility),
                 nameof(ExplorerShellVisibility),
                 nameof(SettingsShellVisibility),
+                nameof(ShellTabTitleBarVisibility),
                 nameof(ShellTitleBarLeftInsetWidth),
                 nameof(SidebarTopChromeMargin),
                 nameof(SidebarTopChromeVisibility),
                 nameof(SidebarTopSettingsVisibility),
                 nameof(TitleBarSidebarSettingsVisibility));
+
+            if (_appSettings.ExpandSidebarTreeToCurrentPath)
+            {
+                _ = DispatcherQueue.TryEnqueue(UpdateSidebarSelectionOnly);
+            }
         }
 
         private void ExitSettingsShell()
@@ -33,6 +39,7 @@ namespace FileExplorerUI
                 nameof(ExplorerChromeVisibility),
                 nameof(ExplorerShellVisibility),
                 nameof(SettingsShellVisibility),
+                nameof(ShellTabTitleBarVisibility),
                 nameof(ShellTitleBarLeftInsetWidth),
                 nameof(SidebarTopChromeMargin),
                 nameof(SidebarTopChromeVisibility),

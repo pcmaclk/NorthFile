@@ -99,7 +99,7 @@ namespace FileExplorerUI
                     }
                     else
                     {
-                        await _paneFileCommandController.ExecuteDeleteTargetAsync(contextPanelId, target);
+                        await _paneFileCommandController.ExecuteDeleteAsync(contextPanelId);
                     }
                     break;
                 case FileCommandIds.NewFile:
@@ -200,27 +200,21 @@ namespace FileExplorerUI
                 FileCommandIds.Open => !string.IsNullOrWhiteSpace(target.Path),
                 FileCommandIds.Copy => isSidebarContext
                     ? _paneFileCommandController.CanCopyTarget(contextPanelId, target)
-                    : IsPrimaryEntriesContextOrigin(_entriesContextRequest?.Origin)
-                        ? CanCopySelectedEntry() && IsEntriesContextSelectionAligned(target)
-                        : _paneFileCommandController.CanCopyTarget(contextPanelId, target),
+                    : _paneFileCommandController.CanCopy(contextPanelId) && IsEntriesContextSelectionAligned(target),
                 FileCommandIds.Cut => isSidebarContext
                     ? _paneFileCommandController.CanCutTarget(contextPanelId, target)
-                    : IsPrimaryEntriesContextOrigin(_entriesContextRequest?.Origin)
-                        ? CanCutSelectedEntry() && IsEntriesContextSelectionAligned(target)
-                        : _paneFileCommandController.CanCutTarget(contextPanelId, target),
+                    : _paneFileCommandController.CanCut(contextPanelId) && IsEntriesContextSelectionAligned(target),
                 FileCommandIds.Paste => _paneFileCommandController.CanPasteTarget(contextPanelId, target),
                 FileCommandIds.Rename => isSidebarContext
                     ? !string.IsNullOrWhiteSpace(target.Path) &&
                         !IsDriveRoot(target.Path) &&
                         _explorerService.PathExists(target.Path)
-                    : _paneFileCommandController.CanRenameTarget(contextPanelId, target) &&
-                        (!IsPrimaryEntriesContextOrigin(_entriesContextRequest?.Origin) || IsEntriesContextSelectionAligned(target)),
+                    : _paneFileCommandController.CanRename(contextPanelId) && IsEntriesContextSelectionAligned(target),
                 FileCommandIds.Delete => isSidebarContext
                     ? !string.IsNullOrWhiteSpace(target.Path) &&
                         !IsDriveRoot(target.Path) &&
                         _explorerService.PathExists(target.Path)
-                    : _paneFileCommandController.CanDeleteTarget(contextPanelId, target) &&
-                        (!IsPrimaryEntriesContextOrigin(_entriesContextRequest?.Origin) || IsEntriesContextSelectionAligned(target)),
+                    : _paneFileCommandController.CanDelete(contextPanelId) && IsEntriesContextSelectionAligned(target),
                 FileCommandIds.NewFile or FileCommandIds.NewFolder =>
                     _paneFileCommandController.CanCreateTarget(contextPanelId, target),
                 FileCommandIds.Refresh => _paneFileCommandController.CanRefreshTarget(contextPanelId, target),
@@ -267,12 +261,19 @@ namespace FileExplorerUI
                 return true;
             }
 
-            if (string.IsNullOrWhiteSpace(target.Path) || string.IsNullOrWhiteSpace(_selectedEntryPath))
+            if (string.IsNullOrWhiteSpace(target.Path))
             {
                 return false;
             }
 
-            return string.Equals(_selectedEntryPath, target.Path, StringComparison.OrdinalIgnoreCase);
+            WorkspacePanelId contextPanelId = ResolvePanelIdForEntriesContextOrigin(_entriesContextRequest.Origin);
+            PanelViewState panelState = GetPanelState(contextPanelId);
+            if (panelState.SelectedEntryPaths.Count > 0)
+            {
+                return panelState.SelectedEntryPaths.Contains(target.Path);
+            }
+
+            return string.Equals(panelState.SelectedEntryPath, target.Path, StringComparison.OrdinalIgnoreCase);
         }
 
         private void ExecuteCopyOrCutContextTarget(FileCommandTarget target, FileTransferMode mode)

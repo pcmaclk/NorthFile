@@ -9,27 +9,34 @@ namespace FileExplorerUI
     {
         private void ClearListSelection()
         {
-            _selectedEntryPath = null;
-            SyncActivePanelPresentationState();
-            UpdateEntrySelectionVisuals();
-            UpdateFileCommandStates();
+            ClearPanelSelection(WorkspacePanelId.Primary, clearAnchor: false);
         }
 
         private void ClearListSelectionAndAnchor()
         {
-            _selectedEntryPath = null;
-            _focusedEntryPath = null;
-            SyncActivePanelPresentationState();
-            UpdateEntrySelectionVisuals();
-            UpdateFileCommandStates();
+            ClearPanelSelection(WorkspacePanelId.Primary, clearAnchor: true);
         }
 
         private void ClearExplicitSelectionKeepAnchor()
         {
-            _selectedEntryPath = null;
-            SyncActivePanelPresentationState();
-            UpdateEntrySelectionVisuals();
-            UpdateFileCommandStates();
+            ClearPanelSelection(WorkspacePanelId.Primary, clearAnchor: false);
+        }
+
+        private bool TryClearActivePanelSelection(bool clearAnchor)
+        {
+            WorkspacePanelId panelId = _isDualPaneEnabled
+                ? _workspaceLayoutHost.ActivePanel
+                : WorkspacePanelId.Primary;
+            PanelViewState panelState = GetPanelState(panelId);
+            if (panelState.SelectedEntryPaths.Count == 0 &&
+                string.IsNullOrWhiteSpace(panelState.SelectedEntryPath))
+            {
+                return false;
+            }
+
+            ClearPanelSelection(panelId, clearAnchor);
+            FocusPanelEntries(panelId);
+            return true;
         }
 
         private void FocusEntriesList()
@@ -65,22 +72,41 @@ namespace FileExplorerUI
             WorkspaceTabPerf.Mark("selection.active.enter", $"surface={surface}");
             WorkspacePanelId previousActivePanel = _workspaceLayoutHost.ActivePanel;
             bool previousDualPaneEnabled = _isDualPaneEnabled;
+            WorkspacePanelId? requestedPanel = surface switch
+            {
+                SelectionSurfaceId.PrimaryPane => WorkspacePanelId.Primary,
+                SelectionSurfaceId.SecondaryPane when _isDualPaneEnabled => WorkspacePanelId.Secondary,
+                _ => null
+            };
             SyncActivePanelPresentationState();
             WorkspaceTabPerf.Mark("selection.active.presentation");
 
-            if (surface == SelectionSurfaceId.PrimaryPane)
+            if (requestedPanel == WorkspacePanelId.Primary)
             {
                 _workspaceLayoutHost.ActivatePanel(WorkspacePanelId.Primary);
             }
-            else if (surface == SelectionSurfaceId.SecondaryPane && _isDualPaneEnabled)
+            else if (requestedPanel == WorkspacePanelId.Secondary)
             {
                 _workspaceLayoutHost.ActivatePanel(WorkspacePanelId.Secondary);
+            }
+
+            if (requestedPanel is WorkspacePanelId activePanel &&
+                previousDualPaneEnabled &&
+                previousActivePanel != activePanel)
+            {
+                ClearPanelSelection(previousActivePanel, clearAnchor: true);
             }
 
             _selectionSurfaceCoordinator.SetActiveSurface(surface);
             UpdateSelectionActivityState();
             WorkspaceTabPerf.Mark("selection.active.state");
             NotifyWorkspacePanelVisualStateChanged(previousActivePanel, previousDualPaneEnabled);
+            if (requestedPanel is not null &&
+                (previousActivePanel != _workspaceLayoutHost.ActivePanel || previousDualPaneEnabled != _isDualPaneEnabled))
+            {
+                UpdateSidebarSelectionOnly();
+            }
+
             WorkspaceTabPerf.Mark("selection.active.visual");
             UpdateFileCommandStates();
             WorkspaceTabPerf.Mark("selection.active.commands");
@@ -186,6 +212,15 @@ namespace FileExplorerUI
 
             CancelRenameOverlayForPanelSwitch(WorkspacePanelId.Secondary);
             SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
+            if (e.OriginalSource is DependencyObject source &&
+                IsDescendantOf(source, SecondaryEntriesScrollViewer) &&
+                FindAncestorWithDataContext<EntryViewModel>(source) is null &&
+                (SecondaryPanelState.SelectedEntryPaths.Count > 0 ||
+                    !string.IsNullOrWhiteSpace(SecondaryPanelState.SelectedEntryPath)))
+            {
+                ClearPanelSelection(WorkspacePanelId.Secondary, clearAnchor: false);
+                FocusSecondaryEntriesList();
+            }
         }
 
         private void RefreshSidebarTreeSelectionVisuals()

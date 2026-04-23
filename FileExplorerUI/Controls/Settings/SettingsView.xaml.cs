@@ -33,6 +33,7 @@ public sealed partial class SettingsView : UserControl
     public event Action<EntrySortField>? DefaultSortFieldChanged;
     public event Action<EntryGroupField>? DefaultGroupFieldChanged;
     public event Action<bool>? DeleteConfirmationChanged;
+    public event Action<bool>? ExpandSidebarTreeToCurrentPathChanged;
     public event Action<bool>? AutoStartChanged;
     public event Action<bool>? MinimizeToTrayChanged;
     public event Action? ExportSettingsRequested;
@@ -88,6 +89,13 @@ public sealed partial class SettingsView : UserControl
     {
         _suppressSidebarSectionEvents = true;
         DeleteConfirmToggleSwitch.IsOn = enabled;
+        _suppressSidebarSectionEvents = false;
+    }
+
+    public void SetExpandSidebarTreeToCurrentPath(bool enabled)
+    {
+        _suppressSidebarSectionEvents = true;
+        ExpandSidebarTreeToggleSwitch.IsOn = enabled;
         _suppressSidebarSectionEvents = false;
     }
 
@@ -303,6 +311,16 @@ public sealed partial class SettingsView : UserControl
         }
 
         DeleteConfirmationChanged?.Invoke(DeleteConfirmToggleSwitch.IsOn);
+    }
+
+    private void ExpandSidebarTreeToggleSwitch_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressSidebarSectionEvents)
+        {
+            return;
+        }
+
+        ExpandSidebarTreeToCurrentPathChanged?.Invoke(ExpandSidebarTreeToggleSwitch.IsOn);
     }
 
     private void AutoStartToggleSwitch_Toggled(object sender, RoutedEventArgs e)

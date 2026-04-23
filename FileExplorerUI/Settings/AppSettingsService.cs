@@ -10,6 +10,11 @@ namespace FileExplorerUI.Settings;
 
 public sealed class AppSettingsService
 {
+    private static readonly AppJsonSerializerContext s_indentedJsonContext = new(new JsonSerializerOptions
+    {
+        WriteIndented = true
+    });
+
     private readonly string _fallbackSettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NorthFile",
@@ -36,6 +41,7 @@ public sealed class AppSettingsService
                     ShowProtectedSystemEntries = ReadBool(localSettings, nameof(AppSettings.ShowProtectedSystemEntries), false),
                     ShowDotEntries = ReadBool(localSettings, nameof(AppSettings.ShowDotEntries), true),
                     ShowFileExtensions = ReadBool(localSettings, nameof(AppSettings.ShowFileExtensions), true),
+                    ExpandSidebarTreeToCurrentPath = ReadBool(localSettings, nameof(AppSettings.ExpandSidebarTreeToCurrentPath), false),
                     ThemePreference = ReadEnum(localSettings, nameof(AppSettings.ThemePreference), AppThemePreference.UseSystem),
                     LanguagePreference = ReadEnum(localSettings, nameof(AppSettings.LanguagePreference), AppLanguagePreference.UseSystem),
                     StartupLocationPreference = ReadEnum(localSettings, nameof(AppSettings.StartupLocationPreference), StartupLocationPreference.ThisPc),
@@ -87,6 +93,7 @@ public sealed class AppSettingsService
                 localSettings.Values[nameof(AppSettings.ShowProtectedSystemEntries)] = settings.ShowProtectedSystemEntries;
                 localSettings.Values[nameof(AppSettings.ShowDotEntries)] = settings.ShowDotEntries;
                 localSettings.Values[nameof(AppSettings.ShowFileExtensions)] = settings.ShowFileExtensions;
+                localSettings.Values[nameof(AppSettings.ExpandSidebarTreeToCurrentPath)] = settings.ExpandSidebarTreeToCurrentPath;
                 localSettings.Values[nameof(AppSettings.ThemePreference)] = (int)settings.ThemePreference;
                 localSettings.Values[nameof(AppSettings.LanguagePreference)] = (int)settings.LanguagePreference;
                 localSettings.Values[nameof(AppSettings.StartupLocationPreference)] = (int)settings.StartupLocationPreference;
@@ -104,7 +111,9 @@ public sealed class AppSettingsService
                 localSettings.Values[nameof(AppSettings.WindowPosY)] = settings.WindowPosY;
                 localSettings.Values[nameof(AppSettings.WindowMaximized)] = settings.WindowMaximized;
                 localSettings.Values[nameof(AppSettings.FavoritesInitialized)] = settings.FavoritesInitialized;
-                localSettings.Values[nameof(AppSettings.Favorites)] = JsonSerializer.Serialize(settings.Favorites ?? new List<FavoriteItem>());
+                localSettings.Values[nameof(AppSettings.Favorites)] = JsonSerializer.Serialize(
+                    settings.Favorites ?? new List<FavoriteItem>(),
+                    AppJsonSerializerContext.Default.ListFavoriteItem);
                 return;
             }
         }
@@ -124,10 +133,7 @@ public sealed class AppSettingsService
             Directory.CreateDirectory(directory);
         }
 
-        string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+        string json = JsonSerializer.Serialize(settings, s_indentedJsonContext.AppSettings);
         File.WriteAllText(path, json);
     }
 
@@ -141,7 +147,7 @@ public sealed class AppSettingsService
             }
 
             string json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<AppSettings>(json);
+            return JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.AppSettings);
         }
         catch
         {
@@ -201,7 +207,7 @@ public sealed class AppSettingsService
 
         try
         {
-            return JsonSerializer.Deserialize<List<FavoriteItem>>(json) ?? new List<FavoriteItem>();
+            return JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.ListFavoriteItem) ?? new List<FavoriteItem>();
         }
         catch
         {
@@ -220,7 +226,7 @@ public sealed class AppSettingsService
             }
 
             string json = File.ReadAllText(_fallbackSettingsPath);
-            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            AppSettings settings = JsonSerializer.Deserialize(json, AppJsonSerializerContext.Default.AppSettings) ?? new AppSettings();
             TraceWindowSizeSettings(
                 "加载设置",
                 $"source=file width={settings.WindowWidth} height={settings.WindowHeight} x={settings.WindowPosX} y={settings.WindowPosY} maximized={settings.WindowMaximized} path=\"{_fallbackSettingsPath}\"");

@@ -509,10 +509,16 @@ namespace FileExplorerUI
 
             panelState.SelectedEntryPath = ResolveExistingPanelEntryPath(panelId, panelState.SelectedEntryPath);
             panelState.FocusedEntryPath = ResolveExistingPanelEntryPath(panelId, panelState.FocusedEntryPath);
+            panelState.SelectedEntryPaths.RemoveWhere(path => ResolveExistingPanelEntryPath(panelId, path) is null);
 
             if (string.IsNullOrWhiteSpace(panelState.SelectedEntryPath))
             {
                 panelState.FocusedEntryPath = null;
+                if (panelState.SelectedEntryPaths.Count > 0)
+                {
+                    panelState.SelectedEntryPath = panelState.SelectedEntryPaths.FirstOrDefault();
+                    panelState.FocusedEntryPath = panelState.SelectedEntryPath;
+                }
             }
         }
 
@@ -663,8 +669,8 @@ namespace FileExplorerUI
                 return;
             }
 
-            SetPanelSelectedEntryPath(WorkspacePanelId.Secondary, entry.FullPath);
-            SetPanelFocusedEntryPath(WorkspacePanelId.Secondary, entry.FullPath);
+            string entryPath = GetPaneEntryPath(WorkspacePanelId.Secondary, entry);
+            SetPanelSingleSelectionPath(WorkspacePanelId.Secondary, entryPath, entryPath);
             UpdateSecondaryEntrySelectionVisuals();
         }
 
@@ -710,16 +716,20 @@ namespace FileExplorerUI
         {
             string? selectedPath = SecondaryPanelState.SelectedEntryPath;
             string? focusedPath = SecondaryPanelState.FocusedEntryPath;
+            HashSet<string> selectedPaths = SecondaryPanelState.SelectedEntryPaths;
             bool isActive = IsSecondaryWorkspacePanelActive;
 
             foreach (EntryViewModel entry in SecondaryPanelState.DataSession.Entries)
             {
+                string entryPath = GetPaneEntryPath(WorkspacePanelId.Secondary, entry);
                 entry.IsExplicitlySelected = !entry.IsGroupHeader &&
-                    !string.IsNullOrWhiteSpace(selectedPath) &&
-                    string.Equals(entry.FullPath, selectedPath, StringComparison.OrdinalIgnoreCase);
+                    ((selectedPaths.Count > 0 && selectedPaths.Contains(entryPath)) ||
+                        (selectedPaths.Count == 0 &&
+                            !string.IsNullOrWhiteSpace(selectedPath) &&
+                            string.Equals(entryPath, selectedPath, StringComparison.OrdinalIgnoreCase)));
                 entry.IsKeyboardAnchor = !entry.IsGroupHeader &&
                     !string.IsNullOrWhiteSpace(focusedPath) &&
-                    string.Equals(entry.FullPath, focusedPath, StringComparison.OrdinalIgnoreCase);
+                    string.Equals(entryPath, focusedPath, StringComparison.OrdinalIgnoreCase);
                 entry.IsSelectionActive = isActive;
             }
         }
@@ -738,7 +748,25 @@ namespace FileExplorerUI
 
             CancelRenameOverlayForPanelSwitch(WorkspacePanelId.Secondary);
             SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
-            SecondarySelectEntryInList(entry);
+            if (IsShiftPressed())
+            {
+                SelectPanelEntryRange(
+                    WorkspacePanelId.Secondary,
+                    GetSecondarySelectableEntriesInPresentationOrder(),
+                    entry);
+                UpdateSecondaryEntrySelectionVisuals();
+                UpdateFileCommandStates();
+            }
+            else if (IsControlPressed())
+            {
+                TogglePanelSelectionPath(WorkspacePanelId.Secondary, GetPaneEntryPath(WorkspacePanelId.Secondary, entry));
+                UpdateSecondaryEntrySelectionVisuals();
+                UpdateFileCommandStates();
+            }
+            else
+            {
+                SecondarySelectEntryInList(entry);
+            }
             SecondaryEntriesScrollViewer.Focus(FocusState.Pointer);
             e.Handled = true;
         }
@@ -748,10 +776,12 @@ namespace FileExplorerUI
             SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
             _lastEntriesContextItem = null;
             if (!string.IsNullOrWhiteSpace(SecondaryPanelState.SelectedEntryPath) ||
-                !string.IsNullOrWhiteSpace(SecondaryPanelState.FocusedEntryPath))
+                !string.IsNullOrWhiteSpace(SecondaryPanelState.FocusedEntryPath) ||
+                SecondaryPanelState.SelectedEntryPaths.Count > 0)
             {
                 SecondaryPanelState.SelectedEntryPath = null;
                 SecondaryPanelState.FocusedEntryPath = null;
+                SecondaryPanelState.SelectedEntryPaths.Clear();
                 UpdateSecondaryEntrySelectionVisuals();
             }
 
@@ -772,7 +802,10 @@ namespace FileExplorerUI
             }
 
             SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
-            SecondarySelectEntryInList(entry);
+            if (!SecondaryPanelState.SelectedEntryPaths.Contains(GetPaneEntryPath(WorkspacePanelId.Secondary, entry)))
+            {
+                SecondarySelectEntryInList(entry);
+            }
             _lastEntriesContextItem = entry;
 
             ShowEntriesContextFlyout(new EntriesContextRequest(

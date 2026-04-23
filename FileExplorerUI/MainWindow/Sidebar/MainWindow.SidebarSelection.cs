@@ -14,33 +14,34 @@ namespace FileExplorerUI
                 return;
             }
 
-            if (GetPanelIsLoading(WorkspacePanelId.Primary))
+            WorkspacePanelId targetPanelId = GetSidebarNavigationTargetPanelId();
+            if (GetPanelIsLoading(targetPanelId))
             {
                 UpdateStatusKey("StatusSidebarNavIgnoredLoading");
                 return;
             }
 
             FocusSidebarSurface();
-            ClearListSelectionAndAnchor();
+            ClearPanelSelection(targetPanelId, clearAnchor: true);
 
-            if (IsCurrentPath(e.Path))
+            if (IsCurrentPath(e.Path, targetPanelId))
             {
-                StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(WorkspacePanelId.Primary));
+                StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(targetPanelId));
                 return;
             }
 
             try
             {
-            await NavigatePanelToPathAsync(
-                WorkspacePanelId.Primary,
-                e.Path,
-                pushHistory: true,
-                focusEntriesAfterNavigation: false);
+                await NavigatePanelToPathAsync(
+                    targetPanelId,
+                    e.Path,
+                    pushHistory: true,
+                    focusEntriesAfterNavigation: false);
             }
             catch (Exception ex)
             {
                 UpdateStatusKey("StatusSidebarNavFailed", FileOperationErrors.ToUserMessage(ex));
-                StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(WorkspacePanelId.Primary));
+                StyledSidebarView.SetSelectedPath(GetPanelCurrentPath(targetPanelId));
             }
         }
 
@@ -67,18 +68,33 @@ namespace FileExplorerUI
 
         private void UpdateSidebarSelectionOnly()
         {
-            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            UpdateSidebarSelectionForPanelPathChange(GetSidebarNavigationTargetPanelId(), force: true);
+        }
+
+        private void UpdateSidebarSelectionForPanelPathChange(WorkspacePanelId panelId, bool force = false)
+        {
+            if (!force && GetSidebarNavigationTargetPanelId() != panelId)
+            {
+                return;
+            }
+
+            string currentPath = GetPanelCurrentPath(panelId);
             StyledSidebarView.SetSelectedPath(currentPath);
             _ = SelectSidebarTreePathAsync(currentPath);
         }
 
-        private bool IsCurrentPath(string candidate)
+        private WorkspacePanelId GetSidebarNavigationTargetPanelId()
+        {
+            return _isDualPaneEnabled ? _workspaceLayoutHost.ActivePanel : WorkspacePanelId.Primary;
+        }
+
+        private bool IsCurrentPath(string candidate, WorkspacePanelId panelId)
         {
             if (string.IsNullOrWhiteSpace(candidate))
             {
                 return false;
             }
-            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            string currentPath = GetPanelCurrentPath(panelId);
             if (string.IsNullOrWhiteSpace(currentPath))
             {
                 return false;
@@ -100,9 +116,9 @@ namespace FileExplorerUI
             return curr.StartsWith(cand + "\\", StringComparison.OrdinalIgnoreCase);
         }
 
-        private bool IsExactCurrentPath(string candidate)
+        private bool IsExactCurrentPath(string candidate, WorkspacePanelId panelId)
         {
-            string currentPath = GetPanelCurrentPath(WorkspacePanelId.Primary);
+            string currentPath = GetPanelCurrentPath(panelId);
             if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(currentPath))
             {
                 return false;

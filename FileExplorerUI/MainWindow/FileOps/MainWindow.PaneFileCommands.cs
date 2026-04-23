@@ -3,6 +3,7 @@ using FileExplorerUI.Services;
 using FileExplorerUI.Workspace;
 using Microsoft.UI.Xaml.Controls;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -107,6 +108,12 @@ namespace FileExplorerUI
 
         private Task ExecuteDeleteForPaneCoreAsync(WorkspacePanelId panelId)
         {
+            List<EntryViewModel> selectedEntries = GetSelectedLoadedEntriesForPane(panelId);
+            if (selectedEntries.Count > 1)
+            {
+                return ExecuteDeleteEntriesForPaneCoreAsync(panelId, selectedEntries);
+            }
+
             if (!TryBuildSelectedDeleteTargetForPane(panelId, out FileCommandTarget target))
             {
                 UpdateStatusKey("StatusDeleteFailedSelectLoaded");
@@ -123,36 +130,56 @@ namespace FileExplorerUI
 
         private void ExecuteCopyForPaneCore(WorkspacePanelId panelId)
         {
-            if (!TryGetSelectedLoadedEntryForPane(panelId, out EntryViewModel? entry))
+            List<EntryViewModel> entries = GetSelectedLoadedEntriesForPane(panelId);
+            if (entries.Count == 0)
             {
                 UpdateStatusKey("StatusCopyFailedSelectLoaded");
                 return;
             }
 
-            string sourcePath = GetPaneEntryPath(panelId, entry);
-            _fileManagementCoordinator.SetClipboard(new[] { sourcePath }, FileTransferMode.Copy);
+            string[] sourcePaths = entries
+                .Select(entry => GetPaneEntryPath(panelId, entry))
+                .ToArray();
+            _fileManagementCoordinator.SetClipboard(sourcePaths, FileTransferMode.Copy);
             UpdateFileCommandStates();
-            UpdateStatusKey("StatusCopyReady", entry.Name);
+            if (entries.Count == 1)
+            {
+                UpdateStatusKey("StatusCopyReady", entries[0].Name);
+            }
+            else
+            {
+                UpdateStatusKey("StatusCopyMultipleReady", entries.Count);
+            }
         }
 
         private void ExecuteCutForPaneCore(WorkspacePanelId panelId)
         {
-            if (!TryGetSelectedLoadedEntryForPane(panelId, out EntryViewModel? entry))
+            List<EntryViewModel> entries = GetSelectedLoadedEntriesForPane(panelId);
+            if (entries.Count == 0)
             {
                 UpdateStatusKey("StatusCutFailedSelectLoaded");
                 return;
             }
 
-            string sourcePath = GetPaneEntryPath(panelId, entry);
-            if (IsDriveRoot(sourcePath))
+            string[] sourcePaths = entries
+                .Select(entry => GetPaneEntryPath(panelId, entry))
+                .ToArray();
+            if (sourcePaths.Any(IsDriveRoot))
             {
                 UpdateStatusKey("StatusCutFailedDriveRootsUnsupported");
                 return;
             }
 
-            _fileManagementCoordinator.SetClipboard(new[] { sourcePath }, FileTransferMode.Cut);
+            _fileManagementCoordinator.SetClipboard(sourcePaths, FileTransferMode.Cut);
             UpdateFileCommandStates();
-            UpdateStatusKey("StatusCutReady", entry.Name);
+            if (entries.Count == 1)
+            {
+                UpdateStatusKey("StatusCutReady", entries[0].Name);
+            }
+            else
+            {
+                UpdateStatusKey("StatusCutMultipleReady", entries.Count);
+            }
         }
 
         private Task ExecutePasteForPaneCoreAsync(WorkspacePanelId panelId)
@@ -240,34 +267,34 @@ namespace FileExplorerUI
 
         private bool CanRenameForPaneCore(WorkspacePanelId panelId)
         {
-            return TryGetSelectedLoadedEntryForPane(panelId, out _);
+            return GetSelectedLoadedEntryCountForPane(panelId) == 1;
         }
 
         private bool CanDeleteForPaneCore(WorkspacePanelId panelId)
         {
-            if (!TryGetSelectedLoadedEntryForPane(panelId, out EntryViewModel? entry))
+            List<EntryViewModel> entries = GetSelectedLoadedEntriesForPane(panelId);
+            if (entries.Count == 0)
             {
                 return false;
             }
 
-            string targetPath = GetPaneEntryPath(panelId, entry);
-            return !IsDriveRoot(targetPath);
+            return entries.All(entry => !IsDriveRoot(GetPaneEntryPath(panelId, entry)));
         }
 
         private bool CanCopyForPaneCore(WorkspacePanelId panelId)
         {
-            return TryGetSelectedLoadedEntryForPane(panelId, out _);
+            return GetSelectedLoadedEntryCountForPane(panelId) > 0;
         }
 
         private bool CanCutForPaneCore(WorkspacePanelId panelId)
         {
-            if (!TryGetSelectedLoadedEntryForPane(panelId, out EntryViewModel? entry))
+            List<EntryViewModel> entries = GetSelectedLoadedEntriesForPane(panelId);
+            if (entries.Count == 0)
             {
                 return false;
             }
 
-            string targetPath = GetPaneEntryPath(panelId, entry);
-            return !IsDriveRoot(targetPath);
+            return entries.All(entry => !IsDriveRoot(GetPaneEntryPath(panelId, entry)));
         }
 
         private bool CanPasteForPaneCore(WorkspacePanelId panelId)
@@ -465,6 +492,69 @@ namespace FileExplorerUI
                     }
                 }
             }
+        }
+
+        private async Task ExecuteDeleteEntriesForPaneCoreAsync(WorkspacePanelId panelId, IReadOnlyList<EntryViewModel> entries)
+        {
+            var targets = entries
+                .Select(entry =>
+                {
+                    string path = GetPaneEntryPath(panelId, entry);
+                    return new FileCommandTarget(
+                        entry.IsDirectory ? FileCommandTargetKind.DirectoryEntry : FileCommandTargetKind.FileEntry,
+                        path,
+                        entry.Name,
+                        entry.IsDirectory,
+                        false,
+                        FileEntryTraits.None,
+                        FileCommandCapabilities.Delete | FileCommandCapabilities.Copy | FileCommandCapabilities.Cut);
+                })
+                .Where(target => !string.IsNullOrWhiteSpace(target.Path) && !IsDriveRoot(target.Path))
+                .ToList();
+
+            if (targets.Count == 0)
+            {
+                UpdateStatusKey("StatusDeleteFailedSelectLoaded");
+                return;
+            }
+
+            if (_appSettings.ConfirmDelete && !await ConfirmDeleteAsync($"{targets.Count} 个项目", targets.Any(target => target.IsDirectory)))
+            {
+                return;
+            }
+
+            int deletedCount = 0;
+            foreach (FileCommandTarget target in targets)
+            {
+                bool recursive = target.IsDirectory;
+                FileOperationResult<bool> deleteResult = await RunFileOperationWithProgressAsync(
+                    "OperationProgressDeleteTitle",
+                    "OperationProgressDeleteMessage",
+                    (progress, cancellationToken) =>
+                        _fileManagementCoordinator.TryDeleteEntryAsync(target.Path!, recursive, progress, cancellationToken));
+                FileOperationsController.DeleteDecision deleteDecision = _fileOperationsController.AnalyzeDeleteResult(
+                    deleteResult,
+                    S("ErrorFileOperationUnknown"));
+                if (!deleteDecision.Succeeded)
+                {
+                    if (deleteDecision.Canceled)
+                    {
+                        return;
+                    }
+
+                    await ShowDeleteFailureDialogAsync(
+                        target.DisplayName,
+                        deleteResult.Failure?.Error ?? FileOperationError.Unknown,
+                        deleteDecision.FailureMessage ?? S("ErrorFileOperationUnknown"));
+                    continue;
+                }
+
+                await HandleDeletedEntryForPaneAsync(panelId, target, deleteDecision.ChangeNotified);
+                deletedCount++;
+            }
+
+            ClearPanelSelection(panelId, clearAnchor: true);
+            UpdateStatusKey("StatusDeleteMultipleSuccess", deletedCount);
         }
 
         private async Task HandleDeletedEntryForPaneAsync(WorkspacePanelId panelId, FileCommandTarget target, bool changeNotified)

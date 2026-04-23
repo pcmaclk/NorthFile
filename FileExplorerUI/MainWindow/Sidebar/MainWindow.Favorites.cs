@@ -340,7 +340,7 @@ namespace FileExplorerUI
             }
 
             FocusSidebarSurface();
-            ClearListSelectionAndAnchor();
+            ClearPanelSelection(GetSidebarNavigationTargetPanelId(), clearAnchor: true);
 
             var contextEntry = new EntryViewModel
             {
