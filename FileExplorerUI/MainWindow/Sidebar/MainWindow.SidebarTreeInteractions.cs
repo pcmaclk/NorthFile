@@ -202,6 +202,7 @@ namespace FileExplorerUI
             }
 
             bool shouldSelectCollapsedNode = false;
+            WorkspacePanelId activePanelId = GetSidebarNavigationTargetPanelId();
             TreeViewNode? selected = _sidebarTreeView.SelectedNode;
             if (selected is not null &&
                 !ReferenceEquals(selected, args.Node) &&
@@ -211,9 +212,9 @@ namespace FileExplorerUI
                 _sidebarTreeSelectionMemory[entry.FullPath] = selectedEntry.FullPath;
                 shouldSelectCollapsedNode = true;
             }
-            else if (IsPathWithin(GetPanelCurrentPath(WorkspacePanelId.Primary), entry.FullPath))
+            else if (IsPathWithin(GetPanelCurrentPath(activePanelId), entry.FullPath))
             {
-                _sidebarTreeSelectionMemory[entry.FullPath] = GetPanelCurrentPath(WorkspacePanelId.Primary);
+                _sidebarTreeSelectionMemory[entry.FullPath] = GetPanelCurrentPath(activePanelId);
                 shouldSelectCollapsedNode = true;
             }
 
@@ -278,7 +279,7 @@ namespace FileExplorerUI
             _activeSidebarTreeContextNode = node;
 
             FocusSidebarSurface();
-            ClearListSelectionAndAnchor();
+            ClearPanelSelection(GetSidebarNavigationTargetPanelId(), clearAnchor: true);
 
             var contextEntry = new EntryViewModel
             {
@@ -321,27 +322,28 @@ namespace FileExplorerUI
 
         private async Task NavigateSidebarTreeEntryAsync(SidebarTreeEntry entry)
         {
+            WorkspacePanelId targetPanelId = GetSidebarNavigationTargetPanelId();
             FocusSidebarSurface();
-            ClearListSelectionAndAnchor();
+            ClearPanelSelection(targetPanelId, clearAnchor: true);
 
             if (string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
             {
-                SetPrimaryPanelNavigationState(ShellMyComputerPath, queryText: string.Empty, syncEditors: true);
-                UpdateBreadcrumbs(GetPanelCurrentPath(WorkspacePanelId.Primary));
-                UpdateNavButtonsState();
-                _ = SelectSidebarTreePathAsync(GetPanelCurrentPath(WorkspacePanelId.Primary));
-                await LoadPanelDataAsync(WorkspacePanelId.Primary);
+                await NavigatePanelToPathAsync(
+                    targetPanelId,
+                    ShellMyComputerPath,
+                    pushHistory: true,
+                    focusEntriesAfterNavigation: false);
                 return;
             }
 
             Debug.WriteLine($"[Tree] Selected: {entry.FullPath}");
-            if (GetPanelIsLoading(WorkspacePanelId.Primary))
+            if (GetPanelIsLoading(targetPanelId))
             {
                 UpdateStatusKey("StatusSidebarTreeNavIgnoredLoading");
                 return;
             }
 
-            if (IsExactCurrentPath(entry.FullPath))
+            if (IsExactCurrentPath(entry.FullPath, targetPanelId))
             {
                 return;
             }
@@ -349,11 +351,11 @@ namespace FileExplorerUI
             try
             {
                 Debug.WriteLine($"[Tree] Navigate: {entry.FullPath}");
-                    await NavigatePanelToPathAsync(
-                        WorkspacePanelId.Primary,
-                        entry.FullPath,
-                        pushHistory: true,
-                        focusEntriesAfterNavigation: false);
+                await NavigatePanelToPathAsync(
+                    targetPanelId,
+                    entry.FullPath,
+                    pushHistory: true,
+                    focusEntriesAfterNavigation: false);
             }
             catch (Exception ex)
             {

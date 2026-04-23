@@ -132,6 +132,10 @@ namespace FileExplorerUI
 
         public double ShellTitleBarHeight => ShellTitleBarHeightValue;
 
+        public Visibility ShellTabTitleBarVisibility => _shellMode == ShellMode.Explorer
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
         public double ShellControlSize => ShellControlSizeValue;
 
         public double ShellGlyphSize => ShellGlyphSizeValue;

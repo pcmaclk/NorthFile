@@ -89,6 +89,7 @@ public static class WorkspaceSessionSnapshot
             BackStack = panel.Navigation.BackStack.ToList(),
             ForwardStack = panel.Navigation.ForwardStack.ToList(),
             SelectedEntryPath = panel.SelectedEntryPath,
+            SelectedEntryPaths = panel.SelectedEntryPaths.ToList(),
             FocusedEntryPath = panel.FocusedEntryPath,
             ViewMode = panel.ViewMode,
             SortField = panel.SortField,
@@ -134,6 +135,21 @@ public static class WorkspaceSessionSnapshot
         CopyStack(dto.ForwardStack, panel.Navigation.ForwardStack, shellRootPath);
         panel.SelectedEntryPath = dto.SelectedEntryPath;
         panel.FocusedEntryPath = dto.FocusedEntryPath;
+        panel.SelectedEntryPaths.Clear();
+        if (dto.SelectedEntryPaths is { Count: > 0 })
+        {
+            foreach (string selectedPath in dto.SelectedEntryPaths)
+            {
+                if (!string.IsNullOrWhiteSpace(selectedPath))
+                {
+                    panel.SelectedEntryPaths.Add(selectedPath);
+                }
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(panel.SelectedEntryPath))
+        {
+            panel.SelectedEntryPaths.Add(panel.SelectedEntryPath);
+        }
         panel.ViewMode = dto.ViewMode;
         panel.SortField = dto.SortField;
         panel.SortDirection = dto.SortDirection;
@@ -221,6 +237,7 @@ public static class WorkspaceSessionSnapshot
         public List<string> BackStack { get; set; } = [];
         public List<string> ForwardStack { get; set; } = [];
         public string? SelectedEntryPath { get; set; }
+        public List<string> SelectedEntryPaths { get; set; } = [];
         public string? FocusedEntryPath { get; set; }
         public EntryViewMode ViewMode { get; set; } = EntryViewMode.Details;
         public EntrySortField SortField { get; set; } = EntrySortField.Name;

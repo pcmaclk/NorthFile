@@ -597,8 +597,14 @@
   <data name="StatusCopyReady" xml:space="preserve">
     <value>复制就绪：{0}</value>
   </data>
+  <data name="StatusCopyMultipleReady" xml:space="preserve">
+    <value>已准备复制 {0} 个项目。</value>
+  </data>
   <data name="StatusCutReady" xml:space="preserve">
     <value>剪切就绪：{0}</value>
+  </data>
+  <data name="StatusCutMultipleReady" xml:space="preserve">
+    <value>已准备剪切 {0} 个项目。</value>
   </data>
   <data name="StatusPasteFailedOpenFolderFirst" xml:space="preserve">
     <value>请先打开一个文件夹，然后再粘贴。</value>
@@ -764,6 +770,9 @@
   </data>
   <data name="StatusDeleteSuccess" xml:space="preserve">
     <value>已删除“{0}”。</value>
+  </data>
+  <data name="StatusDeleteMultipleSuccess" xml:space="preserve">
+    <value>已删除 {0} 个项目。</value>
   </data>
   <data name="StatusDeleteFailedWithReason" xml:space="preserve">
     <value>无法删除该项目：{0}</value>
@@ -1397,6 +1406,12 @@
   </data>
   <data name="SettingsShowExtensionsDescription" xml:space="preserve">
     <value>控制文件扩展名是否显示在名称后方。</value>
+  </data>
+  <data name="SettingsExpandSidebarTreeTitle" xml:space="preserve">
+    <value>路径变化时展开侧边栏树</value>
+  </data>
+  <data name="SettingsExpandSidebarTreeDescription" xml:space="preserve">
+    <value>面板路径变化时，自动展开到当前文件夹并滚动到对应项目。</value>
   </data>
   <data name="SettingsDeleteConfirmTitle" xml:space="preserve">
     <value>删除时显示确认对话框</value>

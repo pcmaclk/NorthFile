@@ -597,8 +597,14 @@
   <data name="StatusCopyReady" xml:space="preserve">
     <value>Copy ready: {0}</value>
   </data>
+  <data name="StatusCopyMultipleReady" xml:space="preserve">
+    <value>Ready to copy {0} items.</value>
+  </data>
   <data name="StatusCutReady" xml:space="preserve">
     <value>Cut ready: {0}</value>
+  </data>
+  <data name="StatusCutMultipleReady" xml:space="preserve">
+    <value>Ready to cut {0} items.</value>
   </data>
   <data name="StatusPasteFailedOpenFolderFirst" xml:space="preserve">
     <value>Open a folder before pasting.</value>
@@ -764,6 +770,9 @@
   </data>
   <data name="StatusDeleteSuccess" xml:space="preserve">
     <value>Deleted \"{0}\".</value>
+  </data>
+  <data name="StatusDeleteMultipleSuccess" xml:space="preserve">
+    <value>Deleted {0} items.</value>
   </data>
   <data name="StatusDeleteFailedWithReason" xml:space="preserve">
     <value>This item couldn't be deleted: {0}</value>
@@ -1391,6 +1400,12 @@
   </data>
   <data name="SettingsShowExtensionsDescription" xml:space="preserve">
     <value>Controls whether file extensions are shown after the name.</value>
+  </data>
+  <data name="SettingsExpandSidebarTreeTitle" xml:space="preserve">
+    <value>Expand sidebar tree when path changes</value>
+  </data>
+  <data name="SettingsExpandSidebarTreeDescription" xml:space="preserve">
+    <value>When a pane path changes, expand to the current folder and scroll the matching tree item into view.</value>
   </data>
   <data name="SettingsDeleteConfirmTitle" xml:space="preserve">
     <value>Show confirmation when deleting</value>

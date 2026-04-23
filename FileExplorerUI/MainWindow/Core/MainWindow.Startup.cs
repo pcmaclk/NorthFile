@@ -89,6 +89,7 @@ namespace FileExplorerUI
             SettingsViewControl.DefaultSortFieldChanged += SettingsViewControl_DefaultSortFieldChanged;
             SettingsViewControl.DefaultGroupFieldChanged += SettingsViewControl_DefaultGroupFieldChanged;
             SettingsViewControl.DeleteConfirmationChanged += SettingsViewControl_DeleteConfirmationChanged;
+            SettingsViewControl.ExpandSidebarTreeToCurrentPathChanged += SettingsViewControl_ExpandSidebarTreeToCurrentPathChanged;
             SettingsViewControl.AutoStartChanged += SettingsViewControl_AutoStartChanged;
             SettingsViewControl.MinimizeToTrayChanged += SettingsViewControl_MinimizeToTrayChanged;
             SettingsViewControl.ExportSettingsRequested += SettingsViewControl_ExportSettingsRequested;

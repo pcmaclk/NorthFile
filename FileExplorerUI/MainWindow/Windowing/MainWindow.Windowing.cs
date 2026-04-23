@@ -31,6 +31,12 @@ namespace FileExplorerUI
                 {
                     // The center rail is a pane-level affordance; using it must not switch panel focus.
                 }
+                else if (_isDualPaneEnabled &&
+                    (IsDescendantOf(pointerSource, SecondaryPaneHost) ||
+                        IsDescendantOf(pointerSource, SecondaryToolbarPaneHost)))
+                {
+                    SetActiveSelectionSurface(SelectionSurfaceId.SecondaryPane);
+                }
                 else if (IsDescendantOf(pointerSource, ExplorerBodyGrid))
                 {
                     SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);

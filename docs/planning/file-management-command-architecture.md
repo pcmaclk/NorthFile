@@ -1,6 +1,6 @@
 # NorthFile File Management Command Architecture
 
-Last updated: 2026-04-22
+Last updated: 2026-04-23
 Applies to: post-`0.1.1` file-management phase
 
 ## Goal
@@ -78,7 +78,29 @@ Rules:
 
 - source/target pane choice must not fork the filesystem operation path
 - selected and all-items transfer may differ in source-path collection, but not in copy/move execution
+- selected transfer must read the pane-local multi-selection set, not a single focused or context-menu item
+- all-items transfer must enumerate the whole current directory snapshot, not only currently loaded or visible rows
+- all-items copy/move must show a confirmation dialog before execution
 - command buttons between panes should not switch the active pane by themselves; panel activation should come from explicit panel interaction
+
+## Multi-Selection Model
+
+Selection is pane-local state.
+
+Current model:
+
+- each `PanelViewState` owns its selected entry path set
+- clicking or keyboard-selecting inside one pane updates only that pane
+- clicking the other pane clears the previous pane selection and moves the active command target
+- command helpers must resolve selected entries through `GetSelectedLoadedEntriesForPane(...)`
+- single-item helpers should only be used for commands that are explicitly single-target, such as inline rename
+
+Rules:
+
+- toolbar, context menu, shortcut, and middle-rail commands must agree on the same selected path set
+- copying/cutting/deleting selected items must preserve all selected paths
+- commands should ignore drive roots and empty/null paths when building filesystem operation inputs
+- sidebar and favorites navigation target the active pane; they must not implicitly force navigation back to the primary pane
 
 ## Progress Model
 

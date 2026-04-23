@@ -84,6 +84,19 @@ namespace FileExplorerUI
                             return true;
                         }
                         break;
+                    case Windows.System.VirtualKey.A:
+                        SelectAllLoadedEntriesForPane(_paneFileCommandController.ActivePanel);
+                        if (_paneFileCommandController.ActivePanel == WorkspacePanelId.Secondary)
+                        {
+                            UpdateSecondaryEntrySelectionVisuals();
+                        }
+                        else
+                        {
+                            UpdateEntrySelectionVisuals();
+                        }
+
+                        UpdateFileCommandStates();
+                        return true;
                     case Windows.System.VirtualKey.L:
                         FocusActivePaneAddressBox(selectAll: true);
                         return true;
@@ -126,6 +139,8 @@ namespace FileExplorerUI
 
             switch (key)
             {
+                case Windows.System.VirtualKey.Escape:
+                    return TryClearActivePanelSelection(clearAnchor: false);
                 case Windows.System.VirtualKey.GoBack:
                 case Windows.System.VirtualKey.NavigationLeft:
                     _ = TryNavigateActivePanelBackAsync();
@@ -373,6 +388,8 @@ namespace FileExplorerUI
                     }
                     TryMoveSelectionByPage(1);
                     return true;
+                case Windows.System.VirtualKey.Escape:
+                    return TryClearActivePanelSelection(clearAnchor: false);
                 case Windows.System.VirtualKey.Enter:
                     TryActivateSelectedEntry();
                     return true;
@@ -920,6 +937,8 @@ namespace FileExplorerUI
                 case Windows.System.VirtualKey.PageDown:
                     _ = MoveDetailsSelectionByPageAsync(WorkspacePanelId.Secondary, 1);
                     return true;
+                case Windows.System.VirtualKey.Escape:
+                    return TryClearActivePanelSelection(clearAnchor: false);
                 case Windows.System.VirtualKey.Enter:
                     return TryActivateSecondarySelectedEntry();
                 default:

@@ -12,7 +12,7 @@
         <Setter Property="Background" Value="Transparent" />
     </Style>
 
-    <Style x:Key="DetailsEntryItemHostStyle" TargetType="controls:EntryItemHost">
+    <Style x:Key="DetailsEntryItemHostStyle" TargetType="controls:EntryItemHost" BasedOn="{StaticResource DefaultEntryItemHostStyle}">
         <Setter Property="Margin" Value="0,2,0,2" />
         <Setter Property="Padding" Value="0,3,0,3" />
         <Setter Property="Background" Value="Transparent" />

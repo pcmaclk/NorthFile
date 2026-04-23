@@ -64,10 +64,15 @@ namespace FileExplorerUI
                 computerNode.Children.Add(CreateSidebarTreeNode(rootEntry, hasUnrealizedChildren: _explorerService.DirectoryHasChildDirectories(root)));
             }
 
-            await SelectSidebarTreePathAsync(GetPanelCurrentPath(WorkspacePanelId.Primary));
+            await SelectSidebarTreePathAsync(GetPanelCurrentPath(GetSidebarNavigationTargetPanelId()));
         }
 
         private async Task SelectSidebarTreePathAsync(string path)
+        {
+            await SelectSidebarTreePathAsync(path, _appSettings.ExpandSidebarTreeToCurrentPath);
+        }
+
+        private async Task SelectSidebarTreePathAsync(string path, bool expandToTarget)
         {
             if (_sidebarTreeView is null)
             {
@@ -83,8 +88,11 @@ namespace FileExplorerUI
                         string.Equals(entry.FullPath, ShellMyComputerPath, StringComparison.OrdinalIgnoreCase))
                     {
                         SelectSidebarTreeNode(node);
-                        int requestVersion = ++_sidebarTreeScrollRequestVersion;
-                        await BringSidebarTreeNodeIntoViewAsync(node, requestVersion);
+                        if (expandToTarget)
+                        {
+                            int requestVersion = ++_sidebarTreeScrollRequestVersion;
+                            await BringSidebarTreeNodeIntoViewAsync(node, requestVersion);
+                        }
                         return;
                     }
                 }
@@ -118,10 +126,15 @@ namespace FileExplorerUI
             current = computer;
             if (!computer.IsExpanded)
             {
-                SelectSidebarTreeNode(current);
-                int requestVersion = ++_sidebarTreeScrollRequestVersion;
-                await BringSidebarTreeNodeIntoViewAsync(current, requestVersion);
-                return;
+                if (expandToTarget)
+                {
+                    computer.IsExpanded = true;
+                }
+                else
+                {
+                    SelectSidebarTreeNode(current);
+                    return;
+                }
             }
 
             foreach (TreeViewNode node in computer.Children)
@@ -148,7 +161,12 @@ namespace FileExplorerUI
                 {
                     if (!ReferenceEquals(current, computer) && !current.IsExpanded)
                     {
-                        break;
+                        if (!expandToTarget)
+                        {
+                            break;
+                        }
+
+                        current.IsExpanded = true;
                     }
 
                     walk = Path.Combine(walk, part);
@@ -192,7 +210,12 @@ namespace FileExplorerUI
 
                     if (!string.Equals(walk, target, StringComparison.OrdinalIgnoreCase) && !current.IsExpanded)
                     {
-                        break;
+                        if (!expandToTarget)
+                        {
+                            break;
+                        }
+
+                        current.IsExpanded = true;
                     }
 
                     if (current.HasUnrealizedChildren && current.IsExpanded)
@@ -203,8 +226,11 @@ namespace FileExplorerUI
             }
 
             SelectSidebarTreeNode(current);
-            int finalRequestVersion = ++_sidebarTreeScrollRequestVersion;
-            await BringSidebarTreeNodeIntoViewAsync(current, finalRequestVersion);
+            if (expandToTarget)
+            {
+                int finalRequestVersion = ++_sidebarTreeScrollRequestVersion;
+                await BringSidebarTreeNodeIntoViewAsync(current, finalRequestVersion);
+            }
         }
 
         private void SelectSidebarTreeNode(TreeViewNode node)

@@ -41,6 +41,7 @@ public sealed class AppSettingsService
                     ShowProtectedSystemEntries = ReadBool(localSettings, nameof(AppSettings.ShowProtectedSystemEntries), false),
                     ShowDotEntries = ReadBool(localSettings, nameof(AppSettings.ShowDotEntries), true),
                     ShowFileExtensions = ReadBool(localSettings, nameof(AppSettings.ShowFileExtensions), true),
+                    ExpandSidebarTreeToCurrentPath = ReadBool(localSettings, nameof(AppSettings.ExpandSidebarTreeToCurrentPath), false),
                     ThemePreference = ReadEnum(localSettings, nameof(AppSettings.ThemePreference), AppThemePreference.UseSystem),
                     LanguagePreference = ReadEnum(localSettings, nameof(AppSettings.LanguagePreference), AppLanguagePreference.UseSystem),
                     StartupLocationPreference = ReadEnum(localSettings, nameof(AppSettings.StartupLocationPreference), StartupLocationPreference.ThisPc),
@@ -92,6 +93,7 @@ public sealed class AppSettingsService
                 localSettings.Values[nameof(AppSettings.ShowProtectedSystemEntries)] = settings.ShowProtectedSystemEntries;
                 localSettings.Values[nameof(AppSettings.ShowDotEntries)] = settings.ShowDotEntries;
                 localSettings.Values[nameof(AppSettings.ShowFileExtensions)] = settings.ShowFileExtensions;
+                localSettings.Values[nameof(AppSettings.ExpandSidebarTreeToCurrentPath)] = settings.ExpandSidebarTreeToCurrentPath;
                 localSettings.Values[nameof(AppSettings.ThemePreference)] = (int)settings.ThemePreference;
                 localSettings.Values[nameof(AppSettings.LanguagePreference)] = (int)settings.LanguagePreference;
                 localSettings.Values[nameof(AppSettings.StartupLocationPreference)] = (int)settings.StartupLocationPreference;

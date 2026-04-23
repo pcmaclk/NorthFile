@@ -69,7 +69,9 @@ namespace FileExplorerUI
             else
             {
                 _lastEntriesContextItem = null;
-                if (!string.IsNullOrWhiteSpace(_selectedEntryPath) || !string.IsNullOrWhiteSpace(_focusedEntryPath))
+                if (!string.IsNullOrWhiteSpace(_selectedEntryPath) ||
+                    !string.IsNullOrWhiteSpace(_focusedEntryPath) ||
+                    PrimaryPanelState.SelectedEntryPaths.Count > 0)
                 {
                     ClearListSelectionAndAnchor();
                 }
@@ -458,7 +460,7 @@ namespace FileExplorerUI
             {
                 if (GetActiveEntriesViewHost()?.ResolvePressedEntry(e) is null &&
                     !IsEntriesGroupHeaderSource(e.OriginalSource as DependencyObject) &&
-                    !string.IsNullOrWhiteSpace(_selectedEntryPath))
+                    (!string.IsNullOrWhiteSpace(_selectedEntryPath) || PrimaryPanelState.SelectedEntryPaths.Count > 0))
                 {
                     ClearExplicitSelectionKeepAnchor();
                     FocusEntriesList();
@@ -490,7 +492,7 @@ namespace FileExplorerUI
                 }
             }
             else if (!IsEntriesGroupHeaderSource(e.OriginalSource as DependencyObject) &&
-                !string.IsNullOrWhiteSpace(_selectedEntryPath))
+                (!string.IsNullOrWhiteSpace(_selectedEntryPath) || PrimaryPanelState.SelectedEntryPaths.Count > 0))
             {
                 ClearExplicitSelectionKeepAnchor();
                 FocusEntriesList();

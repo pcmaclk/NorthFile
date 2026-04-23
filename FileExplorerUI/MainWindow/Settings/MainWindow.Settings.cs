@@ -42,6 +42,7 @@ namespace FileExplorerUI
                 _appSettings.ShowDotEntries,
                 _appSettings.ShowFileExtensions);
             SettingsViewControl.SetDeleteConfirmationEnabled(_appSettings.ConfirmDelete);
+            SettingsViewControl.SetExpandSidebarTreeToCurrentPath(_appSettings.ExpandSidebarTreeToCurrentPath);
             SettingsViewControl.SetAdvancedSettings(
                 _appSettings.AutoStartEnabled,
                 _appSettings.MinimizeToTrayEnabled);
@@ -121,6 +122,13 @@ namespace FileExplorerUI
         {
             _appSettings.ConfirmDelete = enabled;
             _appSettingsService.Save(_appSettings);
+        }
+
+        private void SettingsViewControl_ExpandSidebarTreeToCurrentPathChanged(bool enabled)
+        {
+            _appSettings.ExpandSidebarTreeToCurrentPath = enabled;
+            _appSettingsService.Save(_appSettings);
+            UpdateSidebarSelectionOnly();
         }
 
         private void SettingsViewControl_AutoStartChanged(bool enabled)

@@ -31,6 +31,9 @@ public sealed class PanelViewState
 
     public string? FocusedEntryPath { get; set; }
 
+    public HashSet<string> SelectedEntryPaths { get; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
     internal Dictionary<string, DirectoryViewState> DirectoryViewStates { get; } =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -77,6 +80,11 @@ public sealed class PanelViewState
         Navigation.CopyFrom(source.Navigation);
         SelectedEntryPath = source.SelectedEntryPath;
         FocusedEntryPath = source.FocusedEntryPath;
+        SelectedEntryPaths.Clear();
+        foreach (string path in source.SelectedEntryPaths)
+        {
+            SelectedEntryPaths.Add(path);
+        }
         DirectoryViewStates.Clear();
         foreach ((string path, DirectoryViewState state) in source.DirectoryViewStates)
         {

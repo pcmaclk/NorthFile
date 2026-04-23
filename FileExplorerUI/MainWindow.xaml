@@ -135,7 +135,8 @@
             IsAddTabButtonVisible="False"
             IsTabStop="False"
             SelectionChanged="SingleTabTitleBarView_SelectionChanged"
-            TabWidthMode="Equal">
+            TabWidthMode="Equal"
+            Visibility="{x:Bind ShellTabTitleBarVisibility, Mode=OneWay}">
             <TabView.Resources>
                 <ResourceDictionary Source="Resources/MainWindowTabResources.xaml" />
             </TabView.Resources>

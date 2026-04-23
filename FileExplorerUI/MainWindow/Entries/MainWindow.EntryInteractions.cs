@@ -50,7 +50,9 @@ namespace FileExplorerUI
                 return false;
             }
 
-            return string.Equals(_selectedEntryPath, entry.FullPath, StringComparison.OrdinalIgnoreCase);
+            string entryPath = GetPaneEntryPath(WorkspacePanelId.Primary, entry);
+            return PrimaryPanelState.SelectedEntryPaths.Contains(entryPath) ||
+                string.Equals(_selectedEntryPath, entryPath, StringComparison.OrdinalIgnoreCase);
         }
 
         private void EntryRow_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -67,7 +69,22 @@ namespace FileExplorerUI
 
             CancelRenameOverlayForPanelSwitch(WorkspacePanelId.Primary);
             SetActiveSelectionSurface(SelectionSurfaceId.PrimaryPane);
-            if (!IsEntryAlreadySelected(entry))
+            if (IsShiftPressed())
+            {
+                SelectPanelEntryRange(
+                    WorkspacePanelId.Primary,
+                    GetSelectableEntriesInPresentationOrder(),
+                    entry);
+                UpdateEntrySelectionVisuals();
+                UpdateFileCommandStates();
+            }
+            else if (IsControlPressed())
+            {
+                TogglePanelSelectionPath(WorkspacePanelId.Primary, GetPaneEntryPath(WorkspacePanelId.Primary, entry));
+                UpdateEntrySelectionVisuals();
+                UpdateFileCommandStates();
+            }
+            else if (!IsEntryAlreadySelected(entry) || PrimaryPanelState.SelectedEntryPaths.Count > 1)
             {
                 SelectEntryInList(entry, ensureVisible: false);
             }

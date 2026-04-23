@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using System;
+using System.Numerics;
 
 namespace FileExplorerUI.Controls;
 
@@ -71,6 +72,7 @@ public sealed class WorkspaceTabViewFactory
 
     private object CreateHeader(WorkspaceTabPresentation presentation)
     {
+        var shadowReceiver = new Grid();
         var border = new Border
         {
             Height = 32,
@@ -84,8 +86,15 @@ public sealed class WorkspaceTabViewFactory
             BorderThickness = presentation.IsActive ? new Thickness(1) : new Thickness(0),
             CornerRadius = presentation.IsActive ? new CornerRadius(8) : new CornerRadius(0),
             VerticalAlignment = VerticalAlignment.Top,
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Translation = presentation.IsActive ? new Vector3(0, 0, 6) : Vector3.Zero
         };
+        if (presentation.IsActive)
+        {
+            var shadow = new ThemeShadow();
+            shadow.Receivers.Add(shadowReceiver);
+            border.Shadow = shadow;
+        }
 
         var content = CreateHeaderGrid();
         var leading = new StackPanel
@@ -118,7 +127,15 @@ public sealed class WorkspaceTabViewFactory
         content.Children.Add(CreateCloseButton(presentation, 1));
         content.Children.Add(CreateTrailingSeparator(presentation, 2));
         border.Child = content;
-        return border;
+        if (!presentation.IsActive)
+        {
+            return border;
+        }
+
+        var host = new Grid();
+        host.Children.Add(shadowReceiver);
+        host.Children.Add(border);
+        return host;
     }
 
     private static Grid CreateHeaderGrid()

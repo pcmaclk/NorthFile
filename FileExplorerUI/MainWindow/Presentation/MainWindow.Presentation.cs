@@ -445,6 +445,7 @@ namespace FileExplorerUI
         private void UpdateEntrySelectionVisuals()
         {
             bool isActive = IsPrimaryWorkspacePanelActive;
+            HashSet<string> selectedPaths = PrimaryPanelState.SelectedEntryPaths;
             var seen = new HashSet<EntryViewModel>();
             IEnumerable<EntryViewModel> allEntries = GetPrimaryPresentationSourceEntries().Concat(PrimaryEntries);
             foreach (EntryViewModel entry in allEntries)
@@ -454,12 +455,15 @@ namespace FileExplorerUI
                     continue;
                 }
 
+                string entryPath = GetPaneEntryPath(WorkspacePanelId.Primary, entry);
                 entry.IsExplicitlySelected = !entry.IsGroupHeader &&
-                    !string.IsNullOrWhiteSpace(_selectedEntryPath) &&
-                    string.Equals(entry.FullPath, _selectedEntryPath, StringComparison.OrdinalIgnoreCase);
+                    ((selectedPaths.Count > 0 && selectedPaths.Contains(entryPath)) ||
+                        (selectedPaths.Count == 0 &&
+                            !string.IsNullOrWhiteSpace(_selectedEntryPath) &&
+                            string.Equals(entryPath, _selectedEntryPath, StringComparison.OrdinalIgnoreCase)));
                 entry.IsKeyboardAnchor = !entry.IsGroupHeader &&
                     !string.IsNullOrWhiteSpace(_focusedEntryPath) &&
-                    string.Equals(entry.FullPath, _focusedEntryPath, StringComparison.OrdinalIgnoreCase);
+                    string.Equals(entryPath, _focusedEntryPath, StringComparison.OrdinalIgnoreCase);
                 entry.IsSelectionActive = isActive;
             }
         }
@@ -561,6 +565,7 @@ namespace FileExplorerUI
         {
             PrimaryEntries.Clear();
             _selectedEntryPath = null;
+            PrimaryPanelState.SelectedEntryPaths.Clear();
             List<EntryViewModel> drives = CreateMyComputerDriveEntries();
 
             foreach (EntryViewModel driveEntry in drives)

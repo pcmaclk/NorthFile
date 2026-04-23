@@ -7,6 +7,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 namespace FileExplorerUI
 {
@@ -190,6 +191,42 @@ namespace FileExplorerUI
             return TryGetPaneLoadedEntryByPath(panelId, selectedPath, out entry);
         }
 
+        private List<EntryViewModel> GetSelectedLoadedEntriesForPane(WorkspacePanelId panelId)
+        {
+            PanelViewState panelState = GetPanelState(panelId);
+            var entries = new List<EntryViewModel>();
+            if (panelState.SelectedEntryPaths.Count > 0)
+            {
+                foreach (EntryViewModel entry in GetPanelEntries(panelId))
+                {
+                    if (!entry.IsLoaded || entry.IsGroupHeader)
+                    {
+                        continue;
+                    }
+
+                    string entryPath = GetPaneEntryPath(panelId, entry);
+                    if (panelState.SelectedEntryPaths.Contains(entryPath))
+                    {
+                        entries.Add(entry);
+                    }
+                }
+            }
+
+            if (entries.Count == 0 &&
+                !string.IsNullOrWhiteSpace(panelState.SelectedEntryPath) &&
+                TryGetPaneLoadedEntryByPath(panelId, panelState.SelectedEntryPath, out EntryViewModel? singleEntry))
+            {
+                entries.Add(singleEntry);
+            }
+
+            return entries;
+        }
+
+        private int GetSelectedLoadedEntryCountForPane(WorkspacePanelId panelId)
+        {
+            return GetSelectedLoadedEntriesForPane(panelId).Count;
+        }
+
         private string? GetPanelSelectedEntryPath(WorkspacePanelId panelId)
         {
             return _workspaceLayoutHost.GetPanelState(panelId).SelectedEntryPath;
@@ -197,7 +234,142 @@ namespace FileExplorerUI
 
         private void SetPanelSelectedEntryPath(WorkspacePanelId panelId, string? path)
         {
-            _workspaceLayoutHost.GetPanelState(panelId).SelectedEntryPath = path;
+            SetPanelSingleSelectionPath(panelId, path, path);
+        }
+
+        private void SetPanelSingleSelectionPath(WorkspacePanelId panelId, string? selectedPath, string? focusedPath)
+        {
+            PanelViewState panelState = GetPanelState(panelId);
+            panelState.SelectedEntryPath = selectedPath;
+            panelState.FocusedEntryPath = focusedPath;
+            panelState.SelectedEntryPaths.Clear();
+            if (!string.IsNullOrWhiteSpace(selectedPath))
+            {
+                panelState.SelectedEntryPaths.Add(selectedPath);
+            }
+
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                _selectedEntryPath = selectedPath;
+                _focusedEntryPath = focusedPath;
+            }
+        }
+
+        private void TogglePanelSelectionPath(WorkspacePanelId panelId, string path)
+        {
+            PanelViewState panelState = GetPanelState(panelId);
+            if (!panelState.SelectedEntryPaths.Remove(path))
+            {
+                panelState.SelectedEntryPaths.Add(path);
+                panelState.SelectedEntryPath = path;
+            }
+            else if (string.Equals(panelState.SelectedEntryPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                panelState.SelectedEntryPath = panelState.SelectedEntryPaths.FirstOrDefault();
+            }
+
+            panelState.FocusedEntryPath = path;
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                _selectedEntryPath = panelState.SelectedEntryPath;
+                _focusedEntryPath = panelState.FocusedEntryPath;
+            }
+        }
+
+        private void SelectPanelEntryRange(
+            WorkspacePanelId panelId,
+            IReadOnlyList<EntryViewModel> orderedEntries,
+            EntryViewModel targetEntry)
+        {
+            if (targetEntry.IsGroupHeader)
+            {
+                return;
+            }
+
+            PanelViewState panelState = GetPanelState(panelId);
+            string targetPath = GetPaneEntryPath(panelId, targetEntry);
+            string anchorPath = !string.IsNullOrWhiteSpace(panelState.FocusedEntryPath)
+                ? panelState.FocusedEntryPath
+                : panelState.SelectedEntryPath ?? targetPath;
+
+            int anchorIndex = FindEntryIndexByPath(orderedEntries, anchorPath);
+            int targetIndex = FindEntryIndexByPath(orderedEntries, targetPath);
+            if (anchorIndex < 0 || targetIndex < 0)
+            {
+                SetPanelSingleSelectionPath(panelId, targetPath, targetPath);
+                return;
+            }
+
+            int start = Math.Min(anchorIndex, targetIndex);
+            int end = Math.Max(anchorIndex, targetIndex);
+            panelState.SelectedEntryPaths.Clear();
+            for (int i = start; i <= end; i++)
+            {
+                string path = GetPaneEntryPath(panelId, orderedEntries[i]);
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    panelState.SelectedEntryPaths.Add(path);
+                }
+            }
+
+            panelState.SelectedEntryPath = targetPath;
+            panelState.FocusedEntryPath = targetPath;
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                _selectedEntryPath = panelState.SelectedEntryPath;
+                _focusedEntryPath = panelState.FocusedEntryPath;
+            }
+        }
+
+        private static int FindEntryIndexByPath(IReadOnlyList<EntryViewModel> entries, string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (string.Equals(entries[i].FullPath, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private void SelectAllLoadedEntriesForPane(WorkspacePanelId panelId)
+        {
+            PanelViewState panelState = GetPanelState(panelId);
+            panelState.SelectedEntryPaths.Clear();
+            foreach (EntryViewModel entry in GetPanelEntries(panelId))
+            {
+                if (entry.IsLoaded && !entry.IsGroupHeader)
+                {
+                    panelState.SelectedEntryPaths.Add(GetPaneEntryPath(panelId, entry));
+                }
+            }
+
+            if (panelState.SelectedEntryPaths.Count == 0)
+            {
+                panelState.SelectedEntryPath = null;
+                panelState.FocusedEntryPath = null;
+                if (panelId == WorkspacePanelId.Primary)
+                {
+                    _selectedEntryPath = null;
+                    _focusedEntryPath = null;
+                }
+                return;
+            }
+
+            panelState.SelectedEntryPath ??= panelState.SelectedEntryPaths.FirstOrDefault();
+            panelState.FocusedEntryPath ??= panelState.SelectedEntryPath;
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                _selectedEntryPath = panelState.SelectedEntryPath;
+                _focusedEntryPath = panelState.FocusedEntryPath;
+            }
         }
 
         private string? GetPanelFocusedEntryPath(WorkspacePanelId panelId)
@@ -246,6 +418,7 @@ namespace FileExplorerUI
             panel.CurrentPath = path;
             panel.AddressText = GetDisplayPathText(path);
             NotifyTitleBarTextChanged();
+            UpdateSidebarSelectionForPanelPathChange(panelId);
 
             if (panelId == WorkspacePanelId.Primary &&
                 PathTextBox.Text != GetDisplayPathText(path))
@@ -534,10 +707,21 @@ namespace FileExplorerUI
 
         private void ClearPanelSelection(WorkspacePanelId panelId, bool clearAnchor)
         {
-            SetPanelSelectedEntryPath(panelId, null);
+            PanelViewState panelState = GetPanelState(panelId);
+            panelState.SelectedEntryPath = null;
+            panelState.SelectedEntryPaths.Clear();
             if (clearAnchor)
             {
-                SetPanelFocusedEntryPath(panelId, null);
+                panelState.FocusedEntryPath = null;
+            }
+
+            if (panelId == WorkspacePanelId.Primary)
+            {
+                _selectedEntryPath = null;
+                if (clearAnchor)
+                {
+                    _focusedEntryPath = null;
+                }
             }
 
             SyncActivePanelPresentationState();
