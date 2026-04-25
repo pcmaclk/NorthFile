@@ -1,100 +1,53 @@
 # NorthFile
 
-NorthFile 是一个正在构建中的桌面文件管理器项目，目标是在 WinUI 3 的界面体验之上，结合 Rust 后端提供更稳定的目录枚举、排序、分页和后续可扩展的高性能文件系统能力。本项目的主要实现由 Codex 全程完成。
+NorthFile is a Windows file explorer project built with WinUI 3 and Rust.
 
-当前版本：`0.1.1`
+## Structure
 
-## 项目定位
+- `FileExplorerUI/`: WinUI 3 frontend, C#, .NET 8, x64
+- `rust_engine/`: Rust backend exposed through FFI
+- `scripts/`: utility scripts
+- `tools/`: small internal code tools
 
-这个项目关注的不是“做一个最基础的资源管理器替代品”，而是逐步打磨一条更清晰的桌面文件管理器实现路线：
+## Requirements
 
-- WinUI 3 负责现代桌面交互与界面结构
-- Rust 负责目录访问、排序、分页、搜索与底层文件系统能力
-- 前后端通过 FFI 协作，保持 UI 层和文件系统访问层职责分离
+- Windows
+- .NET SDK 8+
+- Rust nightly toolchain
 
-## 当前特性
+## Build
 
-- 默认启动到“我的电脑”页，右侧显示驱动器列表
-- “我的电脑”页支持双击进入驱动器，并显示类型、总大小、可用空间
-- 当前目录默认按“文件夹优先、名称升序”排序
-- 面包屑导航，支持长路径折叠与溢出菜单
-- 可拖拽宽度的侧边栏，支持压缩模式
-- 侧边栏包含固定、文件树、云盘、网络、标签分组，支持折叠与样式同步
-- 侧边栏压缩模式支持图标导航与右侧弹出菜单，文件树压缩为“我的电脑”入口
-- 侧边栏压缩模式的多级目录菜单当前基于原生 `MenuFlyout` / `MenuFlyoutSubItem` 实现，并额外补上“父项点击直接导航”的行为
-- 文件树支持按真实子目录状态显示展开箭头，并区分箭头展开与内容点击跳转
-- 文件列表分页加载
-- 文件详情异步补齐
-- 支持重命名、删除、双击打开
-- 支持目录搜索
-- 为 NTFS 原始访问、缓存和后续高性能路径预留了能力接口
+Build the Rust backend first:
 
-## Sidebar Notes
+```powershell
+cd rust_engine
+cargo build --release
+cd ..
+```
 
-这一轮侧边栏相关实现有几条明确约束，后续继续改这块时需要保持：
+Then build the WinUI app:
 
-- 普通模式下的左侧 `TreeView` 和压缩模式下的 compact 弹出目录菜单，是两条不同的交互链路。
-- 普通模式文件树仍然使用 `TreeView + TreeViewNode + 延迟加载`。
-- 压缩模式目录菜单当前使用原生 `MenuFlyoutSubItem` 展开子菜单，并通过额外的 `Tapped` 处理补上“父项点击直接导航”。
-- compact 菜单的数据现在不再按层级或按固定数量截断，hover 到某目录时会实际枚举该目录的下一层子目录。
-- 如果后续需要重新引入层级上限、数量上限、滚动限制或其他兜底策略，必须在实现前明确记录原因和影响，不能静默加限制。
+```powershell
+dotnet build FileExplorerUI\FileExplorerUI.csproj -c Release -p:Platform=x64
+```
 
-### 普通模式树
+For local debug builds:
 
-- “我的电脑”根节点图标已单独改为显示屏图标。
-- 普通目录节点保持默认文件夹图标。
-- 左侧树的子节点枚举运行在后台线程，因此 `SidebarTreeEntry` 这类数据对象里不能再放 `Brush`、`UIElement` 或其他 UI 线程对象。
-- 之前这里出现过一次回归：为了给“我的电脑”单独着色，把 `SolidColorBrush` 放进了 `SidebarTreeEntry`，结果后台枚举目录时触发 COM 异常，异常又被吞掉，表面现象就是“点击箭头后箭头消失、不展开、childCount=0”。这个坑后续不能再踩。
+```powershell
+dotnet build FileExplorerUI\FileExplorerUI.csproj -c Debug -p:Platform=x64
+```
 
-### Compact 目录菜单
+## Current Scope
 
-- compact 文件树菜单当前保留两条核心交互：
-  - hover 父项展开子菜单
-  - 点击父项直接导航到该目录
-- 子菜单中的“打开当前项”入口已经删除，避免和父项点击语义重复。
-- compact 菜单的目录数据改成惰性加载，只在需要展开某一层时才枚举下一层目录。
-- 之前 compact 菜单曾使用自定义 `Popup`，后来切回原生 `MenuFlyout`，原因是系统背景、阴影和 submenu 状态更稳定。
-- 原生 `MenuFlyoutSubItem` 的子菜单 presenter 目前不方便单独定制，所以子菜单滚动行为更多依赖系统默认实现，这一点是已知取舍。
+- tabbed workspace
+- dual-pane explorer shell
+- sidebar navigation
+- breadcrumb and search
+- file operations: copy, move, rename, delete, paste
+- pane-aware selection and command routing
+- WinUI frontend with Rust-backed directory/file operations
 
-## 技术栈
+## Notes
 
-- UI：WinUI 3 / C#
-- Engine：Rust
-- 平台：Windows
-
-主要目录：
-
-- [FileExplorerUI](/D:/Develop/Workspace/Rust/FileExplorer/FileExplorerUI)
-- [rust_engine](/D:/Develop/Workspace/Rust/FileExplorer/rust_engine)
-
-## 当前状态
-
-`0.1.1` 是一个可运行的早期版本，已经具备基础浏览和交互能力，但项目仍在持续迭代中。
-
-当前版本重点完成了：
-
-- 文件列表排序与分页链路整理
-- 面包屑与侧边栏交互打磨
-- “我的电脑”驱动器页与侧边栏文件树/固定分组联动
-- 侧边栏 compact 模式与多级弹出菜单组件
-- 深浅色模式下标题栏与系统标题栏主题联动
-- 文件类型、图标和基础视觉体系收口
-- Rust 侧目录浏览与缓存路径整理
-- 可直接启动的 unpackaged `x64` 发布方式
-
-## 后续方向
-
-- 继续完善大目录场景下的性能体验
-- 进一步整理侧边栏、列表和命令区的界面结构
-- 逐步增强 NTFS / 索引 / 搜索能力
-- 补充更完整的发布流程和测试覆盖
-
-## 说明
-
-- 当前主要按 `x64` 目标进行调试和发布验证
-- 普通权限下通常会走传统目录枚举路径
-- 原始 NTFS 访问目前仍属于增强路径，不是默认运行前提
-
-## License
-
-MIT License，详见 `LICENSE`。
+- The repository is intentionally kept code-focused.
+- Local planning notes, detailed docs, screenshots, and temporary files are not part of the remote repository snapshot.

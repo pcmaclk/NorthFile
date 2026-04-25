@@ -29,3 +29,16 @@ artifacts/
 FileExplorerUI/rust_engine.dll
 FileExplorerUI/build_diag.txt
 docs/
+# Added by code-review-graph
+.code-review-graph/
+
+# Local agent/tooling files
+.agents/
+.claude/
+.roo/
+AGENTS.md
+skills-lock.json
+build-shell.log
+build-titlebar.log
+tmp/
+UITest/
