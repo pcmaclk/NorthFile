@@ -270,16 +270,6 @@ public sealed class EntryItemHost : ContentControl
     {
         if (IsSelected)
         {
-            if (_isPressed && SelectedPressedBackground is not null)
-            {
-                return SelectedPressedBackground;
-            }
-
-            if (_isPointerOver && SelectedPointerOverBackground is not null)
-            {
-                return SelectedPointerOverBackground;
-            }
-
             return SelectedBackground;
         }
 

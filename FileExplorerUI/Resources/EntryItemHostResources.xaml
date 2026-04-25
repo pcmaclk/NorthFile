@@ -25,7 +25,8 @@
                             <Border
                                 x:Name="BackgroundBorder"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="{ThemeResource ListViewItemCornerRadius}" />
+                                CornerRadius="{ThemeResource ListViewItemCornerRadius}"
+                                Margin="0,0,1,0" />
                             <Border
                                 x:Name="AnchorBorder"
                                 BorderBrush="{TemplateBinding AnchorBorderBrush}"
