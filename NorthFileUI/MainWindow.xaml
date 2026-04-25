@@ -1,0 +1,1958 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="NorthFileUI.MainWindow"
+    x:Name="RootWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:NorthFileUI"
+    xmlns:controls="using:NorthFileUI.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="NorthFile">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid
+        x:Name="WindowRootGrid"
+        RowDefinitions="Auto,Auto,*"
+        RowSpacing="0"
+        Padding="{x:Bind ShellWindowPadding, Mode=OneWay}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="{x:Bind SidebarColumnWidth, Mode=OneWay}" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Grid
+            x:Name="LeftShellColumn"
+            Grid.Column="0"
+            Grid.RowSpan="3"
+            HorizontalAlignment="Stretch"
+            RowDefinitions="Auto,*">
+            <!-- Left-side title bar chrome for explorer mode: collapse/settings live above the sidebar. -->
+            <Grid
+                Height="{x:Bind ShellTitleBarHeight, Mode=OneWay}"
+                Visibility="{x:Bind SidebarTopChromeVisibility, Mode=OneWay}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel
+                    Orientation="Horizontal"
+                    Padding="4, 0, 0, 0"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Bottom"
+                    Spacing="4">
+                    <Button
+                        x:Name="SidebarCollapseButton"
+                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Padding="0"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Click="SidebarCollapseButton_Click">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{x:Bind SidebarCollapseButtonToolTipText, Mode=OneWay}" />
+                        </ToolTipService.ToolTip>
+                        <FontIcon
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                            Glyph="&#xE700;" />
+                    </Button>
+
+                    <Button
+                        x:Name="SidebarTopSettingsButton"
+                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Padding="0"
+                        Visibility="{x:Bind SidebarTopSettingsVisibility, Mode=OneWay}"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Click="TitleBarSettingsButton_Click">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{Binding Source={StaticResource Strings}, Path=[SidebarSettingsButtonToolTip.Content]}" />
+                        </ToolTipService.ToolTip>
+                        <FontIcon
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                            Glyph="&#xE713;" />
+                    </Button>
+
+                    <Button
+                        x:Name="LanguageToggleButton"
+                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Padding="0"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Click="LanguageToggleButton_Click"
+                        UseSystemFocusVisuals="False">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{Binding Source={StaticResource Strings}, Path=[ToolTipToggleTheme]}" />
+                        </ToolTipService.ToolTip>
+                        <FontIcon
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                            Glyph="{x:Bind ThemeToggleGlyph, Mode=OneWay}" />
+                    </Button>
+                </StackPanel>
+                <Grid
+                    x:Name="LeftTitleBarDragRegion"
+                    Grid.Column="1"
+                    Background="Transparent"
+                    Loaded="TitleBarDragRegion_Loaded"
+                    SizeChanged="TitleBarDragRegion_SizeChanged" />
+            </Grid>
+
+            <!-- Explorer sidebar host occupies the left shell column. -->
+            <Grid
+                Grid.Row="1"
+                Padding="{x:Bind SidebarContentPadding, Mode=OneWay}"
+                HorizontalAlignment="Stretch"
+                Background="Transparent"
+                Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}">
+                <local:SidebarView x:Name="StyledSidebarView" />
+            </Grid>
+        </Grid>
+
+        <Grid
+            x:Name="RightShellColumn"
+            Grid.Column="1"
+            Grid.RowSpan="3"
+            HorizontalAlignment="Stretch"
+            RowDefinitions="Auto,Auto,*">
+            <Grid.Resources>
+                <ResourceDictionary Source="Resources/MainWindowResources.xaml" />
+            </Grid.Resources>
+        <!-- Right-side title bar shell: tab strip stays aligned to the content column. -->
+        <TabView
+            x:Name="SingleTabTitleBarView"
+            Height="{x:Bind ShellTitleBarHeight, Mode=OneWay}"
+            Margin="{x:Bind ShellTitleBarMargin, Mode=OneWay}"
+            HorizontalAlignment="Stretch"
+            Background="Transparent"
+            BorderThickness="0"
+            CanDragTabs="False"
+            IsAddTabButtonVisible="False"
+            IsTabStop="False"
+            SelectionChanged="SingleTabTitleBarView_SelectionChanged"
+            TabWidthMode="Equal"
+            Visibility="{x:Bind ShellTabTitleBarVisibility, Mode=OneWay}">
+            <TabView.Resources>
+                <ResourceDictionary Source="Resources/MainWindowTabResources.xaml" />
+            </TabView.Resources>
+            <TabView.TabStripHeader>
+                <Grid
+                    x:Name="WindowTabStripLeftInset"
+                    Width="{x:Bind ShellTitleBarLeftInsetWidth, Mode=OneWay}"
+                    Visibility="{x:Bind ShellTitleBarLeftInsetVisibility, Mode=OneWay}"
+                    Background="Transparent">
+                    <Button
+                        x:Name="TitleBarSettingsButton"
+                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Margin="{x:Bind ShellTitleBarLeftInsetButtonMargin, Mode=OneWay}"
+                        Padding="0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Visibility="{x:Bind TitleBarSidebarSettingsVisibility, Mode=OneWay}"
+                        Click="TitleBarSettingsButton_Click">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="{Binding Source={StaticResource Strings}, Path=[SidebarSettingsButtonToolTip.Content]}" />
+                        </ToolTipService.ToolTip>
+                        <FontIcon
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                            Glyph="&#xE713;" />
+                    </Button>
+                </Grid>
+            </TabView.TabStripHeader>
+            <TabView.TabStripFooter>
+                <Grid ColumnDefinitions="Auto,*">
+                    <Button
+                        x:Name="AddWorkspaceTabButton"
+                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                        Padding="0"
+                        Margin="{x:Bind AddWorkspaceTabButtonMargin, Mode=OneWay}"
+                        VerticalAlignment="Top"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}"
+                        Click="AddWorkspaceTabButton_Click">
+                        <ToolTipService.ToolTip>
+                            <ToolTip Content="新建标签页" />
+                        </ToolTipService.ToolTip>
+                        <FontIcon
+                            FontFamily="Segoe Fluent Icons"
+                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                            Glyph="&#xE710;" />
+                    </Button>
+                    <Grid
+                        x:Name="WindowTabDragRegion"
+                        Grid.Column="1"
+                        MinWidth="188"
+                        HorizontalAlignment="Stretch"
+                        Background="Transparent"
+                        Loaded="TitleBarDragRegion_Loaded"
+                        SizeChanged="TitleBarDragRegion_SizeChanged" />
+                </Grid>
+            </TabView.TabStripFooter>
+        </TabView>
+
+        <!-- Explorer toolbar stays separate from pane bodies to keep startup stable while dual-pane stays shell-only. -->
+        <Grid
+            x:Name="ExplorerToolbarHost"
+            Grid.Row="1"
+            Margin="{x:Bind ShellToolbarMargin, Mode=OneWay}"
+            Visibility="{x:Bind ExplorerChromeVisibility, Mode=OneWay}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="PrimaryToolbarPaneColumn" Width="{x:Bind ExplorerPanePrimaryColumnWidth, Mode=OneWay}" />
+                <ColumnDefinition x:Name="ToolbarActionRailColumn" Width="{x:Bind ExplorerPaneToolbarActionRailColumnWidth, Mode=OneWay}" />
+                <ColumnDefinition x:Name="SecondaryToolbarPaneColumn" Width="{x:Bind ExplorerPaneSecondaryColumnWidth, Mode=OneWay}" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <controls:ExplorerPaneNavigationBar
+                    x:Name="PrimaryToolbarPaneHost"
+                    PointerPressed="PrimaryPaneSurface_PointerPressed"
+                    ChromePadding="{x:Bind ShellToolbarPadding, Mode=OneWay}"
+                    ChromeBackground="{x:Bind PrimaryPaneToolbarBackground, Mode=OneWay}"
+                    ChromeBorderBrush="{x:Bind PrimaryPaneToolbarBorderBrush, Mode=OneWay}"
+                    ChromeBorderThickness="{x:Bind PrimaryPaneToolbarBorderThickness, Mode=OneWay}"
+                    ChromeTranslation="{x:Bind PrimaryPaneToolbarTranslation, Mode=OneWay}"
+                    LayoutHeight="{x:Bind ShellControlSize, Mode=OneWay}"
+                    ColumnSpacing="8">
+                    <controls:ExplorerPaneNavigationBar.LeadingContent>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button
+                                        x:Name="BackButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="BackButton_Click">
+                                        <ToolTipService.ToolTip>
+                                            <ToolTip x:Uid="BackButtonToolTip" />
+                                        </ToolTipService.ToolTip>
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE72B;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="ForwardButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="ForwardButton_Click">
+                                        <ToolTipService.ToolTip>
+                                            <ToolTip x:Uid="ForwardButtonToolTip" />
+                                        </ToolTipService.ToolTip>
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE72A;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="UpButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="UpButton_Click">
+                                        <ToolTipService.ToolTip>
+                                            <ToolTip x:Uid="UpButtonToolTip" />
+                                        </ToolTipService.ToolTip>
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE74A;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="LoadButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="LoadButton_Click">
+                                        <ToolTipService.ToolTip>
+                                            <ToolTip x:Uid="LoadButtonToolTip" />
+                                        </ToolTipService.ToolTip>
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE72C;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="PrimaryPaneCloseButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="PrimaryPaneCloseButton_Click">
+                                        <ToolTipService.ToolTip>
+                                            <ToolTip Content="关闭此面板" />
+                                        </ToolTipService.ToolTip>
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE711;" />
+                                    </Button>
+                                </StackPanel>
+                    </controls:ExplorerPaneNavigationBar.LeadingContent>
+                    <controls:ExplorerPaneNavigationBar.AddressContent>
+                                <Grid>
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="PrimaryAddressChromeStates">
+                                            <VisualState x:Name="PrimaryAddressChromeInactive" />
+                                            <VisualState x:Name="PrimaryAddressChromeActive">
+                                                <VisualState.StateTriggers>
+                                                    <controls:BoolStateTrigger Value="{x:Bind IsPrimaryWorkspacePanelActive, Mode=OneWay}" />
+                                                </VisualState.StateTriggers>
+                                                <VisualState.Setters>
+                                                    <Setter Target="AddressBreadcrumbBorder.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="AddressBreadcrumbBorder.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="PathTextBox.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="PathTextBox.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="PathTextBox.Foreground" Value="{ThemeResource ActivePaneForegroundBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <Border
+                                        x:Name="AddressBreadcrumbBorder"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Style="{StaticResource PaneAddressBreadcrumbBorderStyle}"
+                                        SizeChanged="AddressBreadcrumbBorder_SizeChanged"
+                                        Tapped="AddressBreadcrumbBorder_Tapped">
+                                        <Grid
+                                            ColumnDefinitions="Auto,*,40"
+                                            VerticalAlignment="Center">
+                                            <Button
+                                                x:Name="OverflowBreadcrumbButton"
+                                                Grid.Column="0"
+                                                Style="{StaticResource PaneOverflowBreadcrumbButtonStyle}"
+                                                Visibility="Collapsed"
+                                                Click="OverflowBreadcrumbButton_Click">
+                                                <ToolTipService.ToolTip>
+                                                    <ToolTip x:Uid="OverflowBreadcrumbButtonToolTip" />
+                                                </ToolTipService.ToolTip>
+                                                <FontIcon
+                                                    FontFamily="Segoe Fluent Icons"
+                                                    FontSize="12"
+                                                    Glyph="&#xE712;" />
+                                            </Button>
+                                            <ItemsControl
+                                                x:Name="BreadcrumbMeasureItemsControl"
+                                                Grid.Column="1"
+                                                Opacity="0"
+                                                IsHitTestVisible="False"
+                                                HorizontalAlignment="Left"
+                                                ItemsSource="{x:Bind Breadcrumbs, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="2" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                                                        <Grid
+                                                            ColumnDefinitions="Auto,Auto"
+                                                            Loaded="MeasureBreadcrumbItem_Loaded"
+                                                            SizeChanged="MeasureBreadcrumbItem_SizeChanged">
+                                                            <Button
+                                                                Style="{StaticResource PaneBreadcrumbButtonStyle}"
+                                                                IsHitTestVisible="False">
+                                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="{Binding IconGlyph}"
+                                                                        Visibility="{Binding IconVisibility}" />
+                                                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button
+                                                                Grid.Column="1"
+                                                                Style="{StaticResource PaneBreadcrumbChevronButtonStyle}"
+                                                                Visibility="{Binding ChevronVisibility}"
+                                                                IsHitTestVisible="False">
+                                                                <Button.Content>
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="&#xE76C;" />
+                                                                </Button.Content>
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <ItemsControl
+                                                x:Name="BreadcrumbItemsControl"
+                                                Grid.Column="1"
+                                                HorizontalAlignment="Left"
+                                                ItemsSource="{x:Bind VisibleBreadcrumbs, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="2" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                                                        <Grid ColumnDefinitions="Auto,Auto">
+                                                            <Button
+                                                                Style="{StaticResource PaneBreadcrumbButtonStyle}"
+                                                                Tag="{Binding FullPath}"
+                                                                Click="BreadcrumbButton_Click">
+                                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="{Binding IconGlyph}"
+                                                                        Visibility="{Binding IconVisibility}" />
+                                                                    <TextBlock
+                                                                        Text="{Binding Label}"
+                                                                        TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button
+                                                                Grid.Column="1"
+                                                                Style="{StaticResource PaneBreadcrumbChevronButtonStyle}"
+                                                                Tag="{Binding FullPath}"
+                                                                Visibility="{Binding ChevronVisibility}"
+                                                                Click="BreadcrumbChevronButton_Click">
+                                                                <Button.Content>
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="&#xE76C;" />
+                                                                </Button.Content>
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Visibility="{x:Bind AddressTextFallbackVisibility, Mode=OneWay}"
+                                                Text="{x:Bind DisplayAddressText, Mode=OneWay}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <Grid
+                                                x:Name="PrimaryAddressEditHitTarget"
+                                                Grid.Column="2"
+                                                Background="Transparent" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBox
+                                        x:Name="PathTextBox"
+                                        x:Uid="PathTextBox"
+                                        Style="{StaticResource PaneAddressTextBoxStyle}"
+                                        GotFocus="PrimaryPaneInput_GotFocus"
+                                        PointerPressed="PrimaryPaneInput_PointerPressed"
+                                        TextChanging="PathTextBox_TextChanging"
+                                        Text="C:\"
+                                        Visibility="Collapsed"
+                                        KeyDown="PathTextBox_KeyDown" />
+                                    <TeachingTip
+                                        x:Name="AddressInputTeachingTip"
+                                        IsLightDismissEnabled="False"
+                                        IsOpen="False"
+                                        PlacementMargin="8"
+                                        PreferredPlacement="Bottom" />
+                                </Grid>
+                    </controls:ExplorerPaneNavigationBar.AddressContent>
+                    <controls:ExplorerPaneNavigationBar.SearchContent>
+                                <Grid>
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="PrimarySearchChromeStates">
+                                            <VisualState x:Name="PrimarySearchChromeInactive" />
+                                            <VisualState x:Name="PrimarySearchChromeActive">
+                                                <VisualState.StateTriggers>
+                                                    <controls:BoolStateTrigger Value="{x:Bind IsPrimaryWorkspacePanelActive, Mode=OneWay}" />
+                                                </VisualState.StateTriggers>
+                                                <VisualState.Setters>
+                                                    <Setter Target="SearchTextBox.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="SearchTextBox.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="SearchTextBox.Foreground" Value="{ThemeResource ActivePaneForegroundBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <TextBox
+                                        x:Name="SearchTextBox"
+                                        x:Uid="SearchTextBox"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Visibility="{x:Bind PrimaryPaneSearchVisibility, Mode=OneWay}"
+                                        Style="{StaticResource PaneSearchTextBoxStyle}"
+                                        GotFocus="PrimaryPaneInput_GotFocus"
+                                        PointerPressed="PrimaryPaneInput_PointerPressed"
+                                        TextChanged="SearchTextBox_TextChanged"
+                                        KeyDown="SearchTextBox_KeyDown" />
+                                </Grid>
+                    </controls:ExplorerPaneNavigationBar.SearchContent>
+                </controls:ExplorerPaneNavigationBar>
+            </Grid>
+
+            <Grid
+                x:Name="ExplorerPaneActionToolbarHost"
+                Grid.Column="1"
+                Visibility="{x:Bind ExplorerPaneToolbarActionRailVisibility, Mode=OneWay}">
+                <Button
+                    x:Name="ExplorerPaneToggleButton"
+                    Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                    Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                    Padding="0"
+                    Margin="{x:Bind ExplorerPaneToggleButtonMargin, Mode=OneWay}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Style="{ThemeResource SubtleButtonStyle}"
+                    Click="ExplorerPaneToggleButton_Click">
+                    <ToolTipService.ToolTip>
+                        <ToolTip Content="{x:Bind ExplorerPaneToggleToolTipText, Mode=OneWay}" />
+                    </ToolTipService.ToolTip>
+                    <FontIcon
+                        FontFamily="Segoe Fluent Icons"
+                        FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                        Glyph="{x:Bind ExplorerPaneToggleGlyph, Mode=OneWay}" />
+                </Button>
+            </Grid>
+
+            <Grid
+                Grid.Column="2"
+                Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}">
+                <controls:ExplorerPaneNavigationBar
+                    x:Name="SecondaryToolbarPaneHost"
+                    PointerPressed="SecondaryPaneSurface_PointerPressed"
+                    ChromePadding="{x:Bind ShellToolbarPadding, Mode=OneWay}"
+                    ChromeBackground="{x:Bind SecondaryPaneToolbarBackground, Mode=OneWay}"
+                    ChromeBorderBrush="{x:Bind SecondaryPaneToolbarBorderBrush, Mode=OneWay}"
+                    ChromeBorderThickness="{x:Bind SecondaryPaneToolbarBorderThickness, Mode=OneWay}"
+                    ChromeTranslation="{x:Bind SecondaryPaneToolbarTranslation, Mode=OneWay}"
+                    LayoutHeight="{x:Bind ShellControlSize, Mode=OneWay}"
+                    ColumnSpacing="8">
+                    <controls:ExplorerPaneNavigationBar.LeadingContent>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button
+                                        x:Name="SecondaryPaneBackButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        IsEnabled="{x:Bind SecondaryPaneCanGoBack, Mode=OneWay}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneBackButton_Click">
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE72B;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="SecondaryPaneForwardButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        IsEnabled="{x:Bind SecondaryPaneCanGoForward, Mode=OneWay}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneForwardButton_Click">
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE72A;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="SecondaryPaneUpButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        IsEnabled="{x:Bind SecondaryPaneCanGoUp, Mode=OneWay}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneUpButton_Click">
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE74A;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="SecondaryPaneLoadButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneLoadButton_Click">
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE72C;" />
+                                    </Button>
+                                    <Button
+                                        x:Name="SecondaryPaneCloseButton"
+                                        Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Padding="0"
+                                        Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Click="SecondaryPaneCloseButton_Click">
+                                        <ToolTipService.ToolTip>
+                                            <ToolTip Content="关闭此面板" />
+                                        </ToolTipService.ToolTip>
+                                        <FontIcon
+                                            FontFamily="Segoe Fluent Icons"
+                                            FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                            Glyph="&#xE711;" />
+                                    </Button>
+                                </StackPanel>
+                    </controls:ExplorerPaneNavigationBar.LeadingContent>
+                    <controls:ExplorerPaneNavigationBar.AddressContent>
+                                <Grid>
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="SecondaryAddressChromeStates">
+                                            <VisualState x:Name="SecondaryAddressChromeInactive" />
+                                            <VisualState x:Name="SecondaryAddressChromeActive">
+                                                <VisualState.StateTriggers>
+                                                    <controls:BoolStateTrigger Value="{x:Bind IsSecondaryWorkspacePanelActive, Mode=OneWay}" />
+                                                </VisualState.StateTriggers>
+                                                <VisualState.Setters>
+                                                    <Setter Target="SecondaryAddressBreadcrumbBorder.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="SecondaryAddressBreadcrumbBorder.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="SecondaryPaneAddressTextBox.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="SecondaryPaneAddressTextBox.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="SecondaryPaneAddressTextBox.Foreground" Value="{ThemeResource ActivePaneForegroundBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <Border
+                                        x:Name="SecondaryAddressBreadcrumbBorder"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Style="{StaticResource PaneAddressBreadcrumbBorderStyle}"
+                                        SizeChanged="SecondaryAddressBreadcrumbBorder_SizeChanged"
+                                        Tapped="SecondaryAddressBreadcrumbBorder_Tapped">
+                                        <Grid
+                                            ColumnDefinitions="Auto,*,40"
+                                            VerticalAlignment="Center">
+                                            <Button
+                                                x:Name="SecondaryOverflowBreadcrumbButton"
+                                                Grid.Column="0"
+                                                Style="{StaticResource PaneOverflowBreadcrumbButtonStyle}"
+                                                Visibility="Collapsed"
+                                                Click="SecondaryOverflowBreadcrumbButton_Click">
+                                                <FontIcon
+                                                    FontFamily="Segoe Fluent Icons"
+                                                    FontSize="12"
+                                                    Glyph="&#xE712;" />
+                                            </Button>
+                                            <ItemsControl
+                                                x:Name="SecondaryBreadcrumbMeasureItemsControl"
+                                                Grid.Column="1"
+                                                Opacity="0"
+                                                IsHitTestVisible="False"
+                                                HorizontalAlignment="Left"
+                                                ItemsSource="{x:Bind SecondaryPaneBreadcrumbs, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="2" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                                                        <Grid
+                                                            ColumnDefinitions="Auto,Auto"
+                                                            Loaded="SecondaryMeasureBreadcrumbItem_Loaded"
+                                                            SizeChanged="SecondaryMeasureBreadcrumbItem_SizeChanged">
+                                                            <Button
+                                                                Style="{StaticResource PaneBreadcrumbButtonStyle}"
+                                                                IsHitTestVisible="False">
+                                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="{Binding IconGlyph}"
+                                                                        Visibility="{Binding IconVisibility}" />
+                                                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button
+                                                                Grid.Column="1"
+                                                                Style="{StaticResource PaneBreadcrumbChevronButtonStyle}"
+                                                                Visibility="{Binding ChevronVisibility}"
+                                                                IsHitTestVisible="False">
+                                                                <Button.Content>
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="&#xE76C;" />
+                                                                </Button.Content>
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <ItemsControl
+                                                x:Name="SecondaryBreadcrumbItemsControl"
+                                                Grid.Column="1"
+                                                HorizontalAlignment="Left"
+                                                ItemsSource="{x:Bind SecondaryPaneVisibleBreadcrumbs, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="2" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:BreadcrumbItemViewModel">
+                                                        <Grid ColumnDefinitions="Auto,Auto">
+                                                            <Button
+                                                                Style="{StaticResource PaneBreadcrumbButtonStyle}"
+                                                                Tag="{Binding FullPath}"
+                                                                Click="SecondaryBreadcrumbButton_Click">
+                                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="{Binding IconGlyph}"
+                                                                        Visibility="{Binding IconVisibility}" />
+                                                                    <TextBlock
+                                                                        Text="{Binding Label}"
+                                                                        TextTrimming="CharacterEllipsis" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button
+                                                                Grid.Column="1"
+                                                                Style="{StaticResource PaneBreadcrumbChevronButtonStyle}"
+                                                                Tag="{Binding FullPath}"
+                                                                Visibility="{Binding ChevronVisibility}"
+                                                                Click="SecondaryBreadcrumbChevronButton_Click">
+                                                                <Button.Content>
+                                                                    <FontIcon
+                                                                        FontFamily="Segoe Fluent Icons"
+                                                                        FontSize="12"
+                                                                        Glyph="&#xE76C;" />
+                                                                </Button.Content>
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Visibility="{x:Bind SecondaryPaneAddressTextFallbackVisibility, Mode=OneWay}"
+                                                Text="{x:Bind SecondaryPaneDisplayAddressText, Mode=OneWay}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <Grid
+                                                x:Name="SecondaryAddressEditHitTarget"
+                                                Grid.Column="2"
+                                                Background="Transparent" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBox
+                                        x:Name="SecondaryPaneAddressTextBox"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Style="{StaticResource PaneAddressTextBoxStyle}"
+                                        Text="{x:Bind SecondaryPaneAddressEditorText, Mode=TwoWay}"
+                                        GotFocus="SecondaryPaneInput_GotFocus"
+                                        PointerPressed="SecondaryPaneInput_PointerPressed"
+                                        TextChanged="SecondaryPaneAddressTextBox_TextChanged"
+                                        Visibility="Collapsed"
+                                        KeyDown="SecondaryPaneAddressTextBox_KeyDown" />
+                                </Grid>
+                    </controls:ExplorerPaneNavigationBar.AddressContent>
+                    <controls:ExplorerPaneNavigationBar.SearchContent>
+                                <Grid>
+                                    <VisualStateManager.VisualStateGroups>
+                                        <VisualStateGroup x:Name="SecondarySearchChromeStates">
+                                            <VisualState x:Name="SecondarySearchChromeInactive" />
+                                            <VisualState x:Name="SecondarySearchChromeActive">
+                                                <VisualState.StateTriggers>
+                                                    <controls:BoolStateTrigger Value="{x:Bind IsSecondaryWorkspacePanelActive, Mode=OneWay}" />
+                                                </VisualState.StateTriggers>
+                                                <VisualState.Setters>
+                                                    <Setter Target="SecondaryPaneSearchTextBox.Background" Value="{ThemeResource ActivePaneInputBackgroundBrush}" />
+                                                    <Setter Target="SecondaryPaneSearchTextBox.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+                                                    <Setter Target="SecondaryPaneSearchTextBox.Foreground" Value="{ThemeResource ActivePaneForegroundBrush}" />
+                                                </VisualState.Setters>
+                                            </VisualState>
+                                        </VisualStateGroup>
+                                    </VisualStateManager.VisualStateGroups>
+                                    <TextBox
+                                        x:Name="SecondaryPaneSearchTextBox"
+                                        Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                        Style="{StaticResource PaneSearchTextBoxStyle}"
+                                        PlaceholderText="{x:Bind SecondaryPaneSearchPlaceholderText, Mode=OneWay}"
+                                        Text="{x:Bind SecondaryPaneSearchText, Mode=TwoWay}"
+                                        GotFocus="SecondaryPaneInput_GotFocus"
+                                        PointerPressed="SecondaryPaneInput_PointerPressed"
+                                        TextChanged="SecondaryPaneSearchTextBox_TextChanged"
+                                        KeyDown="SecondaryPaneSearchTextBox_KeyDown" />
+                                </Grid>
+                    </controls:ExplorerPaneNavigationBar.SearchContent>
+                </controls:ExplorerPaneNavigationBar>
+            </Grid>
+        </Grid>
+
+        <!-- Explorer workspace host: content panes + center action rail + status bar. -->
+        <Grid
+            x:Name="ExplorerShellGrid"
+            Grid.Row="2"
+            RowDefinitions="*,Auto"
+            Padding="0"
+            Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}">
+            <Grid
+                x:Name="ExplorerWorkspaceHost"
+                Grid.Row="0"
+                Padding="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="PrimaryPaneColumn" Width="{x:Bind ExplorerPanePrimaryColumnWidth, Mode=OneWay}" />
+                    <ColumnDefinition x:Name="ExplorerPaneActionRailColumn" Width="{x:Bind ExplorerPaneActionRailColumnWidth, Mode=OneWay}" />
+                    <ColumnDefinition x:Name="SecondaryPaneColumn" Width="{x:Bind ExplorerPaneSecondaryColumnWidth, Mode=OneWay}" />
+                </Grid.ColumnDefinitions>
+
+                <Grid
+                    x:Name="PrimaryPaneHost"
+                    Grid.Column="0"
+                    PointerPressed="PrimaryPaneSurface_PointerPressed"
+                    RowDefinitions="*,Auto"
+                    Padding="0">
+                    <Grid
+                        x:Name="ExplorerBodyGrid"
+                        Grid.Row="0"
+                        Padding="0">
+                        <Grid x:Name="ExplorerBodyShadowReceiverGrid" />
+                        <Border
+                            x:Name="ExplorerBodyBorder"
+                            Padding="0"
+                            Background="{x:Bind PrimaryPaneBodyBackground, Mode=OneWay}"
+                            BorderBrush="{x:Bind PrimaryPaneBodyBorderBrush, Mode=OneWay}"
+                            BorderThickness="{x:Bind PrimaryPaneBodyBorderThickness, Mode=OneWay}"
+                            CornerRadius="{ThemeResource OverlayCornerRadius}"
+                            Loaded="ExplorerBodyBorder_Loaded"
+                            Translation="{x:Bind PrimaryPaneBodyTranslation, Mode=OneWay}">
+                            <Border.Shadow>
+                                <ThemeShadow x:Name="ExplorerBodyThemeShadow" />
+                            </Border.Shadow>
+                            <Grid RowDefinitions="Auto,*">
+                        <Border
+                            x:Name="DetailsHeaderBorder"
+                            Width="{x:Bind DetailsRowWidth, Mode=OneWay}"
+                            Margin="10,0,0,4"
+                            Padding="0"
+                            HorizontalAlignment="Left"
+                            Background="Transparent"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,0,0,1"
+                            Visibility="{x:Bind DetailsHeaderVisibility, Mode=OneWay}">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="DetailsHeaderTranslateTransform" />
+                            </Border.RenderTransform>
+                            <Grid x:Name="DetailsHeaderGrid" Height="28" Margin="0" HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
+                                    <ColumnDefinition Width="6" />
+                                    <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border
+                                    x:Name="NameHeaderBorder"
+                                    Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                    PointerEntered="DetailsHeader_PointerEntered"
+                                    PointerExited="DetailsHeader_PointerExited"
+                                    PointerPressed="DetailsHeader_PointerPressed"
+                                    Tag="Name">
+                                    <Grid Margin="{Binding ElementName=RootWindow, Path=NameHeaderMargin}" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="NameHeaderTextBlock"
+                                            x:Uid="NameHeaderTextBlock"
+                                            Style="{StaticResource DetailsHeaderTextStyle}" />
+                                        <TextBlock
+                                            x:Name="NameHeaderSortGlyphTextBlock"
+                                            Grid.Column="2"
+                                            Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                    </Grid>
+                                </Border>
+                                <Border
+                                    x:Name="TypeHeaderBorder"
+                                    Grid.Column="2"
+                                    Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                    PointerEntered="DetailsHeader_PointerEntered"
+                                    PointerExited="DetailsHeader_PointerExited"
+                                    PointerPressed="DetailsHeader_PointerPressed"
+                                    Tag="Type">
+                                    <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="TypeHeaderTextBlock"
+                                            x:Uid="TypeHeaderTextBlock"
+                                            Style="{StaticResource DetailsHeaderTextStyle}" />
+                                        <TextBlock
+                                            x:Name="TypeHeaderSortGlyphTextBlock"
+                                            Grid.Column="2"
+                                            Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                    </Grid>
+                                </Border>
+                                <Border
+                                    x:Name="SizeHeaderBorder"
+                                    Grid.Column="4"
+                                    Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                    PointerEntered="DetailsHeader_PointerEntered"
+                                    PointerExited="DetailsHeader_PointerExited"
+                                    PointerPressed="DetailsHeader_PointerPressed"
+                                    Tag="Size">
+                                    <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="SizeHeaderTextBlock"
+                                            x:Uid="SizeHeaderTextBlock"
+                                            Style="{StaticResource DetailsHeaderTextStyle}" />
+                                        <TextBlock
+                                            x:Name="SizeHeaderSortGlyphTextBlock"
+                                            Grid.Column="2"
+                                            Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                    </Grid>
+                                </Border>
+                                <Border
+                                    x:Name="ModifiedHeaderBorder"
+                                    Grid.Column="6"
+                                    Margin="0,0,6,0"
+                                    Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                    PointerEntered="DetailsHeader_PointerEntered"
+                                    PointerExited="DetailsHeader_PointerExited"
+                                    PointerPressed="DetailsHeader_PointerPressed"
+                                    Tag="ModifiedDate">
+                                    <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            x:Name="ModifiedHeaderTextBlock"
+                                            x:Uid="ModifiedHeaderTextBlock"
+                                            Style="{StaticResource DetailsHeaderTextStyle}" />
+                                        <TextBlock
+                                            x:Name="ModifiedHeaderSortGlyphTextBlock"
+                                            Grid.Column="2"
+                                            Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                    </Grid>
+                                </Border>
+
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter1"
+                                    Grid.Column="1"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    Tag="1"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter2"
+                                    Grid.Column="3"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    Tag="2"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter3"
+                                    Grid.Column="5"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    Tag="3"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                                <local:ColumnSplitter
+                                    x:Name="HeaderSplitter4"
+                                    Grid.ColumnSpan="7"
+                                    HorizontalAlignment="Right"
+                                    GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    Tag="4"
+                                    PointerEntered="ColumnSplitterHover_PointerEntered"
+                                    PointerExited="ColumnSplitterHover_PointerExited" />
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer
+                            x:Name="DetailsEntriesScrollViewer"
+                            Grid.Row="1"
+                            Style="{StaticResource EntryListScrollViewerStyle}"
+                            HorizontalScrollBarVisibility="{x:Bind EntriesHorizontalScrollBarVisibility, Mode=OneWay}"
+                            HorizontalScrollMode="{x:Bind EntriesHorizontalScrollMode, Mode=OneWay}"
+                            VerticalScrollBarVisibility="Visible"
+                            VerticalScrollMode="Enabled"
+                            DoubleTapped="GroupedEntriesView_DoubleTapped"
+                            PointerPressed="GroupedEntriesView_PointerPressedPreview"
+                            RightTapped="GroupedEntriesView_RightTapped"
+                            Visibility="{x:Bind DetailsItemsVisibility, Mode=OneWay}">
+                            <ItemsRepeater x:Name="DetailsEntriesRepeater" ItemsSource="{x:Bind PrimaryEntries, Mode=OneWay}">
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid RowDefinitions="Auto,Auto">
+                                            <Border
+                                                Grid.Row="0"
+                                                Height="{Binding ElementName=RootWindow, Path=EntryItemMetrics.GroupHeaderHeight}"
+                                                Margin="{Binding DetailsGroupHeaderMargin}"
+                                                Padding="8,0,8,0"
+                                                HorizontalAlignment="Stretch"
+                                                Visibility="{Binding HeaderRowVisibility}">
+                                                <Border Background="Transparent" PointerPressed="GroupHeaderBorder_PointerPressed">
+                                                    <Grid HorizontalAlignment="Stretch">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <controls:EntryGroupHeader
+                                                            Grid.Column="0"
+                                                            ContentPadding="6,0,0,0"
+                                                            CountText="{Binding GroupCountText}"
+                                                            ExpandGlyph="{Binding GroupExpandGlyph}"
+                                                            HeaderText="{Binding GroupHeaderText}"
+                                                            Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
+                                                            ShowBottomBorder="False"
+                                                            ShowExpandGlyph="True" />
+                                                    </Grid>
+                                                </Border>
+                                            </Border>
+                                            <controls:EntryItemHost
+                                                Grid.Row="1"
+                                                Style="{StaticResource DetailsEntryItemHostStyle}"
+                                                Width="{Binding ElementName=RootWindow, Path=DetailsRowWidth}"
+                                                MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
+                                                IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
+                                                IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
+                                                PointerPressed="EntryRow_PointerPressed"
+                                                SelectedBackground="{Binding RowBackground}"
+                                                SelectedPointerOverBackground="{Binding RowBackground}"
+                                                SelectedPressedBackground="{Binding RowBackground}"
+                                                Visibility="{Binding DetailsRowVisibility}">
+                                                <Grid Margin="6,0,0,0" HorizontalAlignment="Stretch">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=NameColumnWidth}" MinWidth="120" />
+                                                        <ColumnDefinition Width="6" />
+                                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=TypeColumnWidth}" MinWidth="90" />
+                                                        <ColumnDefinition Width="6" />
+                                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SizeColumnWidth}" MinWidth="80" />
+                                                        <ColumnDefinition Width="6" />
+                                                        <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=ModifiedColumnWidth}" MinWidth="120" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <controls:EntryNameCell
+                                                        Grid.Column="0"
+                                                        ContentMargin="{Binding ElementName=RootWindow, Path=DetailsNameCellMargin}"
+                                                        Entry="{Binding}"
+                                                        Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
+                                                        VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding Type}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="4" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding SizeText}" />
+                                                    <TextBlock Grid.Column="6" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding ModifiedText}" />
+                                                </Grid>
+                                            </controls:EntryItemHost>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                        </ScrollViewer>
+
+                        <ScrollViewer
+                            x:Name="GroupedEntriesScrollViewer"
+                            Grid.Row="1"
+                            Style="{StaticResource EntryListScrollViewerStyle}"
+                            HorizontalScrollBarVisibility="Auto"
+                            HorizontalScrollMode="Enabled"
+                            SizeChanged="GroupedEntriesScrollViewer_SizeChanged"
+                            VerticalScrollBarVisibility="Hidden"
+                            VerticalScrollMode="Disabled"
+                            DoubleTapped="GroupedEntriesView_DoubleTapped"
+                            PointerPressed="GroupedEntriesView_PointerPressedPreview"
+                            RightTapped="GroupedEntriesView_RightTapped"
+                            Visibility="{x:Bind GroupedColumnsVisibility, Mode=OneWay}">
+                            <ItemsRepeater x:Name="GroupedEntriesRepeater" ItemsSource="{x:Bind PrimaryEntries, Mode=OneWay}">
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Border
+                                                Background="Transparent"
+                                                DoubleTapped="GroupedListHeader_DoubleTapped"
+                                                PointerPressed="GroupedListHeader_PointerPressed"
+                                                RightTapped="GroupedListHeader_RightTapped"
+                                                Visibility="{Binding HeaderRowVisibility}">
+                                                <controls:EntryGroupHeader
+                                                    ContentPadding="12,0,6,0"
+                                                    CountText="{Binding GroupCountText}"
+                                                    HeaderOpacity="0.72"
+                                                    HeaderText="{Binding GroupHeaderText}"
+                                                    Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
+                                                    ShowExpandGlyph="False" />
+                                            </Border>
+                                            <controls:EntryItemHost
+                                                Style="{StaticResource GroupedEntryItemHostStyle}"
+                                                MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
+                                                IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
+                                                IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
+                                                PointerPressed="EntryRow_PointerPressed"
+                                                SelectedBackground="{Binding RowBackground}"
+                                                SelectedPointerOverBackground="{Binding RowBackground}"
+                                                SelectedPressedBackground="{Binding RowBackground}"
+                                                Visibility="{Binding ListRowVisibility}">
+                                                <controls:EntryNameCell
+                                                    ContentMargin="12,0,0,0"
+                                                    Entry="{Binding}"
+                                                    Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}" />
+                                            </controls:EntryItemHost>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                        </ScrollViewer>
+
+                        <Grid Grid.Row="1" Visibility="Collapsed">
+                            <Grid.Resources>
+                                <Style BasedOn="{StaticResource ContextMenuFlyoutItemStyle}" TargetType="MenuFlyoutItem" />
+                                <Style BasedOn="{StaticResource ContextMenuFlyoutSubItemStyle}" TargetType="MenuFlyoutSubItem" />
+                                <Style x:Key="ContextMenuNoIconItemStyle" BasedOn="{StaticResource ContextMenuFlyoutItemStyle}" TargetType="MenuFlyoutItem">
+                                    <Setter Property="Padding" Value="0,0,24,0" />
+                                </Style>
+                                <controls:CommandMenuFlyout
+                                    x:Name="FileEntriesContextFlyout"
+                                    MenuFlyoutPresenterStyle="{StaticResource CommandMenuFlyoutPresenterStyle}"
+                                    Opening="StaticEntriesContextFlyout_Opening"
+                                    Closed="StaticEntriesContextFlyout_Closed">
+                                    <controls:CommandMenuFlyout.Commands>
+                                        <controls:CommandMenuFlyoutItem CommandId="cut" Label="{Binding Source={StaticResource Strings}, Path=[CommonCut]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C6;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem CommandId="copy" Label="{Binding Source={StaticResource Strings}, Path=[CommonCopy]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem CommandId="rename" Label="{Binding Source={StaticResource Strings}, Path=[CommonRename]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8AC;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem CommandId="delete" Label="{Binding Source={StaticResource Strings}, Path=[CommonDelete]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                    </controls:CommandMenuFlyout.Commands>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpen]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8E5;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open-with" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpenWith]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7AC;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open-target" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpenTarget]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE838;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="run-as-administrator" Text="{Binding Source={StaticResource Strings}, Path=[CommonRunAsAdministrator]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7EF;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="share" Text="{Binding Source={StaticResource Strings}, Path=[CommonShare]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72D;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutSubItem x:Name="FileArchiveActionsSubMenu" Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonArchiveActions]}">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7B8;" /></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem x:Name="FileExtractSmartMenuItem" Click="EntriesContextMenuItem_Click" Tag="extract-smart" Text="{Binding Source={StaticResource Strings}, Path=[CommonExtractSmart]}" />
+                                        <MenuFlyoutItem x:Name="FileExtractHereMenuItem" Click="EntriesContextMenuItem_Click" Tag="extract-here" Text="{Binding Source={StaticResource Strings}, Path=[CommonExtractHere]}" />
+                                        <MenuFlyoutItem x:Name="FileExtractToFolderMenuItem" Click="EntriesContextMenuItem_Click" Tag="extract-to-folder" Text="" />
+                                        <MenuFlyoutSeparator x:Name="FileArchiveExtractSeparator" />
+                                        <MenuFlyoutItem x:Name="FileCompressZipMenuItem" Click="EntriesContextMenuItem_Click" Tag="compress-zip" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompressZipAction]}" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="create-shortcut" Text="{Binding Source={StaticResource Strings}, Path=[CommonCreateShortcut]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE71B;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="copy-path" Text="{Binding Source={StaticResource Strings}, Path=[CommonCopyFilePath]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="{Binding Source={StaticResource Strings}, Path=[CommonSetTag]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8EC;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="properties" Text="{Binding Source={StaticResource Strings}, Path=[CommonProperties]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                </controls:CommandMenuFlyout>
+
+                                <controls:CommandMenuFlyout
+                                    x:Name="FolderEntriesContextFlyout"
+                                    MenuFlyoutPresenterStyle="{StaticResource CommandMenuFlyoutPresenterStyle}"
+                                    Opening="StaticEntriesContextFlyout_Opening"
+                                    Closed="StaticEntriesContextFlyout_Closed">
+                                    <controls:CommandMenuFlyout.Commands>
+                                        <controls:CommandMenuFlyoutItem CommandId="cut" Label="{Binding Source={StaticResource Strings}, Path=[CommonCut]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C6;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem CommandId="copy" Label="{Binding Source={StaticResource Strings}, Path=[CommonCopy]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem CommandId="paste" Label="{Binding Source={StaticResource Strings}, Path=[CommonPaste]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE77F;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem CommandId="rename" Label="{Binding Source={StaticResource Strings}, Path=[CommonRename]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8AC;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem CommandId="delete" Label="{Binding Source={StaticResource Strings}, Path=[CommonDelete]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                    </controls:CommandMenuFlyout.Commands>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpen]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8E5;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open-in-new-window" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpenInNewWindow]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8A7;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="pin-to-sidebar" Text="{Binding Source={StaticResource Strings}, Path=[CommonPinToSidebar]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE718;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="share" Text="{Binding Source={StaticResource Strings}, Path=[CommonShare]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72D;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="create-shortcut" Text="{Binding Source={StaticResource Strings}, Path=[CommonCreateShortcut]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE71B;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutSubItem Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompress]}">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7B8;" /></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="compress-zip" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompressZip]}" />
+                                        <MenuFlyoutItem IsEnabled="False" Text="{Binding Source={StaticResource Strings}, Path=[CommonCompress7z]}" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="copy-path" Text="{Binding Source={StaticResource Strings}, Path=[CommonCopyFolderPath]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open-in-terminal" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpenInTerminal]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE756;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem IsEnabled="False" Text="{Binding Source={StaticResource Strings}, Path=[CommonSetTag]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8EC;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="properties" Text="{Binding Source={StaticResource Strings}, Path=[CommonProperties]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                </controls:CommandMenuFlyout>
+
+                                <controls:CommandMenuFlyout
+                                    x:Name="BackgroundEntriesContextFlyout"
+                                    MenuFlyoutPresenterStyle="{StaticResource CommandMenuFlyoutPresenterStyle}"
+                                    Opening="StaticEntriesContextFlyout_Opening"
+                                    Closed="StaticEntriesContextFlyout_Closed">
+                                    <controls:CommandMenuFlyout.Commands>
+                                        <controls:CommandMenuFlyoutItem CommandId="paste" Label="{Binding Source={StaticResource Strings}, Path=[CommonPaste]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE77F;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                        <controls:CommandMenuFlyoutItem CommandId="refresh" Label="{Binding Source={StaticResource Strings}, Path=[CommonRefresh]}"><controls:CommandMenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" /></controls:CommandMenuFlyoutItem.Icon></controls:CommandMenuFlyoutItem>
+                                    </controls:CommandMenuFlyout.Commands>
+                                    <MenuFlyoutSubItem Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonView]}">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE890;" /></MenuFlyoutSubItem.Icon>
+                                        <ToggleMenuFlyoutItem x:Name="ViewDetailsMenuItem" Click="ViewDetailsMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonViewDetails]}" />
+                                        <ToggleMenuFlyoutItem x:Name="ViewListMenuItem" Click="ViewListMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonViewList]}" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonSortBy]}">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8CB;" /></MenuFlyoutSubItem.Icon>
+                                        <ToggleMenuFlyoutItem x:Name="SortByNameMenuItem" Click="SortByNameMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonSortByName]}" />
+                                        <ToggleMenuFlyoutItem x:Name="SortByTypeMenuItem" Click="SortByTypeMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonSortByType]}" />
+                                        <ToggleMenuFlyoutItem x:Name="SortBySizeMenuItem" Click="SortBySizeMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonSortBySize]}" />
+                                        <ToggleMenuFlyoutItem x:Name="SortByModifiedDateMenuItem" Click="SortByModifiedDateMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonSortByModifiedDate]}" />
+                                        <MenuFlyoutSeparator />
+                                        <ToggleMenuFlyoutItem x:Name="SortAscendingMenuItem" Click="SortAscendingMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonSortAscending]}" />
+                                        <ToggleMenuFlyoutItem x:Name="SortDescendingMenuItem" Click="SortDescendingMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonSortDescending]}" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonGroupBy]}">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE902;" /></MenuFlyoutSubItem.Icon>
+                                        <ToggleMenuFlyoutItem x:Name="GroupByNoneMenuItem" Click="GroupByNoneMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonGroupByNone]}" />
+                                        <ToggleMenuFlyoutItem x:Name="GroupByNameMenuItem" Click="GroupByNameMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonGroupByName]}" />
+                                        <ToggleMenuFlyoutItem x:Name="GroupByTypeMenuItem" Click="GroupByTypeMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonGroupByType]}" />
+                                        <ToggleMenuFlyoutItem x:Name="GroupByModifiedDateMenuItem" Click="GroupByModifiedDateMenuItem_Click" Text="{Binding Source={StaticResource Strings}, Path=[CommonGroupByModifiedDate]}" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Style="{StaticResource ContextMenuFlyoutSubItemStyle}" Text="{Binding Source={StaticResource Strings}, Path=[CommonNew]}">
+                                        <MenuFlyoutSubItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE710;" /></MenuFlyoutSubItem.Icon>
+                                        <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="new-file" Text="{Binding Source={StaticResource Strings}, Path=[CommonNewFile]}" />
+                                        <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="new-folder" Text="{Binding Source={StaticResource Strings}, Path=[CommonNewFolder]}" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="open-in-terminal" Text="{Binding Source={StaticResource Strings}, Path=[CommonOpenInTerminal]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE756;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                    <MenuFlyoutItem Click="EntriesContextMenuItem_Click" Tag="properties" Text="{Binding Source={StaticResource Strings}, Path=[CommonProperties]}"><MenuFlyoutItem.Icon><FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                </controls:CommandMenuFlyout>
+                            </Grid.Resources>
+                        </Grid>
+
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            x:Name="CommandDockPanel"
+                            Style="{StaticResource CommandDockPanelStyle}"
+                            PointerExited="CommandDockPanel_PointerExited"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="8">
+                                <TextBlock x:Name="CommandDockTitleTextBlock" x:Uid="CommandDockTitleTextBlock" FontWeight="SemiBold" />
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                    <Button x:Name="RenameButton" x:Uid="RenameButton" Grid.Column="0" Click="RenameButton_Click" />
+                                    <Button x:Name="DeleteButton" x:Uid="DeleteButton" Grid.Column="1" Click="DeleteButton_Click" />
+                                    <Button x:Name="NextButton" x:Uid="NextButton" Grid.Column="2" Click="NextButton_Click" />
+                                </Grid>
+                                <TextBox x:Name="RenameTextBox" x:Uid="RenameTextBox" />
+                                <CheckBox x:Name="RecursiveDeleteCheckBox" x:Uid="RecursiveDeleteCheckBox" />
+
+                                <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+                                    <RadioButton
+                                        x:Name="DockTopRadioButton"
+                                        x:Uid="DockTopRadioButton"
+                                        GroupName="DockSide"
+                                        Tag="Top"
+                                        Checked="DockRadio_Checked"
+                                        IsChecked="True" />
+                                    <RadioButton
+                                        x:Name="DockRightRadioButton"
+                                        x:Uid="DockRightRadioButton"
+                                        Grid.Column="1"
+                                        GroupName="DockSide"
+                                        Tag="Right"
+                                        Checked="DockRadio_Checked" />
+                                    <RadioButton
+                                        x:Name="DockBottomRadioButton"
+                                        x:Uid="DockBottomRadioButton"
+                                        Grid.Column="2"
+                                        GroupName="DockSide"
+                                        Tag="Bottom"
+                                        Checked="DockRadio_Checked" />
+                                    <ToggleSwitch
+                                        x:Name="CommandAutoHideSwitch"
+                                        x:Uid="CommandAutoHideSwitch"
+                                        Grid.Column="3"
+                                        HorizontalAlignment="Right"
+                                        Toggled="CommandAutoHideSwitch_Toggled" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <TeachingTip
+                            x:Name="RenameInputTeachingTip"
+                            IsLightDismissEnabled="False"
+                            IsOpen="False"
+                            PlacementMargin="8"
+                            PreferredPlacement="Top" />
+
+                        <Button
+                            x:Name="CommandPeekButton"
+                            x:Uid="CommandPeekButton"
+                            Style="{StaticResource CommandPeekButtonStyle}"
+                            Click="CommandPeekButton_Click"
+                            Visibility="Collapsed" />
+                    </Grid>
+                </Grid>
+
+                    <Grid
+                        x:Name="ExplorerPaneActionRailHost"
+                        Grid.Column="1"
+                        Visibility="{x:Bind ExplorerPaneActionRailVisibility, Mode=OneWay}">
+                        <local:ColumnSplitter
+                            x:Name="ExplorerPaneLeftSplitter"
+                            AutomationProperties.AutomationId="ExplorerPaneLeftSplitter"
+                            AutomationProperties.Name="调整主面板宽度"
+                            Width="{x:Bind ShellSplitterWidth, Mode=OneWay}"
+                            Margin="-4,0,0,0"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Stretch"
+                            GuideBrush="{ThemeResource SidebarGroupSeparatorBrush}"
+                            ShowGuide="False"
+                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                            PointerExited="ColumnSplitterHover_PointerExited"
+                            PointerPressed="PaneSplitter_PointerPressed"
+                            PointerMoved="PaneSplitter_PointerMoved"
+                            PointerReleased="PaneSplitter_PointerReleased"
+                            PointerCanceled="PaneSplitter_PointerReleased"
+                            PointerCaptureLost="PaneSplitter_PointerReleased" />
+                        <local:ColumnSplitter
+                            x:Name="ExplorerPaneRightSplitter"
+                            AutomationProperties.AutomationId="ExplorerPaneRightSplitter"
+                            AutomationProperties.Name="调整次面板宽度"
+                            Width="{x:Bind ShellSplitterWidth, Mode=OneWay}"
+                            Margin="0,0,-4,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Stretch"
+                            GuideBrush="{ThemeResource SidebarGroupSeparatorBrush}"
+                            ShowGuide="False"
+                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                            PointerExited="ColumnSplitterHover_PointerExited"
+                            PointerPressed="PaneSplitter_PointerPressed"
+                            PointerMoved="PaneSplitter_PointerMoved"
+                            PointerReleased="PaneSplitter_PointerReleased"
+                            PointerCanceled="PaneSplitter_PointerReleased"
+                            PointerCaptureLost="PaneSplitter_PointerReleased" />
+                        <StackPanel
+                            x:Name="ExplorerPaneActionButtonsHost"
+                            Orientation="Vertical"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <Button
+                                x:Name="CopySelectedPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopySelectedPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制左侧选中项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B5;" />
+                            </Button>
+                            <Button
+                                x:Name="CopyAllPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopyAllPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制左侧全部项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B6;" />
+                            </Button>
+                            <Button
+                                x:Name="MoveSelectedPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveSelectedPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动左侧选中项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xEDE1;" />
+                            </Button>
+                            <Button
+                                x:Name="MoveAllPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveAllPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动左侧全部项到右侧" />
+                                </ToolTipService.ToolTip>
+                                <controls:ExportAllIcon />
+                            </Button>
+                            <Button
+                                x:Name="SyncPrimaryPaneToSecondaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SyncPrimaryPaneToSecondaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="左侧同步到右侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE72A;" />
+                            </Button>
+                            <Button
+                                x:Name="SwapExplorerPanesButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SwapExplorerPanesButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="交换左右面板" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8AB;" />
+                            </Button>
+                            <Button
+                                x:Name="SyncSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="SyncSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="右侧同步到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE72B;" />
+                            </Button>
+                            <Button
+                                x:Name="CopySelectedSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopySelectedSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制右侧选中项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B5;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="CopyAllSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="CopyAllSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="复制右侧全部项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xE8B6;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="MoveSelectedSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveSelectedSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动右侧选中项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <FontIcon
+                                    FontFamily="Segoe Fluent Icons"
+                                    FontSize="{x:Bind ShellGlyphSize, Mode=OneWay}"
+                                    Glyph="&#xEDE1;"
+                                    RenderTransformOrigin="0.5,0.5">
+                                    <FontIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </FontIcon.RenderTransform>
+                                </FontIcon>
+                            </Button>
+                            <Button
+                                x:Name="MoveAllSecondaryPaneToPrimaryButton"
+                                Width="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Height="{x:Bind ShellControlSize, Mode=OneWay}"
+                                Padding="0"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Click="MoveAllSecondaryPaneToPrimaryButton_Click">
+                                <ToolTipService.ToolTip>
+                                    <ToolTip Content="移动右侧全部项到左侧" />
+                                </ToolTipService.ToolTip>
+                                <controls:ExportAllIcon RenderTransformOrigin="0.5,0.5">
+                                    <controls:ExportAllIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="-1" />
+                                    </controls:ExportAllIcon.RenderTransform>
+                                </controls:ExportAllIcon>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid
+                        x:Name="SecondaryPaneHost"
+                        Grid.Column="2"
+                        PointerPressed="SecondaryPaneSurface_PointerPressed"
+                        Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}">
+                        <Grid x:Name="SecondaryPaneShadowReceiverGrid" />
+                        <Border
+                            x:Name="SecondaryPaneBodyBorder"
+                            Background="{x:Bind SecondaryPaneBodyBackground, Mode=OneWay}"
+                            BorderBrush="{x:Bind SecondaryPaneBodyBorderBrush, Mode=OneWay}"
+                            BorderThickness="{x:Bind SecondaryPaneBodyBorderThickness, Mode=OneWay}"
+                            CornerRadius="{ThemeResource OverlayCornerRadius}"
+                            Loaded="SecondaryPaneBodyBorder_Loaded"
+                            Translation="{x:Bind SecondaryPaneBodyTranslation, Mode=OneWay}">
+                            <Border.Shadow>
+                                <ThemeShadow x:Name="SecondaryPaneBodyThemeShadow" />
+                            </Border.Shadow>
+                            <Grid RowDefinitions="Auto,*">
+                                <Border
+                                    x:Name="SecondaryDetailsHeaderBorder"
+                                    Width="{x:Bind SecondaryDetailsRowWidth, Mode=OneWay}"
+                                    Margin="10,0,0,4"
+                                    Padding="0"
+                                    HorizontalAlignment="Left"
+                                    Background="Transparent"
+                                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Visibility="{x:Bind SecondaryDetailsHeaderVisibility, Mode=OneWay}">
+                                    <Grid x:Name="SecondaryDetailsHeaderGrid" Height="28" Margin="0" HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryNameColumnWidth}" MinWidth="120" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryTypeColumnWidth}" MinWidth="90" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondarySizeColumnWidth}" MinWidth="80" />
+                                            <ColumnDefinition Width="6" />
+                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryModifiedColumnWidth}" MinWidth="120" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border
+                                            x:Name="SecondaryNameHeaderBorder"
+                                            Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                            PointerEntered="SecondaryDetailsHeader_PointerEntered"
+                                            PointerExited="SecondaryDetailsHeader_PointerExited"
+                                            PointerPressed="SecondaryDetailsHeader_PointerPressed"
+                                            Tag="Name">
+                                            <Grid Margin="{Binding ElementName=RootWindow, Path=NameHeaderMargin}" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    x:Name="SecondaryNameHeaderTextBlock"
+                                                    Style="{StaticResource DetailsHeaderTextStyle}" />
+                                                <TextBlock
+                                                    x:Name="SecondaryNameHeaderSortGlyphTextBlock"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border
+                                            x:Name="SecondaryTypeHeaderBorder"
+                                            Grid.Column="2"
+                                            Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                            PointerEntered="SecondaryDetailsHeader_PointerEntered"
+                                            PointerExited="SecondaryDetailsHeader_PointerExited"
+                                            PointerPressed="SecondaryDetailsHeader_PointerPressed"
+                                            Tag="Type">
+                                            <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    x:Name="SecondaryTypeHeaderTextBlock"
+                                                    Style="{StaticResource DetailsHeaderTextStyle}" />
+                                                <TextBlock
+                                                    x:Name="SecondaryTypeHeaderSortGlyphTextBlock"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border
+                                            x:Name="SecondarySizeHeaderBorder"
+                                            Grid.Column="4"
+                                            Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                            PointerEntered="SecondaryDetailsHeader_PointerEntered"
+                                            PointerExited="SecondaryDetailsHeader_PointerExited"
+                                            PointerPressed="SecondaryDetailsHeader_PointerPressed"
+                                            Tag="Size">
+                                            <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    x:Name="SecondarySizeHeaderTextBlock"
+                                                    Style="{StaticResource DetailsHeaderTextStyle}" />
+                                                <TextBlock
+                                                    x:Name="SecondarySizeHeaderSortGlyphTextBlock"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <Border
+                                            x:Name="SecondaryModifiedHeaderBorder"
+                                            Grid.Column="6"
+                                            Margin="0,0,6,0"
+                                            Style="{StaticResource DetailsHeaderHitTargetStyle}"
+                                            PointerEntered="SecondaryDetailsHeader_PointerEntered"
+                                            PointerExited="SecondaryDetailsHeader_PointerExited"
+                                            PointerPressed="SecondaryDetailsHeader_PointerPressed"
+                                            Tag="ModifiedDate">
+                                            <Grid Margin="14,0,0,0" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock
+                                                    x:Name="SecondaryModifiedHeaderTextBlock"
+                                                    Style="{StaticResource DetailsHeaderTextStyle}" />
+                                                <TextBlock
+                                                    x:Name="SecondaryModifiedHeaderSortGlyphTextBlock"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource DetailsHeaderSortGlyphStyle}" />
+                                            </Grid>
+                                        </Border>
+                                        <local:ColumnSplitter
+                                            x:Name="SecondaryHeaderSplitter1"
+                                            Grid.Column="1"
+                                            GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                            Tag="S1"
+                                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                                            PointerExited="ColumnSplitterHover_PointerExited" />
+                                        <local:ColumnSplitter
+                                            x:Name="SecondaryHeaderSplitter2"
+                                            Grid.Column="3"
+                                            GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                            Tag="S2"
+                                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                                            PointerExited="ColumnSplitterHover_PointerExited" />
+                                        <local:ColumnSplitter
+                                            x:Name="SecondaryHeaderSplitter3"
+                                            Grid.Column="5"
+                                            GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                            Tag="S3"
+                                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                                            PointerExited="ColumnSplitterHover_PointerExited" />
+                                        <local:ColumnSplitter
+                                            x:Name="SecondaryHeaderSplitter4"
+                                            Grid.ColumnSpan="7"
+                                            HorizontalAlignment="Right"
+                                            GuideBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                            Tag="S4"
+                                            PointerEntered="ColumnSplitterHover_PointerEntered"
+                                            PointerExited="ColumnSplitterHover_PointerExited" />
+                                    </Grid>
+                                </Border>
+
+                                <ScrollViewer
+                                    x:Name="SecondaryEntriesScrollViewer"
+                                    Grid.Row="1"
+                                    Style="{StaticResource EntryListScrollViewerStyle}"
+                                    HorizontalScrollBarVisibility="Auto"
+                                    HorizontalScrollMode="Enabled"
+                                    VerticalScrollBarVisibility="Visible"
+                                    VerticalScrollMode="Enabled"
+                                    DoubleTapped="SecondaryEntriesView_DoubleTapped"
+                                    PointerPressed="SecondaryPaneSurface_PointerPressed"
+                                    RightTapped="SecondaryEntriesView_RightTapped"
+                                    Visibility="{x:Bind SecondaryPaneItemsVisibility, Mode=OneWay}">
+                                    <ItemsRepeater
+                                        x:Name="SecondaryEntriesRepeater"
+                                        ItemsSource="{x:Bind SecondaryPaneEntries, Mode=OneWay}">
+                                        <ItemsRepeater.ItemTemplate>
+                                            <DataTemplate>
+                                                <controls:EntryItemHost
+                                                    Style="{StaticResource DetailsEntryItemHostStyle}"
+                                                    Width="{Binding ElementName=RootWindow, Path=SecondaryDetailsRowWidth}"
+                                                    MinHeight="{Binding ElementName=RootWindow, Path=EntryItemMetrics.RowHeight}"
+                                                    IsSelected="{Binding IsExplicitlySelected, Mode=OneWay}"
+                                                    IsAnchorFocused="{Binding IsKeyboardAnchor, Mode=OneWay}"
+                                                    PointerPressed="SecondaryEntryRow_PointerPressed"
+                                                    RightTapped="SecondaryEntryRow_RightTapped"
+                                                    SelectedBackground="{Binding RowBackground}"
+                                                    SelectedPointerOverBackground="{Binding RowBackground}"
+                                                    SelectedPressedBackground="{Binding RowBackground}"
+                                                    Loaded="SecondaryEntryRow_Loaded">
+                                                    <Grid
+                                                        Margin="6,0,0,0"
+                                                        HorizontalAlignment="Stretch"
+                                                        Loaded="SecondaryDetailsRowGrid_Loaded">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryNameColumnWidth}" MinWidth="120" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryTypeColumnWidth}" MinWidth="90" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondarySizeColumnWidth}" MinWidth="80" />
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="{Binding ElementName=RootWindow, Path=SecondaryModifiedColumnWidth}" MinWidth="120" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <controls:EntryNameCell
+                                                            Grid.Column="0"
+                                                            ContentMargin="{Binding ElementName=RootWindow, Path=DetailsNameCellMargin}"
+                                                            Entry="{Binding}"
+                                                            Metrics="{Binding ElementName=RootWindow, Path=EntryItemMetrics}"
+                                                            VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding Type}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="4" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding SizeText}" />
+                                                        <TextBlock Grid.Column="6" Style="{StaticResource DetailsCellTextStyle}" Text="{Binding ModifiedText}" />
+                                                    </Grid>
+                                                </controls:EntryItemHost>
+                                            </DataTemplate>
+                                        </ItemsRepeater.ItemTemplate>
+                                    </ItemsRepeater>
+                                </ScrollViewer>
+
+                                <TextBlock
+                                    Grid.RowSpan="2"
+                                    HorizontalAlignment="Center"
+                                    Foreground="{ThemeResource InactivePaneForegroundBrush}"
+                                    VerticalAlignment="Center"
+                                    Opacity="0.72"
+                                    Visibility="{x:Bind SecondaryPanePlaceholderVisibility, Mode=OneWay}"
+                                    Text="{x:Bind SecondaryPanePlaceholderText, Mode=OneWay}" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <Canvas
+                        x:Name="RenameOverlayCanvas"
+                        Grid.ColumnSpan="3"
+                        Margin="0,8,0,0"
+                        IsHitTestVisible="True">
+                        <Border
+                            x:Name="RenameOverlayBorder"
+                            Style="{StaticResource RenameOverlayBorderStyle}"
+                            Visibility="Collapsed">
+                            <TextBox
+                                x:Name="RenameOverlayTextBox"
+                                BeforeTextChanging="RenameOverlayTextBox_BeforeTextChanging"
+                                KeyDown="RenameOverlayTextBox_KeyDown"
+                                LostFocus="RenameOverlayTextBox_LostFocus"
+                                TextChanging="RenameOverlayTextBox_TextChanging"
+                                Style="{StaticResource RenameOverlayTextBoxStyle}" />
+                        </Border>
+                    </Canvas>
+                </Grid>
+
+                <Grid Grid.Row="1" Height="{x:Bind ShellStatusBarHeight, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="PrimaryStatusPaneColumn" Width="{x:Bind ExplorerPanePrimaryColumnWidth, Mode=OneWay}" />
+                        <ColumnDefinition x:Name="ExplorerPaneActionRailStatusColumn" Width="{x:Bind ExplorerPaneActionRailColumnWidth, Mode=OneWay}" />
+                        <ColumnDefinition x:Name="SecondaryStatusPaneColumn" Width="{x:Bind ExplorerPaneSecondaryColumnWidth, Mode=OneWay}" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock
+                        x:Name="PrimaryStatusTextBlock"
+                        Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
+                        Style="{StaticResource PaneStatusTextStyle}"
+                        Text="{x:Bind PrimaryPaneStatusText, Mode=OneWay}"
+                        />
+                    <TextBlock
+                        x:Name="SecondaryStatusTextBlock"
+                        Grid.Column="2"
+                        Margin="{x:Bind ShellStatusTextMargin, Mode=OneWay}"
+                        Style="{StaticResource PaneStatusTextStyle}"
+                        Text="{x:Bind SecondaryPaneStatusText, Mode=OneWay}"
+                        Visibility="{x:Bind ExplorerSecondaryPaneVisibility, Mode=OneWay}" />
+                </Grid>
+        </Grid>
+        </Grid>
+
+        <!-- Settings shell uses its own drag region and overlays the explorer shell below. -->
+        <Grid
+            x:Name="SettingsTitleBarDragRegion"
+            Grid.ColumnSpan="2"
+            Height="{x:Bind ShellTitleBarHeight, Mode=OneWay}"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Top"
+            Background="Transparent"
+            Loaded="TitleBarDragRegion_Loaded"
+            SizeChanged="TitleBarDragRegion_SizeChanged"
+            Visibility="{x:Bind SettingsShellVisibility, Mode=OneWay}" />
+
+        <StackPanel Grid.RowSpan="3" Grid.ColumnSpan="2" Visibility="Collapsed">
+            <TextBlock
+                x:Name="TitleBarPrimaryBrushProbe"
+                Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+            <TextBlock
+                x:Name="TitleBarSecondaryBrushProbe"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock
+                x:Name="DetailsHeaderSecondaryBrushProbe"
+                Foreground="{ThemeResource DetailsHeaderSecondaryForegroundBrush}" />
+            <TextBlock
+                x:Name="ActivePaneForegroundBrushProbe"
+                Foreground="{ThemeResource ActivePaneForegroundBrush}" />
+            <TextBlock
+                x:Name="InactivePaneForegroundBrushProbe"
+                Foreground="{ThemeResource InactivePaneForegroundBrush}" />
+            <Border
+                x:Name="ActiveTabBackgroundBrushProbe"
+                Background="{ThemeResource TitleBarActiveTabPillBackgroundBrush}" />
+            <Border
+                x:Name="ActivePaneToolbarBrushProbe"
+                Background="{ThemeResource ActivePaneSurfaceBackgroundBrush}"
+                BorderBrush="{ThemeResource ActivePaneBorderBrush}" />
+            <Border
+                x:Name="InactivePaneToolbarBrushProbe"
+                Background="{ThemeResource InactivePaneSurfaceBackgroundBrush}"
+                BorderBrush="{ThemeResource InactivePaneBorderBrush}" />
+            <Border
+                x:Name="ActivePaneBodyBrushProbe"
+                Background="{ThemeResource ActivePaneSurfaceBackgroundBrush}"
+                BorderBrush="{ThemeResource ActivePaneBorderBrush}" />
+            <Border
+                x:Name="InactivePaneBodyBrushProbe"
+                Background="{ThemeResource InactivePaneSurfaceBackgroundBrush}"
+                BorderBrush="{ThemeResource InactivePaneBorderBrush}" />
+            <Border
+                x:Name="ActivePaneInputBrushProbe"
+                Background="{ThemeResource ActivePaneInputBackgroundBrush}"
+                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" />
+            <Border
+                x:Name="InactivePaneInputBrushProbe"
+                Background="{ThemeResource InactivePaneInputBackgroundBrush}"
+                BorderBrush="{ThemeResource AddressSearchChromeBorderBrush}" />
+            <Button
+                x:Name="NewFileButton"
+                Click="NewFileButton_Click" />
+            <Button
+                x:Name="NewFolderButton"
+                Click="NewFolderButton_Click" />
+            <Button
+                x:Name="CopyButton"
+                Click="CopyButton_Click" />
+            <Button
+                x:Name="CutButton"
+                Click="CutButton_Click" />
+            <Button
+                x:Name="PasteButton"
+                Click="PasteButton_Click" />
+        </StackPanel>
+
+        <!-- Sidebar splitter sits on the content column edge so the guide overlays cleanly. -->
+        <local:ColumnSplitter
+            x:Name="SidebarSplitter"
+            Grid.Row="2"
+            Grid.Column="1"
+            Width="{x:Bind ShellSplitterWidth, Mode=OneWay}"
+            Margin="-4,0,0,0"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Stretch"
+            ShowGuide="False"
+            Visibility="{x:Bind ExplorerShellVisibility, Mode=OneWay}"
+            PointerEntered="ColumnSplitterHover_PointerEntered"
+            PointerExited="ColumnSplitterHover_PointerExited" />
+
+        <!-- Settings shell overlays both columns and replaces the explorer workspace. -->
+        <NavigationView
+            x:Name="SettingsNavigationView"
+            Grid.Row="1"
+            Grid.RowSpan="2"
+            Grid.ColumnSpan="2"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
+            IsSettingsVisible="False"
+            AlwaysShowHeader="False"
+            CompactPaneLength="{x:Bind SettingsNavigationCompactPaneLength, Mode=OneWay}"
+            OpenPaneLength="{x:Bind SettingsNavigationOpenPaneLength, Mode=OneWay}"
+            PaneDisplayMode="Left"
+            SelectionChanged="SettingsNavigationView_SelectionChanged"
+            Visibility="{x:Bind SettingsShellVisibility, Mode=OneWay}">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsNavBack]}" Tag="Back">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72B;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionGeneral]}" Tag="General">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionAppearance]}" Tag="Appearance">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE790;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionFilesAndFolders]}" Tag="FilesAndFolders">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B7;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionShortcuts]}" Tag="Shortcuts">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE765;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionTags]}" Tag="Tags">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8EC;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionAdvanced]}" Tag="Advanced">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9CE;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="{Binding Source={StaticResource Strings}, Path=[SettingsSectionAbout]}" Tag="About">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <Border
+                x:Name="SettingsContentHostBorder"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderThickness="0"
+                CornerRadius="{ThemeResource OverlayCornerRadius}">
+                <controls:SettingsView x:Name="SettingsViewControl" />
+            </Border>
+        </NavigationView>
+    </Grid>
+</Window>

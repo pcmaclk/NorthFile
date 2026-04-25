@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="NorthFileUI.Controls.ExportAllIcon"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Width="32" Height="32">
+        <!-- Keep the positioning frame separate from the glyphs so the frame does not clip icon rendering. -->
+        <Grid
+            Width="22"
+            Height="18"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center">
+            <Border
+                Width="20"
+                Height="9"
+                Margin="4,0,0,0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                BorderBrush="{ThemeResource TextFillColorPrimaryBrush}"
+                BorderThickness="1,0,0,0"
+                IsHitTestVisible="False"
+                CornerRadius="1"
+                Opacity="0.8" />
+            <FontIcon
+                Margin="5,0,0,0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                FontFamily="Segoe Fluent Icons"
+                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                FontSize="8.5"
+                Glyph="&#xF0AF;"
+                Opacity="0.8" />
+            <FontIcon
+                Margin="8,0,0,1"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                FontFamily="Segoe Fluent Icons"
+                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                FontSize="11.5"
+                Glyph="&#xE974;"
+                Opacity="0.8" />
+        </Grid>
+    </Grid>
+</UserControl>

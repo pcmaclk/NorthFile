@@ -13,7 +13,7 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') {
 $root = Split-Path -Parent $PSScriptRoot
 $versionFile = Join-Path $root "VERSION"
 $cargoToml = Join-Path $root "rust_engine\Cargo.toml"
-$csproj = Join-Path $root "FileExplorerUI\FileExplorerUI.csproj"
+$csproj = Join-Path $root "NorthFileUI\NorthFileUI.csproj"
 
 Set-Content -Path $versionFile -Value $Version -Encoding utf8NoBOM
 

@@ -26,8 +26,8 @@ artifacts/
 *.pdb
 
 # Local native copy for UI runtime
-FileExplorerUI/rust_engine.dll
-FileExplorerUI/build_diag.txt
+NorthFileUI/rust_engine.dll
+NorthFileUI/build_diag.txt
 docs/
 # Added by code-review-graph
 .code-review-graph/
