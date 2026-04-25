@@ -18,7 +18,7 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="IndicatorBrush" Value="{ThemeResource TreeViewItemSelectionIndicatorForeground}" />
         <Setter Property="AnchorBorderBrush" Value="{ThemeResource TreeViewItemSelectionIndicatorForeground}" />
-        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
     </Style>
 
     <Style x:Key="GroupedEntryItemHostStyle" TargetType="controls:EntryItemHost" BasedOn="{StaticResource DetailsEntryItemHostStyle}">
